@@ -1,0 +1,23 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+
+# Miscellaneous Files
+nohup.out
+archive/
+
+# Mac specific DS Store
+.DS_Store
+
+# VSCode Temp Files
+.vscode/
+
+# Credentials
+secret.py
+
+# Generated Log Files
+*.log
+*.log.*
+
+# Customized Images
+resources/images/Gameday-*.jpg
+resources/images/GamedayFinal-*.jpg
