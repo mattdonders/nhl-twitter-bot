@@ -338,10 +338,10 @@ def recent_event(event):
     date_time_obj = datetime.strptime(event_datetime, '%Y-%m-%dT%H:%M:%SZ')
     date_time_local = date_time_obj + localoffset
 
-    seconds_since_event = (now - date_time_local).total_seconds()
-    logging.info("Event #%s (%s) occurred %s second(s) in the past - if greater than 60, skip.",
+    seconds_since_event = int((now - date_time_local).total_seconds())
+    logging.info("Event #%s (%s) occurred %s second(s) in the past - if greater than 120, skip.",
                  event_idx, event_type, seconds_since_event)
-    return bool(seconds_since_event < 60)
+    return bool(seconds_since_event < 120)
 
 
 def show_all_objects():
