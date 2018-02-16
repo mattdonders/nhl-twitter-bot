@@ -1318,7 +1318,11 @@ def parse_end_of_game(json_feed, game):
         stars_tweet = ("The three stars for the game are - \n{}\n\n{}"
                        .format(stars_text, game.game_hashtag))
         if game.finaltweets["stars"] is False:
-            game.finaltweets["stars"] = bool(send_tweet(stars_tweet))
+            if args.notweets:
+                logging.info("%s", stars_tweet)
+            else:
+                send_tweet(stars_tweet)
+                game.finaltweets["stars"] = True
     except KeyError:
         return False
 
