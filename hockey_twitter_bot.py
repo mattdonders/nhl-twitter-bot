@@ -496,6 +496,7 @@ def final_image(game, boxscore_preferred, boxscore_other):
 
     # Setup Text Elements
     preferred_team = game.preferred_team
+    other_team = game.other_team
     preferred_stats = boxscore_preferred["teamStats"]["teamSkaterStats"]
     other_stats = boxscore_other["teamStats"]["teamSkaterStats"]
     preferred_stats_faceoff_percent = float(preferred_stats["faceOffWinPercentage"])
@@ -510,13 +511,25 @@ def final_image(game, boxscore_preferred, boxscore_other):
     text_pref_score = game.preferred_team.score
     text_other_score = game.other_team.score
 
-    pref_record = pref["leagueRecord"]
-    pref_record_str = ("({} - {} - {})".format(pref_record["wins"], pref_record["losses"],
-                                               pref_record["ot"]))
+    # Update records & get new for final image
+    if game.preferred_team.score > game.other_team.score:
+        pref_outcome = "win"
+        other_outcome = "loss" if game.period.current < 4 else "ot"
+    else:
+        other_outcome = "loss"
+        pref_outcome = "loss" if game.period.current < 4 else "ot"
 
-    other_record = other["leagueRecord"]
-    other_record_str = ("({} - {} - {})".format(other_record["wins"], other_record["losses"],
-                                                other_record["ot"]))
+
+    # pref_record = pref["leagueRecord"]
+    # pref_record_str = ("({} - {} - {})".format(pref_record["wins"], pref_record["losses"],
+    #                                            pref_record["ot"]))
+
+    # other_record = other["leagueRecord"]
+    # other_record_str = ("({} - {} - {})".format(other_record["wins"], other_record["losses"],
+    #                                             other_record["ot"]))
+
+    pref_record_str = preferred_team.get_new_record(pref_outcome)
+    other_record_str = other_team.get_new_record(other_outcome)
 
     text_shots = preferred_team.shots
     text_pk = "{} / {}".format(preferred_stats_pk_killed, preferred_stats_pk_against)
@@ -611,6 +624,8 @@ def get_lineup(game, period, on_ice, players):
         players (dict): A dictionary of all players of the preferred team.
     """
 
+    logging.info("On Ice Players - {}".format(on_ice))
+
     forwards = []
     defense = []
     goalies = []
@@ -618,8 +633,7 @@ def get_lineup(game, period, on_ice, players):
     for player in on_ice:
         key_id = "ID{}".format(player)
         player_obj = players[key_id]
-        player_name = player_obj["person"]["fullName"]
-        player_last_name = player_name.split(' ')[1]
+        player_last_name = player_obj["person"]["lastName"]
         player_type = player_obj["position"]["type"]
         if player_type == "Forward":
             forwards.append(player_last_name)
@@ -641,9 +655,15 @@ def get_lineup(game, period, on_ice, players):
     elif period == 4 and game.game_type in ("PR", "R"):
         all_players = forwards + defense
         tweet_players = "-".join(all_players)
-        tweet_text = ("On the ice to start overtime for your {} are:\n\n{} & {}\n\n{}"
-                      .format(game.preferred_team.team_name, tweet_players,
-                              goalies[0], game.game_hashtag))
+        try:
+            tweet_goalie = goalies[0]
+            tweet_text = ("On the ice to start overtime for your {} are:\n\n{} & {}\n\n{}"
+                        .format(game.preferred_team.team_name, tweet_players,
+                                tweet_goalie, game.game_hashtag))
+        except IndexError:
+            # If for some reason a goalie isn't detected on ice
+            tweet_text = ("On the ice to start overtime for your {} are:\n\n{}\n\n{}"
+                        .format(game.preferred_team.team_name, tweet_players, game.game_hashtag))
         send_tweet(tweet_text)
 
 
@@ -1207,7 +1227,7 @@ def loop_game_events(json_feed, game):
                     time.sleep(intermission_sleep)
 
             elif event_period == 3 and (game.preferred_team.score == game.other_team.score):
-                tweet_text = ("60 minutes wasn't enough to decide this game."
+                tweet_text = ("60 minutes wasn't enough to decide this game. "
                               "{} and {} headed to overtime tied at {}.\n\n{}"
                               .format(game.preferred_team.short_name, game.other_team.short_name,
                                       game.preferred_team.score, game.game_hashtag))
@@ -1453,7 +1473,7 @@ if __name__ == '__main__':
     except KeyError:
         awayteamobj_tv = "N/A"
     away_team_obj = nhl_game_events.Team(awayteamobj_name, awayteamobj_shortname, awayteamobj_tri,
-                                         "away", awayteamobj_tv, awayteamobj_games)
+                                         "away", awayteamobj_tv, awayteamobj_games, awayteam_record)
 
     hometeam_info = game_info["teams"]["home"]["team"]
     hometeam_record = game_info["teams"]["home"]["leagueRecord"]
@@ -1466,7 +1486,7 @@ if __name__ == '__main__':
     except KeyError:
         hometeamobj_tv = "N/A"
     home_team_obj = nhl_game_events.Team(hometeamobj_name, hometeamobj_shortname, hometeamobj_tri,
-                                         "home", hometeamobj_tv, hometeamobj_games)
+                                         "home", hometeamobj_tv, hometeamobj_games, hometeam_record)
 
     # Set Preferred Team
     home_team_obj.preferred = bool(home_team_obj.team_name == TEAM_BOT)

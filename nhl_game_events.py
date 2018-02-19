@@ -128,13 +128,14 @@ class Period(object):
 class Team(object):
     """Holds attributes related to a team - usually two created per game."""
 
-    def __init__(self, team_name, short_name, tri_code, home_away, tv_channel, games):
+    def __init__(self, team_name, short_name, tri_code, home_away, tv_channel, games, record):
         self.team_name = team_name
         self.short_name = short_name
         self.tri_code = tri_code
         self.home_away = home_away
         self.tv_channel = tv_channel
         self.games = games
+        self.record = record
 
         # Not passed in at object creation time
         self.skaters = 5
@@ -144,6 +145,23 @@ class Team(object):
         self._goalie_pulled = False
         self.preferred = False
         self.goals = []
+
+        # Break-up the record into wins, losses, ot
+        self.wins = record["wins"]
+        self.losses = record["losses"]
+        self.ot = record["ot"]
+
+    def get_new_record(self, outcome):
+        """Takes a game outcome and returns the team's udpated record."""
+        if outcome == "win":
+            self.wins += 1
+        elif outcome == "loss":
+            self.losses += 1
+        elif outcome == "ot":
+            self.ot += 1
+
+        new_record = "({} - {} - {})".format(self.wins, self.losses, self.ot)
+        return new_record
 
 
     @property
