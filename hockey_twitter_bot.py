@@ -68,7 +68,10 @@ def setup_logging():
     #pylint: disable=line-too-long
 
     # logger = logging.getLogger(__name__)
-    if args.console:
+    if args.console and args.debug:
+        logging.basicConfig(level=logging.DEBUG, datefmt='%Y-%m-%d %H:%M:%S',
+                            format='%(asctime)s - %(module)s.%(funcName)s - %(levelname)s - %(message)s')
+    elif args.console:
         logging.basicConfig(level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S',
                             format='%(asctime)s - %(module)s.%(funcName)s - %(levelname)s - %(message)s')
     else:
@@ -92,6 +95,8 @@ def parse_arguments():
     parser.add_argument("--notweets", help="log tweets to console instead of Twitter",
                         action="store_true")
     parser.add_argument("--console", help="log to console instead of file",
+                        action="store_true")
+    parser.add_argument("--debug", help="print debug log items",
                         action="store_true")
     parser.add_argument("--team", help="override team in configuration",
                         action="store")
@@ -197,7 +202,7 @@ def send_tweet(tweet_text, reply=None):
             else:
                 print(reply)
                 tweet_text = "@{} {}".format(TWITTER_ID, tweet_text)
-                status = api.update_status(tweet_text, reply)
+                status = api.update_status(tweet_text, in_reply_to_status_id=reply)
         else:
             tweet_array = []
             tweets_needed = math.ceil(tweet_length / 280)
@@ -328,6 +333,9 @@ def recent_event(event):
     Returns:
         bool: True if the event happened within the past minute, False if not.
     """
+    if args.yesterday:
+        return True
+
     event_type = event["result"]["eventTypeId"]
     event_idx = event["about"]["eventIdx"]
     event_datetime = event["about"]["dateTime"]
@@ -633,8 +641,10 @@ def get_lineup(game, period, on_ice, players):
     for player in on_ice:
         key_id = "ID{}".format(player)
         player_obj = players[key_id]
-        player_last_name = player_obj["person"]["lastName"]
-        player_type = player_obj["position"]["type"]
+        logging.debug("Getting information for %s -- %s", key_id, player_obj)
+        # player_last_name = player_obj["person"]["lastName"]
+        player_last_name = player_obj["lastName"]
+        player_type = player_obj["primaryPosition"]["type"]
         if player_type == "Forward":
             forwards.append(player_last_name)
         elif player_type == "Defenseman":
@@ -752,9 +762,27 @@ def parse_penalty(play, game):
                             .format(penalty_playeron, penalty_minutes, penalty_severity,
                                     penalty_type, penalty_period_remain, penalty_period))
 
-    penalty_tweet = "{} {}\n\n{}".format(penalty_text_players, penalty_text_skaters,
-                                         game.game_hashtag)
-    send_tweet(penalty_tweet)
+    # Build power play / penalty kill stats
+    penalty_on_stats = penalty_on_team.get_stat_and_rank("penaltyKillPercentage")
+    penalty_draw_stats = penalty_draw_team.get_stat_and_rank("powerPlayPercentage")
+
+    penalty_on_team_name = penalty_on_team.short_name
+    penalty_on_stat = penalty_on_stats[0]
+    penalty_on_rank = penalty_on_stats[1]
+    penalty_on_rankstat_str = ("{} PK: {}% ({})"
+                              .format(penalty_on_team_name, penalty_on_stat, penalty_on_rank))
+
+    penalty_draw_team_name = penalty_draw_team.short_name
+    penalty_draw_stat = penalty_draw_stats[0]
+    penalty_draw_rank = penalty_draw_stats[1]
+    penalty_draw_rankstat_str = ("{} PP: {}% ({})"
+                                 .format(penalty_draw_team_name, penalty_draw_stat, penalty_draw_rank))
+
+    penalty_tweet = ("{} {}\n\n{}\n{}\n\n{}".format(penalty_text_players, penalty_text_skaters,
+                                                   penalty_on_rankstat_str, penalty_draw_rankstat_str,
+                                                   game.game_hashtag))
+    penalty_tweet_id = send_tweet(penalty_tweet)
+
 
 
 def parse_regular_goal(play, game):
@@ -1173,7 +1201,8 @@ def loop_game_events(json_feed, game):
             preferred_team = game.preferred_team
             preferred_homeaway = preferred_team.home_away
             on_ice = json_feed["liveData"]["boxscore"]["teams"][preferred_homeaway]["onIce"]
-            players = json_feed["liveData"]["boxscore"]["teams"][preferred_homeaway]["players"]
+            # players = json_feed["liveData"]["boxscore"]["teams"][preferred_homeaway]["players"]
+            players = json_feed["gameData"]["players"]
             if recent_event(play):
                 get_lineup(game, event_period, on_ice, players)
 
@@ -1181,7 +1210,8 @@ def loop_game_events(json_feed, game):
             preferred_team = game.preferred_team
             preferred_homeaway = preferred_team.home_away
             on_ice = json_feed["liveData"]["boxscore"]["teams"][preferred_homeaway]["onIce"]
-            players = json_feed["liveData"]["boxscore"]["teams"][preferred_homeaway]["players"]
+            # players = json_feed["liveData"]["boxscore"]["teams"][preferred_homeaway]["players"]
+            players = json_feed["gameData"]["players"]
             if recent_event(play):
                 get_lineup(game, event_period, on_ice, players)
 
@@ -1208,12 +1238,39 @@ def loop_game_events(json_feed, game):
 
         elif event_type == "PERIOD_END":
             if event_period in (1, 2):
-                tweet_text = ("The {} period of {} comes to an end.\n\n"
-                              "{}: {} ({} shots)\n{}: {} ({} shots)"
-                              .format(event_period_ordinal, game.game_hashtag,
-                                      game.preferred_team.short_name, game.preferred_team.score,
-                                      game.preferred_team.shots, game.other_team.short_name,
-                                      game.other_team.score, game.other_team.shots))
+                # Calculate win percentage when winning / trailing after period
+                pref_score = game.preferred_team.score
+                other_score = game.other_team.score
+
+                if pref_score > other_score:
+                    if event_period == 1:
+                        pref_pd_stats, pref_pd_rank = game.preferred_team.get_stat_and_rank("winLeadFirstPer")
+                    elif event_period == 2:
+                        pref_pd_stats, pref_pd_rank = game.preferred_team.get_stat_and_rank("winLeadSecondPer")
+
+                    pref_pd_stats_pct = pref_pd_stats * 100
+                    win_lead_text = ("When leading after the {} period, the {} win {}% "
+                                     "of their games ({} in the NHL)."
+                                     .format(event_period_ordinal, game.preferred_team.short_name,
+                                             pref_pd_stats_pct, pref_pd_rank))
+                else:
+                    win_lead_text = None
+
+                # Build end of period tweet
+                if win_lead_text is None:
+                    tweet_text = ("The {} period of {} comes to an end.\n\n"
+                                "{}: {} ({} shots)\n{}: {} ({} shots)"
+                                .format(event_period_ordinal, game.game_hashtag,
+                                        game.preferred_team.short_name, game.preferred_team.score,
+                                        game.preferred_team.shots, game.other_team.short_name,
+                                        game.other_team.score, game.other_team.shots))
+                else:
+                    tweet_text = ("The {} period of {} comes to an end. {}\n\n"
+                                "{}: {} ({} shots)\n{}: {} ({} shots)"
+                                .format(event_period_ordinal, game.game_hashtag, win_lead_text,
+                                        game.preferred_team.short_name, game.preferred_team.score,
+                                        game.preferred_team.shots, game.other_team.short_name,
+                                        game.other_team.score, game.other_team.shots))
                 if recent_event(play):
                     send_tweet(tweet_text)
 
@@ -1385,16 +1442,53 @@ def game_preview(game):
     # logging.info("[TWEET] \n%s", preview_tweet_text)
     # Sleep script until game time.
 
+    # Get Season Series
+    season_series_strings = nhl_game_events.season_series(game.game_id, game.preferred_team,
+                                                          game.other_team)
+
+    season_series_str = season_series_strings[0]
+    if season_series_str is None:
+        season_series_tweet = ("This is the first meeting of the season between"
+                               "the {} & the {}.\n\n{} {} {}"
+                               .format(game.preferred_team.short_name, game.other_team.short_name,
+                                       game.preferred_team.team_hashtag,
+                                       game.other_team.team_hashtag, game.game_hashtag))
+    else:
+        points_leader_str = season_series_strings[1]
+        toi_leader_str = season_series_strings[2]
+
+        season_series_tweet = ("{}\n{}\n{}\n\n{} {} {}"
+                               .format(season_series_str, points_leader_str, toi_leader_str,
+                                       game.preferred_team.team_hashtag,
+                                       game.other_team.team_hashtag, game.game_hashtag))
+
+    # Get Goalie Projection
+    pref_team_name = game.preferred_team.team_name
+    pref_team_homeaway = game.preferred_team.home_away
+    other_team_name = game.other_team.team_name
+    pref_goalie, other_goalie = nhl_game_events.dailyfaceoff_goalies(
+                                pref_team_name, other_team_name, pref_team_homeaway)
+    goalie_tweet = ("Projected Goalie Matchup for {}:\n{}\n\n{}"
+                  .format(game.game_hashtag, pref_goalie, other_goalie))
+
+
     img = preview_image(game)
     if args.notweets:
         img.show()
         logging.info("%s", preview_tweet_text)
+        logging.info("%s", goalie_tweet)
+        logging.info("%s", season_series_tweet)
     else:
         if img is not None:
             img_filename = 'resources/images/Gameday-{}.jpg'.format(game.preferred_team.games + 1)
             img.save(img_filename)
             api = get_api()
-            api.update_with_media(img_filename, preview_tweet_text)
+            image_tweet = api.update_with_media(img_filename, preview_tweet_text)
+            image_tweet_id = image_tweet.id_str
+
+            goalie_tweet_id = send_tweet(goalie_tweet, reply=image_tweet_id)
+            send_tweet(season_series_tweet, reply=goalie_tweet_id)
+
     time.sleep(game.game_time_countdown)
 
 
@@ -1466,27 +1560,31 @@ if __name__ == '__main__':
     awayteam_record = game_info["teams"]["away"]["leagueRecord"]
     awayteamobj_games = awayteam_record["wins"] + awayteam_record["losses"] + awayteam_record["ot"]
     awayteamobj_name = awayteam_info["name"]
+    awayteamobj_id = awayteam_info["id"]
     awayteamobj_shortname = awayteam_info["teamName"]
     awayteamobj_tri = awayteam_info["abbreviation"]
     try:
         awayteamobj_tv = gameobj_broadcasts["away"]
     except KeyError:
         awayteamobj_tv = "N/A"
-    away_team_obj = nhl_game_events.Team(awayteamobj_name, awayteamobj_shortname, awayteamobj_tri,
-                                         "away", awayteamobj_tv, awayteamobj_games, awayteam_record)
+    away_team_obj = nhl_game_events.Team(awayteamobj_id, awayteamobj_name, awayteamobj_shortname,
+                                         awayteamobj_tri, "away", awayteamobj_tv, awayteamobj_games,
+                                         awayteam_record)
 
     hometeam_info = game_info["teams"]["home"]["team"]
     hometeam_record = game_info["teams"]["home"]["leagueRecord"]
     hometeamobj_games = hometeam_record["wins"] + hometeam_record["losses"] + hometeam_record["ot"]
     hometeamobj_name = hometeam_info["name"]
+    hometeamobj_id = hometeam_info["id"]
     hometeamobj_shortname = hometeam_info["teamName"]
     hometeamobj_tri = hometeam_info["abbreviation"]
     try:
         hometeamobj_tv = gameobj_broadcasts["home"]
     except KeyError:
         hometeamobj_tv = "N/A"
-    home_team_obj = nhl_game_events.Team(hometeamobj_name, hometeamobj_shortname, hometeamobj_tri,
-                                         "home", hometeamobj_tv, hometeamobj_games, hometeam_record)
+    home_team_obj = nhl_game_events.Team(hometeamobj_id, hometeamobj_name, hometeamobj_shortname,
+                                         hometeamobj_tri, "home", hometeamobj_tv, hometeamobj_games,
+                                         hometeam_record)
 
     # Set Preferred Team
     home_team_obj.preferred = bool(home_team_obj.team_name == TEAM_BOT)
@@ -1520,9 +1618,9 @@ if __name__ == '__main__':
                 game_preview(game_obj)
             else:
                 logging.info(
-                    "Past game time, but game status still 'Preview' - sleep for 60 seconds.")
+                    "Past game time, but game status still 'Preview' - sleep for 30 seconds.")
                 get_game_events(game_obj)
-                time.sleep(60)
+                time.sleep(30)
 
         elif game_obj.game_state == "Live":
             logging.info('-' * 80)

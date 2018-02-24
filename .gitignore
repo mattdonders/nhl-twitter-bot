@@ -4,6 +4,7 @@ __pycache__/
 # Miscellaneous Files
 nohup.out
 archive/
+localdata/
 
 # Mac specific DS Store
 .DS_Store
