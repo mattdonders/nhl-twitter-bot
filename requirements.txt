@@ -1,6 +1,7 @@
-linode_api==4.1.6b0
 tweepy==3.5.0
 requests==2.18.4
+linode_api==4.1.6b0
 Pillow==5.0.0
+beautifulsoup4==4.6.0
 python_dateutil==2.6.1
 linode==0.4
