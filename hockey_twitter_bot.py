@@ -404,11 +404,14 @@ def preview_image(game):
     api = get_api()
     search_text = "{} tune".format(TWITTER_ID)
     search_results = api.search(q=search_text, count=1)
-    latest_tweet_date = search_results[0].created_at
+    if len(search_results) > 0:
+        logging.info("Found an old tune-in tweet - checking if sent today.")
+        latest_tweet_date = search_results[0].created_at
 
-    # If preview tweet was sent today, return False and skip this section
-    if latest_tweet_date.date() == datetime.now().date():
-        return None
+        # If preview tweet was sent today, return False and skip this section
+        logging.info("Previous tune in tweet - %s", latest_tweet_date)
+        if latest_tweet_date.date() == datetime.now().date():
+            return None
 
     # Load required fonts & background image
     teams_font = 'resources/fonts/Adidas.otf'

@@ -442,7 +442,7 @@ def season_series(game_id, pref_team, other_team):
                                  .format(player_name, pref_team.short_name, leader_points,
                                          player_goals, player_assists, other_team.short_name))
         else:
-            points_leader_str = ("{} currently leads the {} in points agains the {} with {} ({}G, {}A)."
+            points_leader_str = ("{} currently leads the {} in points against the {} with {} ({}G, {}A)."
                                  .format(player_name, pref_team.short_name, other_team.short_name,
                                          leader_points, player_goals, player_assists))
     else:
@@ -458,7 +458,7 @@ def season_series(game_id, pref_team, other_team):
             point_leaders_with_attrs.append(player_str)
 
         point_leaders_joined = " & ".join(point_leaders_with_attrs)
-        points_leader_str = ("{} lead the {} in points agains the {} with {} each."
+        points_leader_str = ("{} lead the {} in points against the {} with {} each."
                              .format(point_leaders_joined, pref_team.short_name,
                                      other_team.short_name, leader_points))
 
