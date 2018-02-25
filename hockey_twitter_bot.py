@@ -1057,6 +1057,7 @@ def check_scoring_changes(previous_goals, game):
         # This is used when ONLY the assists change.
         elif assists != preferred_goals[idx].assists:
             logging.info("Assists added or changed for goal #%s.", idx)
+            logging.info("New assists - %s", assists)
             goal_tweet = "{}{}".format(TWITTER_URL, preferred_goals[idx].tweet)
 
             # Original goal has no assists, just tweet that indication.
@@ -1064,9 +1065,11 @@ def check_scoring_changes(previous_goals, game):
                 if len(assists) == 1:
                     goal_assistchange_text = ("Give the lone assist on {}'s goal to {}."
                                               .format(preferred_goals[idx].scorer, assists[0]))
-                else:
-                    goal_assistchange_text = ("The goal is assisted by {} and {}."
+                elif len(assists) == 2:
+                    goal_assistchange_text = ("The goal is now assisted by {} and {}."
                                               .format(assists[0], assists[1]))
+                else:
+                    goal_assistchange_text = "The goal is now unassisted."
 
                 # Use this to quote tweet
                 goal_assistchange_tweet = ("{} {}\n{}"
@@ -1080,9 +1083,11 @@ def check_scoring_changes(previous_goals, game):
                 if len(assists) == 1:
                     goal_assistchange_text = ("Give the lone assist on {}'s goal to {}."
                                               .format(preferred_goals[idx].scorer, assists[0]))
-                else:
+                elif len(assists) == 2:
                     goal_assistchange_text = ("The goal is now assisted by {} and {}."
                                               .format(assists[0], assists[1]))
+                else:
+                    goal_assistchange_text = "The goal is now unassisted."
 
                 # Use this to quote tweet
                 goal_assistchange_tweet = ("{} {} {}\n{}"
