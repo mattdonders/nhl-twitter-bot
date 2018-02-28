@@ -303,7 +303,6 @@ def update_object_attributes(json_feed, game):
             home_goalie_pulled = game.home_team.goalie_pulled_setter(linescore_home["goaliePulled"])
         else:
             logging.info("Home goalie is pulled and a non-important event detected, don't update.")
-            home_goalie_pulled = game.home_team.goalie_pulled_setter(linescore_home["goaliePulled"])
 
         if not game.away_team.goalie_pulled:
             logging.debug("Away goalie in net - check and update attribute.")
@@ -313,7 +312,6 @@ def update_object_attributes(json_feed, game):
             away_goalie_pulled = game.away_team.goalie_pulled_setter(linescore_away["goaliePulled"])
         else:
             logging.info("Away goalie is pulled and a non-important event detected, don't update.")
-            away_goalie_pulled = game.away_team.goalie_pulled_setter(linescore_away["goaliePulled"])
 
         # Calls the goalie_pulled function if the goalie has been pulled
         if home_goalie_pulled:
@@ -886,6 +884,11 @@ def parse_regular_goal(play, game):
 
     # Goal scored by Preferred Team
     if goal_team == game.preferred_team.team_name:
+        # Check previous goal to see if we can skip this goal
+        if len(game.preferred_team.goals == goal_score_preferred):
+            logging.warning("A duplicate goal was detected, skip this eventIdx!")
+            return True
+
         # Count number of goals per game
         goals_per_game = 1
         preferred_goals = game.preferred_team.goals
@@ -1182,8 +1185,8 @@ def loop_game_events(json_feed, game):
         return
 
     # For completeness, print event ID & type in our detection line
-    if len(new_plays) < 5:
-        new_plays_shortlist = []
+    if len(new_plays) < 10:
+        new_plays_shortlist = list()
         for play in new_plays:
             event_type = play["result"]["eventTypeId"]
             event_idx = play["about"]["eventIdx"]
@@ -1302,6 +1305,7 @@ def loop_game_events(json_feed, game):
         elif event_type == "PENALTY":
             if recent_event(play):
                 parse_penalty(play, game)
+
         elif event_type == "GOAL" and period_type != "SHOOTOUT":
             assists_check_done = parse_regular_goal(play, game)
             while not assists_check_done:
@@ -1319,7 +1323,6 @@ def loop_game_events(json_feed, game):
             logging.debug("Other event: %s - %s", event_type, event_description)
 
         # For each loop iteration, update the eventIdx in the game object
-
         game.last_event_idx = event_idx
 
 
