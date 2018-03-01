@@ -1478,7 +1478,7 @@ def game_preview(game):
     pref_team_homeaway = game.preferred_team.home_away
     other_team_name = game.other_team.team_name
     pref_goalie, other_goalie = nhl_game_events.dailyfaceoff_goalies(
-                                pref_team_name, other_team_name, pref_team_homeaway)
+                                preferred_team, other_team, pref_team_homeaway)
     goalie_tweet = ("Projected Goalie Matchup for {}:\n{}\n\n{}"
                   .format(game.game_hashtag, pref_goalie, other_goalie))
 
