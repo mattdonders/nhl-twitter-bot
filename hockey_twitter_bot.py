@@ -196,12 +196,14 @@ def send_tweet(tweet_text, reply=None):
     try:
         api = get_api()
         tweet_length = len(tweet_text)
+        logging.info("Tweet length - %s", tweet_length)
         if tweet_length < 280:
             if reply is None:
+                logging.info("Plain tweet, no reply.")
                 status = api.update_status(status=tweet_text)
             else:
-                print(reply)
                 tweet_text = "@{} {}".format(TWITTER_ID, tweet_text)
+                logging.info("Reply to tweet %s - \n%s", reply, tweet_text)
                 status = api.update_status(tweet_text, in_reply_to_status_id=reply)
         else:
             tweet_array = []
@@ -213,6 +215,7 @@ def send_tweet(tweet_text, reply=None):
 
         # Return a full link to the URL in case a quote-tweet is needed
         tweet_id = status.id_str
+
         # last_tweet = "{}{}".format(TWITTER_URL, tweet_id)
         # return last_tweet
         return tweet_id
@@ -1479,8 +1482,10 @@ def game_preview(game):
     other_team_name = game.other_team.team_name
     pref_goalie, other_goalie = nhl_game_events.dailyfaceoff_goalies(
                                 preferred_team, other_team, pref_team_homeaway)
-    goalie_tweet = ("Projected Goalie Matchup for {}:\n{}\n\n{}"
-                  .format(game.game_hashtag, pref_goalie, other_goalie))
+    pref_goalie_tweet = ("Projected {} Goalie for {}:\n{}"
+                  .format(game.game_hashtag, game.preferred_team.team_hashtag, pref_goalie))
+    other_goalie_tweet = ("Projected {} Goalie for {}:\n{}"
+                  .format(game.game_hashtag, game.other_team.team_hashtag, other_goalie))
 
 
     img = preview_image(game)
@@ -1497,8 +1502,9 @@ def game_preview(game):
             image_tweet = api.update_with_media(img_filename, preview_tweet_text)
             image_tweet_id = image_tweet.id_str
 
-            goalie_tweet_id = send_tweet(goalie_tweet, reply=image_tweet_id)
-            send_tweet(season_series_tweet, reply=goalie_tweet_id)
+            pref_goalie_tweet_id = send_tweet(pref_goalie_tweet, reply=image_tweet_id)
+            other_goalie_tweet_id = send_tweet(other_goalie_tweet, reply=pref_goalie_tweet_id)
+            send_tweet(season_series_tweet, reply=other_goalie_tweet_id)
 
     time.sleep(game.game_time_countdown)
 
