@@ -3,13 +3,27 @@ tracking game events and tweeting relevant attributes."""
 
 # pylint: disable=too-few-public-methods
 
+import configparser
 import datetime
+import logging
+import os
+
 import dateutil.tz
 import requests
 from bs4 import BeautifulSoup
-import logging
 
 log = logging.getLogger('root')
+config = configparser.ConfigParser()
+conf_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'config.ini')
+config.read(conf_path)
+
+TEAM_BOT = config['DEFAULT']['TEAM_NAME']
+NHLAPI_BASEURL = config['ENDPOINTS']['NHL_BASE']
+NHLRPT_BASEURL = config['ENDPOINTS']['NHL_RPT_BASE']
+TWITTER_URL = config['ENDPOINTS']['TWITTER_URL']
+TWITTER_ID = config['ENDPOINTS']['TWITTER_HANDLE']
+VPS_CLOUDHOST = config['VPS']['CLOUDHOST']
+VPS_HOSTNAME = config['VPS']['HOSTNAME']
 
 # ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
@@ -134,7 +148,7 @@ class Period(object):
 class Team(object):
     """Holds attributes related to a team - usually two created per game."""
 
-    def __init__(self, team_id, team_name, short_name, tri_code, home_away, tv_channel, games, record):
+    def __init__(self, team_id, team_name, short_name, tri_code, home_away, tv_channel, games, record, season):
         self.team_id = team_id
         self.team_name = team_name
         self.short_name = short_name
@@ -143,6 +157,7 @@ class Team(object):
         self.tv_channel = tv_channel
         self.games = games
         self.record = record
+        self.season = season
 
         # Not passed in at object creation time
         self.team_hashtag = team_hashtag(self.team_name)
@@ -158,6 +173,31 @@ class Team(object):
         self.wins = record["wins"]
         self.losses = record["losses"]
         self.ot = record["ot"]
+
+        # Send request for leading / trailing stats (via other API)
+        lead_trail_stats_url = ("{}?isAggregate=false"
+                                "&reportType=basic&isGame=false&reportName=leadingtrailing"
+                                "&cayenneExp=seasonId={}%20and%20teamId={}"
+                                .format(NHLRPT_BASEURL, self.season, self.team_id))
+        logging.info("Getting leading / trailing stats for %s via URL - %s", self.short_name, lead_trail_stats_url)
+        lead_trail_stats = requests.get(lead_trail_stats_url).json()
+        lead_trail_stats = lead_trail_stats['data'][0]
+        self.lead_trail_lead1P = ("{}-{}-{}"
+                                  .format(lead_trail_stats["winsAfterLead1p"],
+                                          lead_trail_stats["lossAfterLead1p"],
+                                          lead_trail_stats["otLossAfterLead1p"]))
+        self.lead_trail_lead2P = ("{}-{}-{}"
+                                  .format(lead_trail_stats["winsAfterLead2p"],
+                                          lead_trail_stats["lossAfterLead2p"],
+                                          lead_trail_stats["otLossAfterLead2p"]))
+        self.lead_trail_trail1P = ("{}-{}-{}"
+                                  .format(lead_trail_stats["winsAfterTrail1p"],
+                                          lead_trail_stats["lossAfterTrail1p"],
+                                          lead_trail_stats["otLossAfterTrail1p"]))
+        self.lead_trail_trail2P = ("{}-{}-{}"
+                                  .format(lead_trail_stats["winsAfterTrail2p"],
+                                          lead_trail_stats["lossAfterTrail2p"],
+                                          lead_trail_stats["otLossAfterTrail2p"]))
 
         # Send request to get stats
         stats_url = "https://statsapi.web.nhl.com/api/v1/teams/{}/stats".format(self.team_id)
@@ -418,8 +458,8 @@ def season_series(game_id, pref_team, other_team):
             toi_s = int(s)
             toi_s = "0{}".format(toi_s) if toi_s < 10 else toi_s
             toi_avg = "{}:{}".format(toi_m, toi_s)
-            toi_leader_str = ("{} leads the {} in TOI against the {} with {} / game."
-                            .format(player_name, pref_team.short_name, other_team.short_name, toi_avg))
+            toi_leader_str = ("TOI Leader - {} with {} / game."
+                            .format(player_name, toi_avg))
 
     # Handle tied points leaders
     point_leaders = list()
@@ -442,9 +482,8 @@ def season_series(game_id, pref_team, other_team):
                                  .format(player_name, pref_team.short_name, leader_points,
                                          player_goals, player_assists, other_team.short_name))
         else:
-            points_leader_str = ("{} currently leads the {} in points against the {} with {} ({}G, {}A)."
-                                 .format(player_name, pref_team.short_name, other_team.short_name,
-                                         leader_points, player_goals, player_assists))
+            points_leader_str = ("Points Leader - {} with {} ({}G, {}A)."
+                                 .format(player_name, leader_points, player_goals, player_assists))
     else:
         point_leaders_with_attrs = list()
         for leader in point_leaders:
@@ -458,9 +497,8 @@ def season_series(game_id, pref_team, other_team):
             point_leaders_with_attrs.append(player_str)
 
         point_leaders_joined = " & ".join(point_leaders_with_attrs)
-        points_leader_str = ("{} lead the {} in points against the {} with {} each."
-                             .format(point_leaders_joined, pref_team.short_name,
-                                     other_team.short_name, leader_points))
+        points_leader_str = ("Points Leaders - {} with {} each."
+                             .format(point_leaders_joined, leader_points))
 
     return season_series_str, points_leader_str, toi_leader_str
 
@@ -573,6 +611,16 @@ def hockey_ref_goalie_against_team(goalie, opponent):
     r = requests.get(hockey_ref_url)
     soup = BeautifulSoup(r.content, 'lxml')
 
+    hr_name = soup.find("h1", attrs={"itemprop":"name"}).text
+    if hr_name != goalie_name_camel:
+        logging.warning("Wrong player retrieved from HR, trying 02.")
+        goalie_hockey_ref_name = "{}{}02".format(goalie_last_name[0:5], goalie_first_name[0:2])
+        hockey_ref_url = ("{}/{}/{}/splits"
+                     .format(hockey_ref_url_base, goalie_last_name[0:1], goalie_hockey_ref_name))
+        logging.info("HR URL - %s", hockey_ref_url)
+        r = requests.get(hockey_ref_url)
+        soup = BeautifulSoup(r.content, 'lxml')
+
     split_rows = soup.find("table", { "id" : "splits" }).find("tbody").find_all("tr")
     for row in split_rows:
         cells = row.find_all("td")
@@ -611,7 +659,7 @@ def team_hashtag(team):
         "Florida Panthers": "#FlaPanthers",
         "Los Angeles Kings": "#GoKingsGo",
         "Minnesota Wild": "#mnwild",
-        "Montreal Canadiens": "#GoHabsGo",
+        "Montréal Canadiens": "#GoHabsGo",
         "Nashville Predators": "#Preds",
         "New Jersey Devils": "#NJDevils",
         "New York Islanders": "#Isles",

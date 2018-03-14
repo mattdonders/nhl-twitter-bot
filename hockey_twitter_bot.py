@@ -68,6 +68,7 @@ def setup_logging():
     #pylint: disable=line-too-long
 
     # logger = logging.getLogger(__name__)
+    log_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'NHLTwitterBot.log')
     if args.console and args.debug:
         logging.basicConfig(level=logging.DEBUG, datefmt='%Y-%m-%d %H:%M:%S',
                             format='%(asctime)s - %(module)s.%(funcName)s - %(levelname)s - %(message)s')
@@ -75,8 +76,7 @@ def setup_logging():
         logging.basicConfig(level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S',
                             format='%(asctime)s - %(module)s.%(funcName)s - %(levelname)s - %(message)s')
     else:
-        logging.basicConfig(filename='NHLTwitterBot.log',
-                            level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S',
+        logging.basicConfig(filename=log_file, level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S',
                             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 
@@ -196,28 +196,27 @@ def send_tweet(tweet_text, reply=None):
     try:
         api = get_api()
         tweet_length = len(tweet_text)
-        logging.info("Tweet length - %s", tweet_length)
+        logging.debug("Tweet length - %s", tweet_length)
         if tweet_length < 280:
             if reply is None:
-                logging.info("Plain tweet, no reply.")
+                logging.debug("Plain tweet, no reply.")
                 status = api.update_status(status=tweet_text)
             else:
                 tweet_text = "@{} {}".format(TWITTER_ID, tweet_text)
-                logging.info("Reply to tweet %s - \n%s", reply, tweet_text)
+                logging.debug("Reply to tweet %s - \n%s", reply, tweet_text)
                 status = api.update_status(tweet_text, in_reply_to_status_id=reply)
+            # Return a full link to the URL in case a quote-tweet is needed
+            tweet_id = status.id_str
         else:
-            tweet_array = []
-            tweets_needed = math.ceil(tweet_length / 280)
-            for i in range(tweets_needed):
-                range_start = (i * 280)
-                range_end = ((i+1) * 280)
-                tweet_array.append(tweet_text[range_start:range_end])
+            logging.warning("A tweet longer than 280 characters was detected.")
+            tweet_id = TWITTER_URL
+            # tweet_array = []
+            # tweets_needed = math.ceil(tweet_length / 280)
+            # for i in range(tweets_needed):
+            #     range_start = (i * 280)
+            #     range_end = ((i+1) * 280)
+            #     tweet_array.append(tweet_text[range_start:range_end])
 
-        # Return a full link to the URL in case a quote-tweet is needed
-        tweet_id = status.id_str
-
-        # last_tweet = "{}{}".format(TWITTER_URL, tweet_id)
-        # return last_tweet
         return tweet_id
     except tweepy.TweepError as tweep_error:
         try:
@@ -298,6 +297,10 @@ def update_object_attributes(json_feed, game):
         last_event_type = last_event["result"]["eventTypeId"]
         event_filter_list = ["GOAL", "PENALTY"]
 
+        # Get current values
+        home_goalie_pulled = game.home_team.goalie_pulled
+        away_goalie_pulled = game.away_team.goalie_pulled
+
         if not game.home_team.goalie_pulled:
             logging.debug("Home goalie in net - check and update attribute.")
             home_goalie_pulled = game.home_team.goalie_pulled_setter(linescore_home["goaliePulled"])
@@ -306,6 +309,7 @@ def update_object_attributes(json_feed, game):
             home_goalie_pulled = game.home_team.goalie_pulled_setter(linescore_home["goaliePulled"])
         else:
             logging.info("Home goalie is pulled and a non-important event detected, don't update.")
+            return
 
         if not game.away_team.goalie_pulled:
             logging.debug("Away goalie in net - check and update attribute.")
@@ -315,6 +319,7 @@ def update_object_attributes(json_feed, game):
             away_goalie_pulled = game.away_team.goalie_pulled_setter(linescore_away["goaliePulled"])
         else:
             logging.info("Away goalie is pulled and a non-important event detected, don't update.")
+            return
 
         # Calls the goalie_pulled function if the goalie has been pulled
         if home_goalie_pulled:
@@ -742,8 +747,14 @@ def parse_penalty(play, game):
             penalty_text_skaters = "{} will have a two-man advantage!".format(preferred_shortname)
         elif game.preferred_team.skaters == 4 and game.other_team.skaters == 5:
             penalty_text_skaters = "{} are headed to the penalty kill.".format(preferred_shortname)
+        elif game.preferred_team.skaters == 4 and game.other_team.skaters == 3:
+            penalty_text_skaters = ("{} are headed to a 4-on-3 power play."
+                                    .format(preferred_shortname))
         elif game.preferred_team.skaters == 3 and game.other_team.skaters == 5:
             penalty_text_skaters = ("{} will have to kill off a two-man advantage."
+                                    .format(preferred_shortname))
+        elif game.preferred_team.skaters == 3 and game.other_team.skaters == 4:
+            penalty_text_skaters = ("{} will have a 4-on-3 PK to contend with."
                                     .format(preferred_shortname))
     else:
         penalty_text_skaters = ""
@@ -782,9 +793,14 @@ def parse_penalty(play, game):
     penalty_draw_rankstat_str = ("{} PP: {}% ({})"
                                  .format(penalty_draw_team_name, penalty_draw_stat, penalty_draw_rank))
 
-    penalty_tweet = ("{} {}\n\n{}\n{}\n\n{}".format(penalty_text_players, penalty_text_skaters,
-                                                   penalty_on_rankstat_str, penalty_draw_rankstat_str,
-                                                   game.game_hashtag))
+    if power_play_strength != "Even":
+        penalty_tweet = ("{} {}\n\n{}\n{}\n\n{}"
+                         .format(penalty_text_players, penalty_text_skaters,
+                                 penalty_on_rankstat_str, penalty_draw_rankstat_str,
+                                 game.game_hashtag))
+    else:
+        penalty_tweet = ("{} {}\n\n{}"
+                         .format(penalty_text_players, penalty_text_skaters, game.game_hashtag))
     penalty_tweet_id = send_tweet(penalty_tweet)
 
 
@@ -854,12 +870,11 @@ def parse_regular_goal(play, game):
     # Change some wording around to make it a bit more unique
     # TODO: Add some randomness to this section
     if goal_type == "deflected":
-        goal_scorer_text = ("{} deflects a shot past {} for his {} goal of the "
-                            "season with {} left in the {} period!"
-                            .format(goal_scorer_name, goalie_name, ordinal(goal_scorer_total),
+        goal_scorer_text = ("{} ({}) deflects a shot past {} with {} left in the {} period!"
+                            .format(goal_scorer_name, ordinal(goal_scorer_total), goalie_name,
                                     goal_period_remain, goal_period_ord))
     else:
-        goal_scorer_text = ("{} scores his {} goal of the season on a {} "
+        goal_scorer_text = ("{} scores ({}) on a {} "
                             "with {} left in the {} period!"
                             .format(goal_scorer_name, ordinal(goal_scorer_total),
                                     goal_type, goal_period_remain, goal_period_ord))
@@ -888,7 +903,7 @@ def parse_regular_goal(play, game):
     # Goal scored by Preferred Team
     if goal_team == game.preferred_team.team_name:
         # Check previous goal to see if we can skip this goal
-        if len(game.preferred_team.goals == goal_score_preferred):
+        if len(game.preferred_team.goals) == goal_score_preferred:
             logging.warning("A duplicate goal was detected, skip this eventIdx!")
             return True
 
@@ -925,7 +940,7 @@ def parse_regular_goal(play, game):
         goal_text_full = ("{} {}\n\n{}\n\n{}\n\n{} {}"
                           .format(goal_announce, goal_lights_text, goal_text_player,
                                   goal_text_score, team_hashtag, game.game_hashtag))
-        goal_tweet = send_tweet(goal_text_full)
+        goal_tweet = send_tweet(goal_text_full) if recent_event(play) else None
 
         # Create Goal Object & append to Team goals array
         goal = nhl_game_events.Goal(goal_description, goal_eventidx, goal_period, goal_period_type,
@@ -941,7 +956,7 @@ def parse_regular_goal(play, game):
         goal_thumbs_text = '\U0001F44E' * num_thumbs
 
         goal_announce = "{} scored. {}".format(goal_team, goal_thumbs_text)
-        goal_text_player = ("{} with his {} of the season - {} left in the {} period."
+        goal_text_player = ("{} ({}s) - {} left in the {} period."
                             .format(goal_scorer_name, ordinal(goal_scorer_total),
                                     goal_period_remain, goal_period_ord))
         goal_text_score = ("Score - {}: {} / {}: {}"
@@ -950,7 +965,7 @@ def parse_regular_goal(play, game):
         goal_other_tweet = ("{}\n\n{}\n\n{}\n\n{}"
                             .format(goal_announce, goal_text_player,
                                     goal_text_score, game.game_hashtag))
-        send_tweet(goal_other_tweet)
+        goal_tweet = send_tweet(goal_other_tweet) if recent_event(play) else None
 
     return True
 
@@ -1258,20 +1273,27 @@ def loop_game_events(json_feed, game):
 
                 if pref_score > other_score:
                     if event_period == 1:
-                        pref_pd_stats, pref_pd_rank = game.preferred_team.get_stat_and_rank("winLeadFirstPer")
+                        lead_trail_stat = game.preferred_team.lead_trail_lead1P
                     elif event_period == 2:
-                        pref_pd_stats, pref_pd_rank = game.preferred_team.get_stat_and_rank("winLeadSecondPer")
+                        lead_trail_stat = game.preferred_team.lead_trail_lead2P
 
-                    pref_pd_stats_pct = pref_pd_stats * 100
-                    win_lead_text = ("When leading after the {} period, the {} win {}% "
-                                     "of their games ({} in the NHL)."
+                    lead_trail_text = ("When leading after the {} period, the {} are {}."
                                      .format(event_period_ordinal, game.preferred_team.short_name,
-                                             pref_pd_stats_pct, pref_pd_rank))
+                                             lead_trail_stat))
+                elif pref_score < other_score:
+                    if event_period == 1:
+                        lead_trail_stat = game.preferred_team.lead_trail_trail1P
+                    elif event_period == 2:
+                        lead_trail_stat = game.preferred_team.lead_trail_trail2P
+
+                    lead_trail_text = ("When trailing after the {} period, the {} are {}."
+                                     .format(event_period_ordinal, game.preferred_team.short_name,
+                                             lead_trail_stat))
                 else:
-                    win_lead_text = None
+                    lead_trail_text = None
 
                 # Build end of period tweet
-                if win_lead_text is None:
+                if lead_trail_text is None:
                     tweet_text = ("The {} period of {} comes to an end.\n\n"
                                 "{}: {} ({} shots)\n{}: {} ({} shots)"
                                 .format(event_period_ordinal, game.game_hashtag,
@@ -1281,7 +1303,7 @@ def loop_game_events(json_feed, game):
                 else:
                     tweet_text = ("The {} period of {} comes to an end. {}\n\n"
                                 "{}: {} ({} shots)\n{}: {} ({} shots)"
-                                .format(event_period_ordinal, game.game_hashtag, win_lead_text,
+                                .format(event_period_ordinal, game.game_hashtag, lead_trail_text,
                                         game.preferred_team.short_name, game.preferred_team.score,
                                         game.preferred_team.shots, game.other_team.short_name,
                                         game.other_team.score, game.other_team.shots))
@@ -1492,7 +1514,8 @@ def game_preview(game):
     if args.notweets:
         img.show()
         logging.info("%s", preview_tweet_text)
-        logging.info("%s", goalie_tweet)
+        logging.info("%s", pref_goalie_tweet)
+        logging.info("%s", other_goalie_tweet)
         logging.info("%s", season_series_tweet)
     else:
         if img is not None:
@@ -1553,7 +1576,7 @@ if __name__ == '__main__':
     gameobj_game_type = game_info["gameType"]
     gameobj_date_time = game_info["gameDate"]
     gameobj_game_state = game_info["status"]["abstractGameState"]
-    if args.localdata:
+    if args.localdata or args.yesterday:
         gameobj_game_state = "Live"
     gameobj_venue = game_info["venue"]["name"]
     gameobj_live_feed = game_info["link"]
@@ -1573,6 +1596,8 @@ if __name__ == '__main__':
     # Create Team Objects
     # Note: Schedule endpoint calls 3-character 'abbreviation' - not 'triCcode')
     # TODO: Review record / games played for playoffs
+    team_objs_season_id = str(gameobj_game_id)[0:4]
+    team_objs_season = "{}{}".format(team_objs_season_id, int(team_objs_season_id) + 1)
     awayteam_info = game_info["teams"]["away"]["team"]
     awayteam_record = game_info["teams"]["away"]["leagueRecord"]
     awayteamobj_games = awayteam_record["wins"] + awayteam_record["losses"] + awayteam_record["ot"]
@@ -1586,7 +1611,7 @@ if __name__ == '__main__':
         awayteamobj_tv = "N/A"
     away_team_obj = nhl_game_events.Team(awayteamobj_id, awayteamobj_name, awayteamobj_shortname,
                                          awayteamobj_tri, "away", awayteamobj_tv, awayteamobj_games,
-                                         awayteam_record)
+                                         awayteam_record, team_objs_season)
 
     hometeam_info = game_info["teams"]["home"]["team"]
     hometeam_record = game_info["teams"]["home"]["leagueRecord"]
@@ -1601,7 +1626,7 @@ if __name__ == '__main__':
         hometeamobj_tv = "N/A"
     home_team_obj = nhl_game_events.Team(hometeamobj_id, hometeamobj_name, hometeamobj_shortname,
                                          hometeamobj_tri, "home", hometeamobj_tv, hometeamobj_games,
-                                         hometeam_record)
+                                         hometeam_record, team_objs_season)
 
     # Set Preferred Team
     home_team_obj.preferred = bool(home_team_obj.team_name == TEAM_BOT)
@@ -1612,22 +1637,8 @@ if __name__ == '__main__':
                                     gameobj_game_state, gameobj_venue, home_team_obj,
                                     away_team_obj, preferred_indicator, gameobj_live_feed)
 
-    # print(game_obj)
-    # for k, v in vars(game_obj).items():
-    #     print("{}: {}".format(k, v))
-    # print("------------------------------")
-    # print(home_team_obj)
-    # for k, v in vars(home_team_obj).items():
-    #     print("{}: {}".format(k, v))
-    # print("------------------------------")
-    # print(away_team_obj)
-    # for k, v in vars(away_team_obj).items():
-    #     print("{}: {}".format(k, v))
-
-    # sys.exit()
 
     # All objects are created, start the game loop
-    # game_loop()
     while True:
         if game_obj.game_state == "Preview":
             if game_obj.game_time_countdown > 0:
