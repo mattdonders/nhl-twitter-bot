@@ -611,8 +611,15 @@ def hockey_ref_goalie_against_team(goalie, opponent):
     r = requests.get(hockey_ref_url)
     soup = BeautifulSoup(r.content, 'lxml')
 
+    hr_player_info = soup.find("div", attrs={"itemtype":"https://schema.org/Person"})
+    hr_player_info_attr = hr_player_info.find_all("p")
     hr_name = soup.find("h1", attrs={"itemprop":"name"}).text
-    if hr_name != goalie_name_camel:
+    for attr in hr_player_info_attr:
+        if "Position:" in attr.text:
+            hr_position_goalie = bool("Position: G" in attr.text.rstrip())
+            break
+
+    if hr_name != goalie_name_camel or not hr_position_goalie:
         logging.warning("Wrong player retrieved from HR, trying 02.")
         goalie_hockey_ref_name = "{}{}02".format(goalie_last_name[0:5], goalie_first_name[0:2])
         hockey_ref_url = ("{}/{}/{}/splits"

@@ -1651,13 +1651,18 @@ if __name__ == '__main__':
                 time.sleep(30)
 
         elif game_obj.game_state == "Live":
-            logging.info('-' * 80)
-            logging.info("Game is currently live - checking events after event Idx %s.",
-                         game_obj.last_event_idx)
-            game_events = get_game_events(game_obj)
-            loop_game_events(game_events, game_obj)
-            logging.info("Sleeping for 5 seconds...")
-            time.sleep(5)
+            # Add try / except to avoid exits
+            try:
+                logging.info('-' * 80)
+                logging.info("Game is currently live - checking events after event Idx %s.",
+                            game_obj.last_event_idx)
+                game_events = get_game_events(game_obj)
+                loop_game_events(game_events, game_obj)
+                logging.info("Sleeping for 5 seconds...")
+                time.sleep(5)
+            except Exception as e:
+                logging.error("Uncaught exception in live game loop.")
+                logging.error(e)
 
         elif game_obj.game_state == "Final":
             logging.info("Game is 'Final' - increase sleep time to 10 seconds.")
