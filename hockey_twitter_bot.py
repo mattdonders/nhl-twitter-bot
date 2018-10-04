@@ -113,9 +113,40 @@ def parse_arguments():
                         action="store")
     parser.add_argument("--split", help="split squad game index",
                         action="store_true")
+    parser.add_argument("--docker", help="running in a docker container",
+                        action="store_true")
 
     arguments = parser.parse_args()
     return arguments
+
+
+def parse_env_variables(args):
+    """
+    For when running via Docker, parse Environment variables.
+    Environment variables replace command line arguments.
+
+    Input:
+    args - argument Namespace
+
+    Output:
+    None
+    """
+    print(os.environ)
+
+    if "ARGS_NOTWEETS" in os.environ and os.environ['ARGS_NOTWEETS'] == "TRUE":
+        args.notweets = True
+
+    if "ARGS_DEBUG" in os.environ and os.environ['ARGS_DEBUG'] == "TRUE":
+        args.debug = True
+
+    if "ARGS_TEAM" in os.environ:
+        args.team = os.environ['ARGS_TEAM']
+
+    if "ARGS_DEBUGTWEETS" in os.environ and os.environ['ARGS_DEBUGTWEETS'] == "TRUE":
+        args.debugtweets = True
+
+    if "ARGS_DATE" in os.environ:
+        args.date = os.environ['ARGS_DATE']
 
 
 # ------------------------------------------------------------------------------
@@ -429,13 +460,13 @@ def pregame_image(game):
             return None
 
     # Load Required Fonts
-    FONT_OPENSANS_BOLD = 'resources/fonts/OpenSans-Bold.ttf'
-    FONT_OPENSANS_SEMIBOLD = 'resources/fonts/OpenSans-SemiBold.ttf'
-    FONT_OPENSANS_EXTRABOLD = 'resources/fonts/OpenSans-ExtraBold.ttf'
+    FONT_OPENSANS_BOLD = os.path.join(PROJECT_ROOT, 'resources/fonts/OpenSans-Bold.ttf')
+    FONT_OPENSANS_SEMIBOLD = os.path.join(PROJECT_ROOT, 'resources/fonts/OpenSans-SemiBold.ttf')
+    FONT_OPENSANS_EXTRABOLD = os.path.join(PROJECT_ROOT, 'resources/fonts/OpenSans-ExtraBold.ttf')
     FONT_COLOR_WHITE = (255, 255, 255)
 
     # Set the background / load the baseline image
-    bg = Image.open('resources/images/GamedayPregameFinalV3-Larger.png')
+    bg = Image.open(os.path.join(PROJECT_ROOT, 'resources/images/GamedayPregameFinalV3-Larger.png'))
     draw = ImageDraw.Draw(bg)
     # draw.fontmode = "0"
 
@@ -466,8 +497,8 @@ def pregame_image(game):
     COORDS_GAMEINFO_LINE3_RECT_BOTRIGHT = (1168, 521)
 
     # Load, resize & paste team logos
-    away_logo = Image.open(f"resources/logos/{game.away_team.team_name.replace(' ', '')}.png")
-    home_logo = Image.open(f"resources/logos/{game.home_team.team_name.replace(' ', '')}.png")
+    away_logo = Image.open(os.path.join(PROJECT_ROOT,f"resources/logos/{game.away_team.team_name.replace(' ', '')}.png"))
+    home_logo = Image.open(os.path.join(PROJECT_ROOT,f"resources/logos/{game.home_team.team_name.replace(' ', '')}.png"))
 
     resize = (300, 200)
     away_logo.thumbnail(resize, Image.ANTIALIAS)
@@ -478,13 +509,13 @@ def pregame_image(game):
     # Home Points, Record & Draw
     home_pts = game.home_team.points
     home_record_str = f"{home_pts} PTS • {game.home_team.current_record}"
-    home_w, home_h = draw.textsize(home_record_str, custom_font_size(FONT_OPENSANS_BOLD, 35))
+    home_w, _ = draw.textsize(home_record_str, custom_font_size(FONT_OPENSANS_BOLD, 35))
     coords_home_record = (((2 * LOGO_WIDTH + 325 - home_w) / 2), COORDS_RECORDS_Y)
     draw.text(coords_home_record, home_record_str, fill=FONT_COLOR_WHITE, font=custom_font_size(FONT_OPENSANS_BOLD, 35))
 
     away_pts = game.away_team.points
     away_record_str = f"{away_pts} PTS • {game.away_team.current_record}"
-    away_w, away_h = draw.textsize(away_record_str, custom_font_size(FONT_OPENSANS_BOLD, 35))
+    away_w, _ = draw.textsize(away_record_str, custom_font_size(FONT_OPENSANS_BOLD, 35))
     coords_away_record = (((LOGO_WIDTH - away_w) / 2), COORDS_RECORDS_Y)
     draw.text(coords_away_record, away_record_str, fill=FONT_COLOR_WHITE, font=custom_font_size(FONT_OPENSANS_BOLD, 35))
 
@@ -500,7 +531,6 @@ def pregame_image(game):
     gameinfo_day = game.day_of_game_local.upper()
     day_w, day_h = draw.textsize(gameinfo_day, font=custom_font_size(FONT_OPENSANS_EXTRABOLD, 50))
     draw.text(COORDS_GAMEINFO_DAY, gameinfo_day, fill=pref_color_primary, font=custom_font_size(FONT_OPENSANS_EXTRABOLD, 52))
-    remaining_width = COORDS_GAMEINFO_WIDTH - day_w
 
     gameinfo_date = game.month_day_local.upper()
     date_w, date_h = draw.textsize(gameinfo_date, font=custom_font_size(FONT_OPENSANS_SEMIBOLD, 52))
@@ -563,9 +593,9 @@ def preview_image(game):
             return None
 
     # Load required fonts & background image
-    teams_font = 'resources/fonts/Adidas.otf'
-    details_font = 'resources/fonts/Impact.ttf'
-    bg = Image.open('resources/images/GamedayBlank.jpg')
+    teams_font = os.path.join(PROJECT_ROOT, 'resources/fonts/Adidas.otf')
+    details_font = os.path.join(PROJECT_ROOT, 'resources/fonts/Impact.ttf')
+    bg = Image.open(os.path.join(PROJECT_ROOT, 'resources/images/GamedayBlank.jpg'))
     font_black = (0, 0, 0)
 
     # Create & format text for pre-game image
@@ -632,10 +662,10 @@ def final_image(game, boxscore_preferred, boxscore_other):
     Returns:
         Image: Image object (from PIL library) to be sent to Twitter.
     """
-    teams_font = 'resources/fonts/Adidas.otf'
-    details_font = 'resources/fonts/Impact.ttf'
+    teams_font = os.path.join(PROJECT_ROOT, 'resources/fonts/Adidas.otf')
+    details_font = os.path.join(PROJECT_ROOT, 'resources/fonts/Impact.ttf')
 
-    bg = Image.open('resources/images/GamedayFinalPrudentialBlank.jpg')
+    bg = Image.open(os.path.join(PROJECT_ROOT, 'resources/images/GamedayFinalPrudentialBlank.jpg'))
 
     # Get Game Info for Updated Record
     _, schedule_json = is_game_today(get_team(TEAM_BOT))
@@ -647,10 +677,10 @@ def final_image(game, boxscore_preferred, boxscore_other):
         other = schedule_json["teams"]["home"]
 
     # Load & Resize Logos
-    pref_logo = Image.open('resources/logos/{}.png'
-                           .format(game.preferred_team.team_name.replace(" ", "")))
-    other_logo = Image.open('resources/logos/{}.png'
-                            .format(game.other_team.team_name.replace(" ", "")))
+    pref_logo = Image.open(os.path.join(PROJECT_ROOT, 'resources/logos/{}.png'
+                           .format(game.preferred_team.team_name.replace(" ", ""))))
+    other_logo = Image.open(os.path.join(PROJECT_ROOT, 'resources/logos/{}.png'
+                            .format(game.other_team.team_name.replace(" ", ""))))
 
     resize = (125, 125)
     pref_logo.thumbnail(resize, Image.ANTIALIAS)
@@ -747,10 +777,10 @@ def stats_image_bar_generator(draw, stat, pref_stat_value, other_stat_value,
                   stat, pref_stat_value, other_stat_value, pref_colors, other_colors)
 
     # Load all fonts to be used within the image generator
-    font_opensans_regular = 'resources/fonts/OpenSans-Regular.ttf'
-    font_opensans_italic = 'resources/fonts/OpenSans-Italic.ttf'
-    font_opensans_bold = 'resources/fonts/OpenSans-Bold.ttf'
-    font_opensans_bolditalic = 'resources/fonts/OpenSans-BoldItalic.ttf'
+    font_opensans_regular = os.path.join(PROJECT_ROOT, 'resources/fonts/OpenSans-Regular.ttf')
+    font_opensans_italic = os.path.join(PROJECT_ROOT, 'resources/fonts/OpenSans-Italic.ttf')
+    font_opensans_bold = os.path.join(PROJECT_ROOT, 'resources/fonts/OpenSans-Bold.ttf')
+    font_opensans_bolditalic = os.path.join(PROJECT_ROOT, 'resources/fonts/OpenSans-BoldItalic.ttf')
 
     # Static Font Sizes
     font_opensans_regular_large = ImageFont.truetype(font_opensans_regular, 80)
@@ -883,10 +913,10 @@ def stats_image_generator(game, bg_type, boxscore_preferred, boxscore_other):
     TEAMS_VS_W, TEAMS_VS_H = (447, 39)
 
     # Load & Resize Logos
-    pref_logo = Image.open('resources/logos/{}.png'
-                           .format(game.preferred_team.team_name.replace(" ", "")))
-    other_logo = Image.open('resources/logos/{}.png'
-                            .format(game.other_team.team_name.replace(" ", "")))
+    pref_logo = Image.open(os.path.join(PROJECT_ROOT, 'resources/logos/{}.png'
+                           .format(game.preferred_team.team_name.replace(" ", ""))))
+    other_logo = Image.open(os.path.join(PROJECT_ROOT, 'resources/logos/{}.png'
+                            .format(game.other_team.team_name.replace(" ", ""))))
     resize = (120, 120)
     pref_logo.thumbnail(resize, Image.ANTIALIAS)
     other_logo.thumbnail(resize, Image.ANTIALIAS)
@@ -894,11 +924,11 @@ def stats_image_generator(game, bg_type, boxscore_preferred, boxscore_other):
     # Change background image based on intermission or game final
     # Also change the "losing team" image to grayscale for final
     if bg_type == "intermission":
-        bg = Image.open('resources/images/GamedayIntermissionFinal-V3Larger.png')
+        bg = Image.open(os.path.join(PROJECT_ROOT, 'resources/images/GamedayIntermissionFinal-V3Larger.png'))
         bg.paste(pref_logo, COORDS_PREF_LOGO, pref_logo)
         bg.paste(other_logo, COORDS_OTHER_LOGO, other_logo)
     else:
-        bg = Image.open('resources/images/GamedayRecapFinalV3-Larger.png')
+        bg = Image.open(os.path.join(PROJECT_ROOT, 'resources/images/GamedayRecapFinalV3-Larger.png'))
         COORDS_PREF_LOGO = (780, 120)
         COORDS_OTHER_LOGO = (985, 120)
         COORDS_LOGO_VS = (-100, -100)
@@ -911,12 +941,12 @@ def stats_image_generator(game, bg_type, boxscore_preferred, boxscore_other):
             bg.paste(other_logo, COORDS_OTHER_LOGO, other_logo)
 
     # Load all fonts to be used within the image generator
-    teams_font = 'resources/fonts/Adidas.otf'
-    details_font = 'resources/fonts/Impact.ttf'
-    font_opensans_regular = 'resources/fonts/OpenSans-Regular.ttf'
-    font_opensans_italic = 'resources/fonts/OpenSans-Italic.ttf'
-    font_opensans_bold = 'resources/fonts/OpenSans-Bold.ttf'
-    font_opensans_bolditalic = 'resources/fonts/OpenSans-BoldItalic.ttf'
+    teams_font = os.path.join(PROJECT_ROOT, 'resources/fonts/Adidas.otf')
+    details_font = os.path.join(PROJECT_ROOT, 'resources/fonts/Impact.ttf')
+    font_opensans_regular = os.path.join(PROJECT_ROOT, 'resources/fonts/OpenSans-Regular.ttf')
+    font_opensans_italic = os.path.join(PROJECT_ROOT, 'resources/fonts/OpenSans-Italic.ttf')
+    font_opensans_bold = os.path.join(PROJECT_ROOT, 'resources/fonts/OpenSans-Bold.ttf')
+    font_opensans_bolditalic = os.path.join(PROJECT_ROOT, 'resources/fonts/OpenSans-BoldItalic.ttf')
 
     # Static Font Sizes
     font_opensans_regular_large = ImageFont.truetype(font_opensans_regular, 80)
@@ -1938,8 +1968,8 @@ def loop_game_events(json_feed, game):
                 if args.notweets:
                     img.show()
                 else:
-                    img_filename = ('resources/images/GamedayIntermission-{}-{}.png'
-                                    .format(event_period, game.preferred_team.games + 1))
+                    img_filename = (os.path.join(PROJECT_ROOT, 'resources/images/GamedayIntermission-{}-{}.png'
+                                    .format(event_period, game.preferred_team.games + 1)))
                     img.save(img_filename)
 
 
@@ -2062,8 +2092,8 @@ def parse_end_of_game(json_feed, game):
             img.show()
             logging.info("%s", final_score_tweet)
         else:
-            img_filename = ('resources/images/GamedayFinal-{}.png'
-                            .format(game.preferred_team.games + 1))
+            img_filename = (os.path.join(PROJECT_ROOT, 'resources/images/GamedayFinal-{}.png'
+                            .format(game.preferred_team.games + 1)))
             img.save(img_filename)
             api = get_api()
             api.update_with_media(img_filename, final_score_tweet)
@@ -2191,7 +2221,7 @@ def game_preview(game):
         logging.info("%s", season_series_tweet)
     else:
         if img is not None:
-            img_filename = 'resources/images/Gameday-{}.png'.format(game.preferred_team.games + 1)
+            img_filename = os.path.join(PROJECT_ROOT, 'resources/images/Gameday-{}.png'.format(game.preferred_team.games + 1))
             img.save(img_filename)
             api = get_api()
             image_tweet = api.update_with_media(img_filename, preview_tweet_text)
@@ -2215,6 +2245,19 @@ def game_preview(game):
 # This line is to prevent code from being executed, if ever imported.
 if __name__ == '__main__':
     args = parse_arguments()
+
+    # If running in Docker, parse environment variables (instead of arguments)
+    # And set args.console to True to make `docker logs` easier to use
+    if args.docker:
+        # Check to see if Time Zone is set
+        if "TZ" not in os.environ:
+            print("[ERROR] Timezone environment variable not set, please add to `docker run` commmand.")
+            sys.exit()
+
+        args.console = True
+        parse_env_variables(args)
+
+    # Setup Logging for this script
     setup_logging()
 
     if args.debugtweets:
@@ -2226,7 +2269,9 @@ if __name__ == '__main__':
 
     # Log script start lines
     logging.info('#' * 80)
-    logging.info('New instance of the Hockey Twitter Bot started...')
+    logging.info('New instance of the Hockey Twitter Bot started.')
+    if args.docker:
+        logging.info('Running in a Docker container - environment variables parsed.')
     logging.info('ARGS - notweets: %s, console: %s, teamoverride: %s',
                  args.notweets, args.console, args.team)
     logging.info('ARGS - debug: %s, debugtweets: %s, yesterday: %s',
