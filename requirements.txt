@@ -5,3 +5,4 @@ Pillow==5.0.0
 beautifulsoup4==4.6.0
 python_dateutil==2.6.1
 linode==0.4
+lxml==4.1.1

@@ -71,9 +71,48 @@ class Game(object):
         # Initialize Final Tweets dictionary
         self.finaltweets = {"finalscore": False, "stars": False}
 
+        # Parse Game ID to get attributes
+        game_id_string = str(self.game_id)
+        self.game_id_season = game_id_string[0:4]
+        self.game_id_gametype_id = game_id_string[4:6]
+        self.game_id_shortid = game_id_string[6:]
+
+        if self.game_id_gametype_id == "01":
+            self.game_id_gametype = "Preseason"
+        elif self.game_id_gametype_id == "02":
+            self.game_id_gametype = "Regular"
+        elif self.game_id_gametype_id == "03":
+            self.game_id_gametype = "Playoff"
+            self.game_id_playoff_round = self.game_id_shortid[1]
+            self.game_id_playoff_matchup = self.game_id_shortid[2]
+            self.game_id_playoff_game = self.game_id_shortid[3]
+        elif self.game_id_gametype_id == "04":
+            self.game_id_gametype = "All-Star"
+        else:
+            self.game_id_gametype = "Unknown"
+
+
     # Commands used to calculate time related attributes
     localtz = dateutil.tz.tzlocal()
     localoffset = localtz.utcoffset(datetime.datetime.now(localtz))
+
+    @property
+    def day_of_game_local(self):
+        """Returns the day of date_time in local server time."""
+        game_date = datetime.datetime.strptime(
+            self.date_time, '%Y-%m-%dT%H:%M:%SZ')
+        game_date_local = game_date + self.localoffset
+        game_day_local = game_date_local.strftime('%A')
+        return game_day_local
+
+    @property
+    def month_day_local(self):
+        """Returns the month & date of date_time in local server time."""
+        game_date = datetime.datetime.strptime(
+            self.date_time, '%Y-%m-%dT%H:%M:%SZ')
+        game_date_local = game_date + self.localoffset
+        game_abbr_month = game_date_local.strftime('%b %d').lstrip("0")
+        return game_abbr_month
 
     @property
     def game_time_local(self):
@@ -83,6 +122,14 @@ class Game(object):
         game_date_local = game_date + self.localoffset
         game_date_local_ampm = game_date_local.strftime('%I:%M %p')
         return game_date_local_ampm
+
+    @property
+    def game_date_local(self):
+        game_date = datetime.datetime.strptime(
+            self.date_time, '%Y-%m-%dT%H:%M:%SZ')
+        game_date_local = game_date + self.localoffset
+        game_date_local_api = game_date_local.strftime('%Y-m-d')
+        return game_date_local_api
 
     @property
     def game_date_short(self):
@@ -160,7 +207,7 @@ class Team(object):
         self.season = season
 
         # Not passed in at object creation time
-        self.team_hashtag = team_hashtag(self.team_name)
+        # self.team_hashtag = team_hashtag(self.team_name)
         self.skaters = 5
         self.score = 0
         self.shots = 0
@@ -172,46 +219,70 @@ class Team(object):
         # Break-up the record into wins, losses, ot
         self.wins = record["wins"]
         self.losses = record["losses"]
-        self.ot = record["ot"]
+        try:
+            self.ot = record["ot"]
+        except KeyError:
+            self.ot = None
+
+        # Calculate Points
+        self.points = (2 * self.wins) + self.ot
+
 
         # Send request for leading / trailing stats (via other API)
-        lead_trail_stats_url = ("{}?isAggregate=false"
-                                "&reportType=basic&isGame=false&reportName=leadingtrailing"
-                                "&cayenneExp=seasonId={}%20and%20teamId={}"
-                                .format(NHLRPT_BASEURL, self.season, self.team_id))
-        logging.info("Getting leading / trailing stats for %s via URL - %s", self.short_name, lead_trail_stats_url)
-        lead_trail_stats = requests.get(lead_trail_stats_url).json()
-        lead_trail_stats = lead_trail_stats['data'][0]
-        self.lead_trail_lead1P = ("{}-{}-{}"
-                                  .format(lead_trail_stats["winsAfterLead1p"],
-                                          lead_trail_stats["lossAfterLead1p"],
-                                          lead_trail_stats["otLossAfterLead1p"]))
-        self.lead_trail_lead2P = ("{}-{}-{}"
-                                  .format(lead_trail_stats["winsAfterLead2p"],
-                                          lead_trail_stats["lossAfterLead2p"],
-                                          lead_trail_stats["otLossAfterLead2p"]))
-        self.lead_trail_trail1P = ("{}-{}-{}"
-                                  .format(lead_trail_stats["winsAfterTrail1p"],
-                                          lead_trail_stats["lossAfterTrail1p"],
-                                          lead_trail_stats["otLossAfterTrail1p"]))
-        self.lead_trail_trail2P = ("{}-{}-{}"
-                                  .format(lead_trail_stats["winsAfterTrail2p"],
-                                          lead_trail_stats["lossAfterTrail2p"],
-                                          lead_trail_stats["otLossAfterTrail2p"]))
+        try:
+            lead_trail_stats_url = ("{}?isAggregate=false"
+                                    "&reportType=basic&isGame=false&reportName=leadingtrailing"
+                                    "&cayenneExp=seasonId={}%20and%20teamId={}"
+                                    .format(NHLRPT_BASEURL, self.season, self.team_id))
+            logging.info("Getting leading / trailing stats for %s via URL - %s", self.short_name, lead_trail_stats_url)
+            lead_trail_stats = requests.get(lead_trail_stats_url).json()
+            lead_trail_stats = lead_trail_stats['data'][0]
+            self.lead_trail_lead1P = ("{}-{}-{}"
+                                    .format(lead_trail_stats["winsAfterLead1p"],
+                                            lead_trail_stats["lossAfterLead1p"],
+                                            lead_trail_stats["otLossAfterLead1p"]))
+            self.lead_trail_lead2P = ("{}-{}-{}"
+                                    .format(lead_trail_stats["winsAfterLead2p"],
+                                            lead_trail_stats["lossAfterLead2p"],
+                                            lead_trail_stats["otLossAfterLead2p"]))
+            self.lead_trail_trail1P = ("{}-{}-{}"
+                                    .format(lead_trail_stats["winsAfterTrail1p"],
+                                            lead_trail_stats["lossAfterTrail1p"],
+                                            lead_trail_stats["otLossAfterTrail1p"]))
+            self.lead_trail_trail2P = ("{}-{}-{}"
+                                    .format(lead_trail_stats["winsAfterTrail2p"],
+                                            lead_trail_stats["lossAfterTrail2p"],
+                                            lead_trail_stats["otLossAfterTrail2p"]))
+        except (IndexError, KeyError) as e:
+            # Stats not available (for this team or page timeout)
+            logging.warning("Error getting Lead / Trail Stats - %s", e)
+            self.lead_trail_lead1P = "N/A-N/A-N/A"
+            self.lead_trail_lead2P = "N/A-N/A-N/A"
+            self.lead_trail_trail1P = "N/A-N/A-N/A"
+            self.lead_trail_trail2P = "N/A-N/A-N/A"
 
         # Send request to get stats
-        stats_url = "https://statsapi.web.nhl.com/api/v1/teams/{}/stats".format(self.team_id)
-        logging.info("Getting team stats for %s via URL - %s", self.short_name, stats_url)
-        stats = requests.get(stats_url).json()
-        stats = stats["stats"]
-        self.team_stats = stats[0]["splits"][0]["stat"]
-        self.rank_stats = stats[1]["splits"][0]["stat"]
+        try:
+            stats_url = "https://statsapi.web.nhl.com/api/v1/teams/{}/stats".format(self.team_id)
+            logging.info("Getting team stats for %s via URL - %s", self.short_name, stats_url)
+            stats = requests.get(stats_url).json()
+            stats = stats["stats"]
+            self.team_stats = stats[0]["splits"][0]["stat"]
+            self.rank_stats = stats[1]["splits"][0]["stat"]
+        except (IndexError, KeyError) as e:
+            logging.warning("Error getting team stats - %s", e)
+            self.team_stats = "N/A"
+            self.rank_stats = "N/A"
 
         # Send request to get current roster
-        roster_url = "https://statsapi.web.nhl.com/api/v1/teams/{}/roster".format(self.team_id)
-        logging.info("Getting roster for %s via URL - %s", self.short_name, roster_url)
-        roster = requests.get(roster_url).json()
-        self.roster = roster["roster"]
+        try:
+            roster_url = "https://statsapi.web.nhl.com/api/v1/teams/{}/roster".format(self.team_id)
+            logging.info("Getting roster for %s via URL - %s", self.short_name, roster_url)
+            roster = requests.get(roster_url).json()
+            self.roster = roster["roster"]
+        except (IndexError, KeyError) as e:
+            logging.warning("Error getting team roster - %s", e)
+            self.roster = "N/A"
 
         # If DEBUG, print all objects
         logging.debug('#' * 80)
@@ -221,8 +292,28 @@ class Team(object):
         logging.debug('#' * 80)
 
 
+    @property
+    def current_record(self):
+        return f"{self.wins}-{self.losses}-{self.ot}"
+
+
+    def get_new_points(self, outcome):
+        """Takes a game outcome and returns the team's udpated points."""
+        current_points = self.points
+        if outcome == "win":
+            current_points += 2
+        elif outcome == "loss":
+            current_points += 0
+        elif outcome == "ot":
+            current_points += 1
+
+        return current_points
+
+
     def get_new_record(self, outcome):
         """Takes a game outcome and returns the team's udpated record."""
+        logging.debug("%s Current Record - %s", self.short_name, self.current_record)
+        logging.debug("Outcome - %s", outcome)
         if outcome == "win":
             self.wins += 1
         elif outcome == "loss":
@@ -230,7 +321,18 @@ class Team(object):
         elif outcome == "ot":
             self.ot += 1
 
-        new_record = "({} - {} - {})".format(self.wins, self.losses, self.ot)
+        new_record = "{} - {} - {}".format(self.wins, self.losses, self.ot)
+        logging.debug("New Record - %s", new_record)
+        return new_record
+
+
+    def get_new_playoff_series(self, outcome):
+        """Takes a game outcome and returns the team's udpated record."""
+        if outcome == "win":
+            self.wins += 1
+        elif outcome == "loss":
+            self.losses += 1
+        new_record = "({} - {})".format(self.wins, self.losses)
         return new_record
 
 
@@ -410,9 +512,8 @@ def season_series(game_id, pref_team, other_team):
         else:
             pref_record["losses"] +=1
 
-        season_series_str = ("{} season series against the {}: {}-{}-{}."
-                             .format(pref_team.short_name, other_team.short_name, pref_record["wins"],
-                                     pref_record["losses"], pref_record["ot"]))
+        season_series_str = ("Season Series: {}-{}-{}."
+                             .format(pref_record["wins"], pref_record["losses"], pref_record["ot"]))
 
         # Get stats leaders
         # pref_teamstats = game["liveData"]["boxscore"]["teams"][pref_homeaway]["teamStats"]
@@ -502,6 +603,140 @@ def season_series(game_id, pref_team, other_team):
 
     return season_series_str, points_leader_str, toi_leader_str
 
+
+def playoff_series(game_id, pref_team, other_team):
+    # Init empty dictionaries and lists
+    games_against = list()
+    pref_toi = dict()
+    pref_goals = dict()
+    pref_assists = dict()
+    pref_points = dict()
+    pref_record = {"wins": 0, "losses": 0, "ot": 0}
+    roster_player = True
+
+    season_start = str(game_id)[0:4]
+    season_end = str(int(season_start) + 1)
+    yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
+    schedule_url = ("http://statsapi.web.nhl.com/api/v1/schedule?teamId={}"
+                    "&expand=schedule.broadcasts,schedule.teams&startDate={}-08-01&endDate={:%Y-%m-%d}"
+                    .format(pref_team.team_id, season_start, yesterday))
+
+    schedule = requests.get(schedule_url).json()
+    dates = schedule["dates"]
+
+    # Loop through scheduled to get previously played games against
+    for idx, date in enumerate(dates):
+        game = date["games"][0]
+        game_type = game["gameType"]
+        game_id = game["gamePk"]
+        game_date = game["gameDate"]
+        game_team_home = game["teams"]["home"]["team"]["name"]
+        game_team_away = game["teams"]["away"]["team"]["name"]
+        teams = [game_team_away, game_team_home]
+        if game_type == "P" and other_team.team_name in teams:
+            game_feed = "http://statsapi.web.nhl.com/api/v1/game/{}/feed/live".format(game_id)
+            games_against.append(game_feed)
+
+    # If the two teams haven't played yet, just exit this function
+    if not games_against:
+        return None, None, None
+
+    # Loop through newly created games_against list to get each stats
+    for feed in games_against:
+        game = requests.get(feed).json()
+        game_data = game["gameData"]
+        pref_homeaway = "home" if game_data["teams"]["home"]["name"] == pref_team.team_name else "away"
+        other_homeaway = "away" if game_data["teams"]["home"]["name"] == pref_team.team_name else "home"
+
+        # Get stats leaders
+        # pref_teamstats = game["liveData"]["boxscore"]["teams"][pref_homeaway]["teamStats"]
+        pref_playerstats = game["liveData"]["boxscore"]["teams"][pref_homeaway]["players"]
+        for id, player in pref_playerstats.items():
+            try:
+                # Calculate TOI
+                player_toi_str = player["stats"]["skaterStats"]["timeOnIce"]
+                player_toi_minutes = int(player_toi_str.split(":")[0])
+                player_toi_seconds = int(player_toi_str.split(":")[1])
+                player_toi = (player_toi_minutes * 60) + player_toi_seconds
+                pref_toi[id] = pref_toi.get(id, 0) + player_toi
+
+                # Point Totals
+                player_goal_str = player["stats"]["skaterStats"]["goals"]
+                pref_goals[id] = pref_goals.get(id, 0) + int(player_goal_str)
+                player_assist_str = player["stats"]["skaterStats"]["assists"]
+                pref_assists[id] = pref_assists.get(id, 0) + int(player_assist_str)
+                player_points = int(player_goal_str) + int(player_assist_str)
+                pref_points[id] = pref_points.get(id, 0) + int(player_points)
+
+            except KeyError:
+                pass
+
+    # Calculate Stats Leaders
+    sorted_toi = sorted(pref_toi.values(), reverse=True)
+    leader_toi = sorted_toi[0]
+
+    sorted_points = sorted(pref_points.values(), reverse=True)
+    leader_points = sorted_points[0]
+
+    # Get TOI leader
+    for id in pref_toi.keys():
+        if pref_toi[id] == leader_toi:
+            player_name = player_attr_by_id(pref_team.roster, id, "fullName")
+            if player_name is None:
+                roster_player = False
+                player_id_only = id.replace("ID", "")
+                player_name = nonroster_player_attr_by_id(player_id_only, "fullName")
+            leader_toi_avg = leader_toi / len(games_against)
+            m, s = divmod(leader_toi_avg, 60)
+            toi_m = int(m)
+            toi_s = int(s)
+            toi_s = "0{}".format(toi_s) if toi_s < 10 else toi_s
+            toi_avg = "{}:{}".format(toi_m, toi_s)
+            toi_leader_str = ("TOI Leader - {} with {} / game."
+                            .format(player_name, toi_avg))
+
+    # Handle tied points leaders
+    point_leaders = list()
+    for id in pref_points.keys():
+        if pref_points[id] == leader_points:
+            point_leaders.append(id)
+
+    if len(point_leaders) == 1:
+        leader = point_leaders[0]
+        player_name = player_attr_by_id(pref_team.roster, leader, "fullName")
+        # If the player is no longer on the team, get their information (change string here?)
+        if player_name is None:
+            roster_player = False
+            player_id_only = leader.replace("ID", "")
+            player_name = nonroster_player_attr_by_id(player_id_only, "fullName")
+        player_goals = pref_goals[leader]
+        player_assists = pref_assists[leader]
+        if not roster_player:
+            points_leader_str = ("{} lead the {} with {} points ({}G, {}A) against the {} this season."
+                                 .format(player_name, pref_team.short_name, leader_points,
+                                         player_goals, player_assists, other_team.short_name))
+        else:
+            points_leader_str = ("Points Leader - {} with {} ({}G, {}A)."
+                                 .format(player_name, leader_points, player_goals, player_assists))
+    else:
+        point_leaders_with_attrs = list()
+        for leader in point_leaders:
+            player_name = player_attr_by_id(pref_team.roster, leader, "fullName")
+            if player_name is None:
+                player_id_only = leader.replace("ID", "")
+                player_name = nonroster_player_attr_by_id(player_id_only, "fullName")
+            player_goals = pref_goals[leader]
+            player_assists = pref_assists[leader]
+            player_str = "{} ({}G, {}A)".format(player_name, player_goals, player_assists)
+            point_leaders_with_attrs.append(player_str)
+
+        point_leaders_joined = " & ".join(point_leaders_with_attrs)
+        points_leader_str = ("Points Leaders - {} with {} each."
+                             .format(point_leaders_joined, leader_points))
+
+    return points_leader_str, toi_leader_str
+
+
 # ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
 # Independent functions
@@ -546,51 +781,71 @@ def dailyfaceoff_goalies(pref_team, other_team, pref_homeaway):
     soup = BeautifulSoup(r.content, 'lxml')
 
     games = soup.find_all("div", class_="starting-goalies-card stat-card")
-    for game in games:
-        teams = game.find("h4", class_="top-heading-heavy")
-        teams = teams.text
-        if pref_team_name in teams:
-            teams_split = teams.split(" at ")
-            home_team = teams_split[1]
-            away_team = teams_split[0]
-            goalies = game.find("div", class_="stat-card-main-contents")
+    team_playing_today = any(pref_team_name in game.text for game in games)
+    if len(games) > 0 and team_playing_today:
+        for game in games:
+            teams = game.find("h4", class_="top-heading-heavy")
+            teams = teams.text
+            if pref_team_name in teams:
+                teams_split = teams.split(" at ")
+                home_team = teams_split[1]
+                away_team = teams_split[0]
+                goalies = game.find("div", class_="stat-card-main-contents")
 
-            away_goalie_info = goalies.find("div", class_="away-goalie")
-            away_goalie_name = away_goalie_info.find("h4")
-            away_goalie_name = away_goalie_name.text.strip()
-            away_goalie_confirm = away_goalie_info.find("h5", class_="news-strength")
-            away_goalie_confirm = str(away_goalie_confirm.text.strip())
+                away_goalie_info = goalies.find("div", class_="away-goalie")
+                away_goalie_name = away_goalie_info.find("h4")
+                away_goalie_name = away_goalie_name.text.strip()
+                away_goalie_confirm = away_goalie_info.find("h5", class_="news-strength")
+                away_goalie_confirm = str(away_goalie_confirm.text.strip())
 
-            away_goalie_stats = away_goalie_info.find("p", class_="goalie-record")
-            away_goalie_stats_str = away_goalie_stats.text.strip()
-            away_goalie_stats_str = " ".join(away_goalie_stats_str.split())
-            away_goalie_stats_split = hockey_ref_goalie_against_team(away_goalie_name, home_team)
-            away_goalie_str = "{} ({})\nSeason Stats: {}\nCareer (vs {}): {}".format(away_goalie_name,
-                                                  away_goalie_confirm, away_goalie_stats_str,
-                                                  home_team_short, away_goalie_stats_split)
+                away_goalie_stats = away_goalie_info.find("p", class_="goalie-record")
+                away_goalie_stats_str = away_goalie_stats.text.strip()
+                away_goalie_stats_str = " ".join(away_goalie_stats_str.split())
+                away_goalie_stats_split = hockey_ref_goalie_against_team(away_goalie_name, home_team)
+                away_goalie_str = "{} ({})\nSeason Stats: {}\nCareer (vs {}): {}".format(away_goalie_name,
+                                                    away_goalie_confirm, away_goalie_stats_str,
+                                                    home_team_short, away_goalie_stats_split)
 
-            home_goalie_info = goalies.find("div", class_="home-goalie")
-            home_goalie_name = home_goalie_info.find("h4")
-            home_goalie_name = home_goalie_name.text.strip()
-            home_goalie_confirm = home_goalie_info.find("h5", class_="news-strength")
-            home_goalie_confirm = str(home_goalie_confirm.text.strip())
+                home_goalie_info = goalies.find("div", class_="home-goalie")
+                home_goalie_name = home_goalie_info.find("h4")
+                home_goalie_name = home_goalie_name.text.strip()
+                home_goalie_confirm = home_goalie_info.find("h5", class_="news-strength")
+                home_goalie_confirm = str(home_goalie_confirm.text.strip())
 
-            home_goalie_stats = home_goalie_info.find("p", class_="goalie-record")
-            home_goalie_stats_str = home_goalie_stats.text.strip()
-            home_goalie_stats_str = " ".join(home_goalie_stats_str.split())
-            home_goalie_stats_split = hockey_ref_goalie_against_team(home_goalie_name, away_team)
-            home_goalie_str = "{} ({})\nSeason Stats: {}\nCareer (vs {}): {}".format(home_goalie_name,
-                                                   home_goalie_confirm, home_goalie_stats_str,
-                                                   away_team_short, home_goalie_stats_split)
+                home_goalie_stats = home_goalie_info.find("p", class_="goalie-record")
+                home_goalie_stats_str = home_goalie_stats.text.strip()
+                home_goalie_stats_str = " ".join(home_goalie_stats_str.split())
+                home_goalie_stats_split = hockey_ref_goalie_against_team(home_goalie_name, away_team)
+                home_goalie_str = "{} ({})\nSeason Stats: {}\nCareer (vs {}): {}".format(home_goalie_name,
+                                                    home_goalie_confirm, home_goalie_stats_str,
+                                                    away_team_short, home_goalie_stats_split)
 
-            if pref_homeaway == "home":
-                pref_goalie_str = home_goalie_str
-                other_goalie_str = away_goalie_str
-            else:
-                pref_goalie_str = away_goalie_str
-                other_goalie_str = home_goalie_str
+                if pref_homeaway == "home":
+                    pref_goalie_str = home_goalie_str
+                    other_goalie_str = away_goalie_str
+                else:
+                    pref_goalie_str = away_goalie_str
+                    other_goalie_str = home_goalie_str
 
-            return pref_goalie_str, other_goalie_str
+                return pref_goalie_str, other_goalie_str
+    else:
+        # Get one goalie from each team
+        url_team_name_pref = pref_team.team_name.replace(" ","-").replace("é","e").lower()
+        url_team_name_other = other_team.team_name.replace(" ", "-").replace("é","e").lower()
+        faceoff_url_pref = "https://www.dailyfaceoff.com/teams/{}/line-combinations".format(url_team_name_pref)
+        faceoff_url_other = "https://www.dailyfaceoff.com/teams/{}/line-combinations".format(url_team_name_other)
+
+        r = requests.get(faceoff_url_pref)
+        soup = BeautifulSoup(r.content, 'lxml')
+        goalie_table = soup.find("table", attrs={"summary":"Goalies"}).find("tbody").find_all("tr")
+        pref_goalie_name = goalie_table[0].find_all("td")[0].find("a").text
+
+        r = requests.get(faceoff_url_other)
+        soup = BeautifulSoup(r.content, 'lxml')
+        goalie_table = soup.find("table", attrs={"summary":"Goalies"}).find("tbody").find_all("tr")
+        other_goalie_name = goalie_table[0].find_all("td")[0].find("a").text
+
+        return pref_goalie_name, other_goalie_name
 
 
 def hockey_ref_goalie_against_team(goalie, opponent):
@@ -647,16 +902,16 @@ def hockey_ref_goalie_against_team(goalie, opponent):
             return goalie_stats_split
 
 
-def team_hashtag(team):
+def team_hashtag(team, game_type):
     """Accepts a team name and returns the corresponding team hashtag."""
 
     team_hashtags = {
         "Anaheim Ducks": "#LetsGoDucks",
-        "Arizona Coyotes": "#Yotes",
+        "Arizona Coyotes": "#OurPack",
         "Boston Bruins": "#NHLBruins",
         "Buffalo Sabres": "#Sabres",
-        "Calgary Flames": "#CofRed",
-        "Carolina Hurricanes": "#Redvolution",
+        "Calgary Flames": "#Flames",
+        "Carolina Hurricanes": "#TakeWarning",
         "Chicago Blackhawks": "#Blackhawks",
         "Colorado Avalanche": "#GoAvsGo",
         "Columbus Blue Jackets": "#CBJ",
@@ -675,16 +930,38 @@ def team_hashtag(team):
         "Philadelphia Flyers": "#LetsGoFlyers",
         "Pittsburgh Penguins": "#LetsGoPens",
         "San Jose Sharks": "#SJSharks",
-        "St. Louis Blues": "#AllTogetherNowSTL",
+        "St. Louis Blues": "#stlblues",
         "Tampa Bay Lightning": "#GoBolts",
-        "Toronto Maple Leafs": "#TMLtalk",
+        "Toronto Maple Leafs": "#LeafsForever",
         "Vancouver Canucks": "#Canucks",
-        "Vegas Golden Knights": "#VegasGoesGold",
+        "Vegas Golden Knights": "#VegasBorn",
         "Washington Capitals": "#ALLCAPS",
         "Winnipeg Jets": "#GoJetsGo"
     }
 
-    hashtag = team_hashtags[team]
+    team_hashtags_playoffs = {
+        "Anaheim Ducks": "#LetsGoDucks",
+        "Boston Bruins": "#GoBruins",
+        "Colorado Avalanche": "#GoAvsGo",
+        "Columbus Blue Jackets": "#CBJ",
+        "Los Angeles Kings": "#GoKingsGo",
+        "Minnesota Wild": "#mnwild",
+        "Nashville Predators": "#standwithus",
+        "New Jersey Devils": "#NowWeRise",
+        "Philadelphia Flyers": "#EarnTomorrow",
+        "Pittsburgh Penguins": "#3elieve",
+        "San Jose Sharks": "#SJSharks",
+        "Tampa Bay Lightning": "#GoBolts",
+        "Toronto Maple Leafs": "#TMLTalk",
+        "Vegas Golden Knights": "#VegasBorn",
+        "Washington Capitals": "#ALLCAPS",
+        "Winnipeg Jets": "#WPGWhiteout"
+    }
+
+    if game_type == "P":
+        hashtag = team_hashtags_playoffs[team]
+    else:
+        hashtag = team_hashtags[team]
     return hashtag
 
 
@@ -742,3 +1019,110 @@ def clock_emoji(time):
         clock = hour_emojis[str(hour)]
 
     return clock
+
+
+# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# Imaging Functions
+# ------------------------------------------------------------------------------
+
+def team_colors(team):
+    """Accepts a team name and returns the background color & text color."""
+
+    team_colors_array = {
+        "Anaheim Ducks": {
+            "primary": {"bg": (252, 76, 2), "text": (255, 255, 255)},
+            "secondary": {"bg": (162, 170, 173), "text": (0, 0, 0)}},
+        "Arizona Coyotes": {
+            "primary": {"bg": (134, 38, 51), "text": (255, 255, 255)},
+            "secondary": {"bg": (221, 203, 164), "text": (0, 0, 0)}},
+        "Boston Bruins": {
+            "primary": {"bg": (255, 184, 28), "text": (255, 255, 255)},
+            "secondary": {"bg": (255, 255, 255), "text": (0, 0, 0)}},
+        "Buffalo Sabres": {
+            "primary": {"bg": (4, 30, 66), "text": (255, 255, 255)},
+            "secondary": {"bg": (162, 170, 173), "text": (0, 0, 0)}},
+        "Calgary Flames": {
+            "primary": {"bg": (200, 16, 46), "text": (255, 255, 255)},
+            "secondary": {"bg": (241, 190, 72), "text": (0, 0, 0)}},
+        "Carolina Hurricanes": {
+            "primary": {"bg": (200, 16, 46), "text": (255, 255, 255)},
+            "secondary": {"bg": (162, 170, 173), "text": (0, 0, 0)}},
+        "Chicago Blackhawks": {
+            "primary": {"bg": (204, 138, 0), "text": (255, 255, 255)},
+            "secondary": {"bg": (255, 209, 0), "text": (0, 0, 0)}},
+        "Colorado Avalanche": {
+            "primary": {"bg": (111, 38, 61), "text": (255, 255, 255)},
+            "secondary": {"bg": (35, 97, 146), "text": (0, 0, 0)}},
+        "Columbus Blue Jackets": {
+            "primary": {"bg": (200, 16, 46), "text": (255, 255, 255)},
+            "secondary": {"bg": (4, 30, 66), "text": (0, 0, 0)}},
+        "Dallas Stars": {
+            "primary": {"bg": (0, 99, 65), "text": (255, 255, 255)},
+            "secondary": {"bg": (138, 141, 143), "text": (0, 0, 0)}},
+        "Detroit Red Wings": {
+            "primary": {"bg": (200, 16, 46), "text": (255, 255, 255)},
+            "secondary": {"bg": (255, 255, 255), "text": (0, 0, 0)}},
+        "Edmonton Oilers": {
+            "primary": {"bg": (207, 69, 32), "text": (255, 255, 255)},
+            "secondary": {"bg": (0, 32, 91), "text": (0, 0, 0)}},
+        "Florida Panthers": {
+            "primary": {"bg": (4, 30, 66), "text": (255, 255, 255)},
+            "secondary": {"bg": (185, 151, 91), "text": (0, 0, 0)}},
+        "Los Angeles Kings": {
+            "primary": {"bg": (162, 170, 173), "text": (255, 255, 255)},
+            "secondary": {"bg": (255, 255, 255), "text": (0, 0, 0)}},
+        "Minnesota Wild": {
+            "primary": {"bg": (21, 71, 52), "text": (255, 255, 255)},
+            "secondary": {"bg": (166, 25, 46), "text": (0, 0, 0)}},
+        "Montréal Canadiens": {
+            "primary": {"bg": (166, 25, 46), "text": (255, 255, 255)},
+            "secondary": {"bg": (0, 30, 98), "text": (0, 0, 0)}},
+        "Nashville Predators": {
+            "primary": {"bg": (255, 184, 28), "text": (255, 255, 255)},
+            "secondary": {"bg": (4, 30, 66), "text": (0, 0, 0)}},
+        "New Jersey Devils": {
+            "primary": {"bg": (200, 16, 46), "text": (255, 255, 255)},
+            "secondary": {"bg": (255, 255, 255), "text": (0, 0, 0)}},
+        "New York Islanders": {
+            "primary": {"bg": (252, 76, 2), "text": (255, 255, 255)},
+            "secondary": {"bg": (0, 48, 135), "text": (0, 0, 0)}},
+        "New York Rangers": {
+            "primary": {"bg": (0, 51, 160), "text": (255, 255, 255)},
+            "secondary": {"bg": (200, 16, 46), "text": (0, 0, 0)}},
+        "Ottawa Senators": {
+            "primary": {"bg": (198, 146, 20), "text": (255, 255, 255)},
+            "secondary": {"bg": (200, 16, 46), "text": (0, 0, 0)}},
+        "Philadelphia Flyers": {
+            "primary": {"bg": (250, 70, 22), "text": (255, 255, 255)},
+            "secondary": {"bg": (255, 255, 255), "text": (0, 0, 0)}},
+        "Pittsburgh Penguins": {
+            "primary": {"bg": (255, 184, 28), "text": (255, 255, 255)},
+            "secondary": {"bg": (255, 255, 255), "text": (0, 0, 0)}},
+        "San Jose Sharks": {
+            "primary": {"bg": (0, 98, 114), "text": (255, 255, 255)},
+            "secondary": {"bg": (229, 114, 0), "text": (0, 0, 0)}},
+        "St. Louis Blues": {
+            "primary": {"bg": (0, 48, 135), "text": (255, 255, 255)},
+            "secondary": {"bg": (4, 30, 66), "text": (0, 0, 0)}},
+        "Tampa Bay Lightning": {
+            "primary": {"bg": (0, 32, 91), "text": (255, 255, 255)},
+            "secondary": {"bg": (255, 255, 255), "text": (0, 0, 0)}},
+        "Toronto Maple Leafs": {
+            "primary": {"bg": (0, 32, 91), "text": (255, 255, 255)},
+            "secondary": {"bg": (255, 255, 255), "text": (0, 0, 0)}},
+        "Vancouver Canucks": {
+            "primary": {"bg": (0, 32, 91), "text": (255, 255, 255)},
+            "secondary": {"bg": (151, 153, 155), "text": (0, 0, 0)}},
+        "Vegas Golden Knights": {
+            "primary": {"bg": (180, 151, 90), "text": (255, 255, 255)},
+            "secondary": {"bg": (51, 63, 66), "text": (0, 0, 0)}},
+        "Washington Capitals": {
+            "primary": {"bg": (166, 25, 46), "text": (255, 255, 255)},
+            "secondary": {"bg": (4, 30, 66), "text": (255, 255, 255)}},
+        "Winnipeg Jets": {
+            "primary": {"bg": (4, 30, 66), "text": (255, 255, 255)},
+            "secondary": {"bg": (200, 16, 46), "text": (0, 0, 0)}},
+    }
+
+    return team_colors_array[team]

@@ -26,6 +26,7 @@ import sys
 import time
 from datetime import datetime, timedelta
 import dateutil.tz
+from subprocess import Popen
 
 # 3rd Party Imports
 import linode
@@ -42,6 +43,7 @@ from secret import *
 # Congfiguration, Logging & Argument Parsing
 # ------------------------------------------------------------------------------
 
+PROJECT_ROOT = os.path.dirname(os.path.realpath(__file__))
 config = configparser.ConfigParser()
 conf_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'config.ini')
 config.read(conf_path)
@@ -68,10 +70,11 @@ def setup_logging():
     #pylint: disable=line-too-long
 
     # logger = logging.getLogger(__name__)
-    log_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'NHLTwitterBot.log')
+    log_file_name = datetime.now().strftime(config['SCRIPT']['LOG_FILE_NAME'] + '-%Y%m%d%H%M%s.log')
+    log_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'logs', log_file_name)
     if args.console and args.debug:
         logging.basicConfig(level=logging.DEBUG, datefmt='%Y-%m-%d %H:%M:%S',
-                            format='%(asctime)s - %(module)s.%(funcName)s - %(levelname)s - %(message)s')
+                            format='%(asctime)s - %(module)s.%(funcName)s (%(lineno)d) - %(levelname)s - %(message)s')
     elif args.console:
         logging.basicConfig(level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S',
                             format='%(asctime)s - %(module)s.%(funcName)s - %(levelname)s - %(message)s')
@@ -105,6 +108,10 @@ def parse_arguments():
     parser.add_argument("--localdata", help="use local data instead of API",
                         action="store_true")
     parser.add_argument("--yesterday", help="get yesterday game on the schedule",
+                        action="store_true")
+    parser.add_argument("--date", help="override game date",
+                        action="store")
+    parser.add_argument("--split", help="split squad game index",
                         action="store_true")
 
     arguments = parser.parse_args()
@@ -395,6 +402,142 @@ def show_all_objects():
 # Image Generation Functions
 # ------------------------------------------------------------------------------
 
+def luminance(pixel):
+    return (0.299 * pixel[0] + 0.587 * pixel[1] + 0.114 * pixel[2])
+
+
+def are_colors_similar(color_a, color_b):
+    return abs(luminance(color_a) - luminance(color_b)) < 18
+
+
+def custom_font_size(fontName, size):
+    return ImageFont.truetype(fontName, size)
+
+
+def pregame_image(game):
+    # Check if the preview tweet has been sent already
+    api = get_api()
+    search_text = "{} tune".format(TWITTER_ID)
+    search_results = api.search(q=search_text, count=1)
+    if len(search_results) > 0:
+        logging.info("Found an old tune-in tweet - checking if sent today.")
+        latest_tweet_date = search_results[0].created_at
+
+        # If preview tweet was sent today, return False and skip this section
+        logging.info("Previous tune in tweet - %s", latest_tweet_date)
+        if latest_tweet_date.date() == datetime.now().date():
+            return None
+
+    # Load Required Fonts
+    FONT_OPENSANS_BOLD = 'resources/fonts/OpenSans-Bold.ttf'
+    FONT_OPENSANS_SEMIBOLD = 'resources/fonts/OpenSans-SemiBold.ttf'
+    FONT_OPENSANS_EXTRABOLD = 'resources/fonts/OpenSans-ExtraBold.ttf'
+    FONT_COLOR_WHITE = (255, 255, 255)
+
+    # Set the background / load the baseline image
+    bg = Image.open('resources/images/GamedayPregameFinalV3-Larger.png')
+    draw = ImageDraw.Draw(bg)
+    # draw.fontmode = "0"
+
+    # Setup Colors (via functions)
+    pref_colors = nhl_game_events.team_colors(game.preferred_team.team_name)
+    pref_color_primary = pref_colors["primary"]["bg"]
+    other_colors = nhl_game_events.team_colors(game.other_team.team_name)
+
+    logging.debug("Pref Colors - %s // Other Colors - %s", pref_colors, other_colors)
+
+    # Setup static coordinates / width / etc
+    LOGO_WIDTH = 300
+
+    COORDS_HOME_LOGO = (325, 270)
+    COORDS_AWAY_LOGO = (0, 270)
+    COORDS_RECORDS_Y = 490
+
+    COORDS_GAME_NUM = (845, 100)
+    COORDS_GAMEINFO_DAY_X = 648
+    COORDS_GAMEINFO_DAY_Y = 290
+    COORDS_GAMEINFO_DAY = (COORDS_GAMEINFO_DAY_X, COORDS_GAMEINFO_DAY_Y)
+    COORDS_GAMEINFO_WIDTH = 520
+    MAX_GAMEINFO_WIDTH = COORDS_GAMEINFO_WIDTH - 10
+
+    COORDS_GAMEINFO_LINE2_RECT_TOPLEFT = (648, 381)
+    COORDS_GAMEINFO_LINE2_RECT_BOTRIGHT = (1168, 451)
+    COORDS_GAMEINFO_LINE3_RECT_TOPLEFT = (648, 451)
+    COORDS_GAMEINFO_LINE3_RECT_BOTRIGHT = (1168, 521)
+
+    # Load, resize & paste team logos
+    away_logo = Image.open(f"resources/logos/{game.away_team.team_name.replace(' ', '')}.png")
+    home_logo = Image.open(f"resources/logos/{game.home_team.team_name.replace(' ', '')}.png")
+
+    resize = (300, 200)
+    away_logo.thumbnail(resize, Image.ANTIALIAS)
+    home_logo.thumbnail(resize, Image.ANTIALIAS)
+    bg.paste(away_logo, COORDS_AWAY_LOGO, away_logo)
+    bg.paste(home_logo, COORDS_HOME_LOGO, home_logo)
+
+    # Home Points, Record & Draw
+    home_pts = game.home_team.points
+    home_record_str = f"{home_pts} PTS • {game.home_team.current_record}"
+    home_w, home_h = draw.textsize(home_record_str, custom_font_size(FONT_OPENSANS_BOLD, 35))
+    coords_home_record = (((2 * LOGO_WIDTH + 325 - home_w) / 2), COORDS_RECORDS_Y)
+    draw.text(coords_home_record, home_record_str, fill=FONT_COLOR_WHITE, font=custom_font_size(FONT_OPENSANS_BOLD, 35))
+
+    away_pts = game.away_team.points
+    away_record_str = f"{away_pts} PTS • {game.away_team.current_record}"
+    away_w, away_h = draw.textsize(away_record_str, custom_font_size(FONT_OPENSANS_BOLD, 35))
+    coords_away_record = (((LOGO_WIDTH - away_w) / 2), COORDS_RECORDS_Y)
+    draw.text(coords_away_record, away_record_str, fill=FONT_COLOR_WHITE, font=custom_font_size(FONT_OPENSANS_BOLD, 35))
+
+    ## TODO: Add logic for pre-season & playoffs here.
+    game_number_str = f"{game.preferred_team.games + 1} OF 82"
+    draw.text(COORDS_GAME_NUM, game_number_str, fill=pref_color_primary, font=custom_font_size(FONT_OPENSANS_EXTRABOLD, 80))
+
+    # Draw background rectangles for Game Info lines 2 & 3
+    draw.rectangle([COORDS_GAMEINFO_LINE2_RECT_TOPLEFT, COORDS_GAMEINFO_LINE2_RECT_BOTRIGHT], pref_color_primary)
+    draw.rectangle([COORDS_GAMEINFO_LINE3_RECT_TOPLEFT, COORDS_GAMEINFO_LINE3_RECT_BOTRIGHT], FONT_COLOR_WHITE)
+
+    # Build Day / Date Line
+    gameinfo_day = game.day_of_game_local.upper()
+    day_w, day_h = draw.textsize(gameinfo_day, font=custom_font_size(FONT_OPENSANS_EXTRABOLD, 50))
+    draw.text(COORDS_GAMEINFO_DAY, gameinfo_day, fill=pref_color_primary, font=custom_font_size(FONT_OPENSANS_EXTRABOLD, 52))
+    remaining_width = COORDS_GAMEINFO_WIDTH - day_w
+
+    gameinfo_date = game.month_day_local.upper()
+    date_w, date_h = draw.textsize(gameinfo_date, font=custom_font_size(FONT_OPENSANS_SEMIBOLD, 52))
+    coords_gameinfo_date = (COORDS_GAMEINFO_DAY_X + (COORDS_GAMEINFO_WIDTH - date_w), COORDS_GAMEINFO_DAY_Y)
+    draw.text(coords_gameinfo_date, gameinfo_date, fill=pref_color_primary, font=custom_font_size(FONT_OPENSANS_SEMIBOLD, 52))
+
+    # Build Game Info Line 2 (Time & Venue)
+    gameinfo_venue = game.venue
+    gameinfo_time = game.game_time_local.lstrip("0")
+    gameinfo_line2 = f"{gameinfo_time} • {gameinfo_venue}"
+    line2_w, line2_h = draw.textsize(gameinfo_line2, font=custom_font_size(FONT_OPENSANS_BOLD, 38))
+    if line2_w > MAX_GAMEINFO_WIDTH:
+        logging.info("Line 2 was too long, reducing font size.")
+        line2_w, line2_h = draw.textsize(gameinfo_line2, font=custom_font_size(FONT_OPENSANS_BOLD, 31))
+        coords_line2 = (COORDS_GAMEINFO_DAY_X + ((COORDS_GAMEINFO_WIDTH - line2_w) / 2), 390)
+        draw.text(coords_line2, gameinfo_line2, FONT_COLOR_WHITE, font=custom_font_size(FONT_OPENSANS_BOLD, 31))
+    else:
+        coords_line2 = (COORDS_GAMEINFO_DAY_X + ((COORDS_GAMEINFO_WIDTH - line2_w) / 2), 387)
+        draw.text(coords_line2, gameinfo_line2, FONT_COLOR_WHITE, font=custom_font_size(FONT_OPENSANS_BOLD, 38))
+
+    # Build Game Info Line 3 (Game Hashtag & Pref Team Hashtag)
+    gameinfo_hashtag = game.game_hashtag
+    gameinfo_teamhashtag = nhl_game_events.team_hashtag(game.preferred_team.team_name, game.game_type)
+    gameinfo_line3 = f"{gameinfo_teamhashtag} • {gameinfo_hashtag}"
+    line3_w, line3_h = draw.textsize(gameinfo_line3, font=custom_font_size(FONT_OPENSANS_BOLD, 38))
+    if line3_w > MAX_GAMEINFO_WIDTH:
+        logging.info("Line 3 was too long, reducing font size.")
+        line3_w, line3_h = draw.textsize(gameinfo_line3, font=custom_font_size(FONT_OPENSANS_BOLD, 33))
+        coords_line3 = (COORDS_GAMEINFO_DAY_X + ((COORDS_GAMEINFO_WIDTH - line3_w) / 2), 460)
+        draw.text(coords_line3, gameinfo_line3, pref_color_primary, font=custom_font_size(FONT_OPENSANS_BOLD, 33))
+    else:
+        coords_line3 = (COORDS_GAMEINFO_DAY_X + ((COORDS_GAMEINFO_WIDTH - line3_w) / 2), 457)
+        draw.text(coords_line3, gameinfo_line3, pref_color_primary, font=custom_font_size(FONT_OPENSANS_BOLD, 38))
+
+    return bg
+
+
 def preview_image(game):
     """Generates the game preview image and returns the image instance.
 
@@ -430,10 +573,34 @@ def preview_image(game):
 
     game_date_short = game.game_date_short
     game_time = game.game_time_local.replace(" ", "")
-    details_game = ("{} of 82 | {} | {}"
-                    .format(game.preferred_team.games + 1, game_date_short, game_time))
+    if game.game_type == config['GAMETYPE']['PLAYOFFS']:
+        series_details = ("{} - {} / {} - {}"
+                          .format(game.away_team.short_name, game.away_team.wins,
+                                  game.home_team.short_name, game.home_team.wins))
+        # Convert round number into text
+        if game.game_id_playoff_round == "1":
+            playoff_round_text = "First Round"
+        elif game.game_id_playoff_round == "2":
+            playoff_round_text = "Second Round"
+        else:
+            playoff_round_text = "Unknown Round"
 
-    full_details = "{}\n{}\n{}".format(details_game, game.venue, game.game_hashtag)
+        full_details = ("{} - Game #{}\n{}\n\n{} | {} | {}\n#StanleyCup {} {}"
+                      .format(playoff_round_text, game.game_id_playoff_game,
+                      series_details, game.venue, game_date_short, game_time,
+                      nhl_game_events.team_hashtag(game.preferred_team.team_name, game.game_type),
+                      game.game_hashtag))
+        details_coords = (110, 110)
+    elif game.game_type == config['GAMETYPE']['PRESEASON']:
+        details_game = ("PRESEASON | {} | {}"
+                        .format(game_date_short, game_time))
+        full_details = "{}\n{}\n{}".format(details_game, game.venue, game.game_hashtag)
+        details_coords = (145, 160)
+    else:
+        details_game = ("{} of 82 | {} | {}"
+                        .format(game.preferred_team.games + 1, game_date_short, game_time))
+        full_details = "{}\n{}\n{}".format(details_game, game.venue, game.game_hashtag)
+        details_coords = (145, 160)
 
     # Calculate Font Sizes
     teams_length = len(teams_text)
@@ -441,7 +608,7 @@ def preview_image(game):
     longest_details = 0
     for line in iter(full_details.splitlines()):
         longest_details = len(line) if len(line) > longest_details else longest_details
-    details_font_size = math.floor(1050 / longest_details)
+    details_font_size = math.floor(1100 / longest_details)
 
     font_large = ImageFont.truetype(teams_font, teams_font_size)
     font_small = ImageFont.truetype(details_font, details_font_size)
@@ -449,8 +616,6 @@ def preview_image(game):
     draw = ImageDraw.Draw(bg)
     team_coords = (40, 20)
     draw.text(team_coords, teams_text, font_black, font_large)
-
-    details_coords = (145, 160)
     draw.multiline_text(details_coords, full_details, font_black, font_small, None, 10, "center")
 
     return bg
@@ -528,25 +693,27 @@ def final_image(game, boxscore_preferred, boxscore_other):
     text_pref_score = game.preferred_team.score
     text_other_score = game.other_team.score
 
-    # Update records & get new for final image
-    if game.preferred_team.score > game.other_team.score:
-        pref_outcome = "win"
-        other_outcome = "loss" if game.period.current < 4 else "ot"
+    # Update records & get new for final image (Playoffs)
+    if game.game_type == "P":
+        if game.preferred_team.score > game.other_team.score:
+            pref_outcome = "win"
+            other_outcome = "loss"
+        else:
+            other_outcome = "win"
+            pref_outcome = "loss"
+
+        pref_record_str = preferred_team.get_new_playoff_series(pref_outcome)
+        other_record_str = other_team.get_new_playoff_series(other_outcome)
     else:
-        other_outcome = "loss"
-        pref_outcome = "loss" if game.period.current < 4 else "ot"
+        if game.preferred_team.score > game.other_team.score:
+            pref_outcome = "win"
+            other_outcome = "loss" if game.period.current < 4 else "ot"
+        else:
+            other_outcome = "win"
+            pref_outcome = "loss" if game.period.current < 4 else "ot"
 
-
-    # pref_record = pref["leagueRecord"]
-    # pref_record_str = ("({} - {} - {})".format(pref_record["wins"], pref_record["losses"],
-    #                                            pref_record["ot"]))
-
-    # other_record = other["leagueRecord"]
-    # other_record_str = ("({} - {} - {})".format(other_record["wins"], other_record["losses"],
-    #                                             other_record["ot"]))
-
-    pref_record_str = preferred_team.get_new_record(pref_outcome)
-    other_record_str = other_team.get_new_record(other_outcome)
+        pref_record_str = preferred_team.get_new_record(pref_outcome)
+        other_record_str = other_team.get_new_record(other_outcome)
 
     text_shots = preferred_team.shots
     text_pk = "{} / {}".format(preferred_stats_pk_killed, preferred_stats_pk_against)
@@ -570,6 +737,421 @@ def final_image(game, boxscore_preferred, boxscore_other):
     draw.text(coords_faceoff, str(text_faceoff), font_black, font_small)
     draw.text(coords_hits, str(text_hits), font_black, font_small)
     draw.text(coords_blocks, str(text_blocks), font_black, font_small)
+
+    return bg
+
+
+def stats_image_bar_generator(draw, stat, pref_stat_value, other_stat_value,
+                              pref_colors, other_colors):
+    logging.debug("Stats Bar Generator: stat - %s, pref_value - %s, other_value - %s, pref_colors - %s, other_colors - %s",
+                  stat, pref_stat_value, other_stat_value, pref_colors, other_colors)
+
+    # Load all fonts to be used within the image generator
+    font_opensans_regular = 'resources/fonts/OpenSans-Regular.ttf'
+    font_opensans_italic = 'resources/fonts/OpenSans-Italic.ttf'
+    font_opensans_bold = 'resources/fonts/OpenSans-Bold.ttf'
+    font_opensans_bolditalic = 'resources/fonts/OpenSans-BoldItalic.ttf'
+
+    # Static Font Sizes
+    font_opensans_regular_large = ImageFont.truetype(font_opensans_regular, 80)
+    font_opensans_regular_small = ImageFont.truetype(font_opensans_regular, 40)
+    font_opensans_regular_smaller = ImageFont.truetype(font_opensans_regular, 30)
+    font_opensans_regular_xxs = ImageFont.truetype(font_opensans_regular, 20)
+
+    font_opensans_italic_xs = ImageFont.truetype(font_opensans_italic, 25)
+    font_opensans_italic_xxs = ImageFont.truetype(font_opensans_italic, 20)
+
+    font_opensans_bold_large = ImageFont.truetype(font_opensans_bold, 90)
+    font_opensans_bold_small = ImageFont.truetype(font_opensans_bold, 40)
+    font_opensans_bold_smaller = ImageFont.truetype(font_opensans_bold, 30)
+    font_opensans_bold_xs = ImageFont.truetype(font_opensans_bold, 27)
+
+    font_opensans_boldit_small = ImageFont.truetype(font_opensans_bolditalic, 40)
+    font_opensans_boldit_smallish = ImageFont.truetype(font_opensans_bolditalic, 35)
+    font_opensans_boldit_smaller = ImageFont.truetype(font_opensans_bolditalic, 30)
+    font_opensans_boldit_xs = ImageFont.truetype(font_opensans_bolditalic, 25)
+    font_opensans_boldit_xxs = ImageFont.truetype(font_opensans_bolditalic, 20)
+
+    # Define static values, text strings & coordinates
+    STATS_RECT_WIDTH = 437
+    STATS_RECT_TOPLEFT_X = 279
+    STATS_RECT_HEIGHT = 49
+    FONT_BLACK = (0, 0, 0)
+    FONT_WHITE = (255, 255, 255)
+
+    # Check stat type and set specific parameters here
+    if stat == "shots":
+        stat_total = pref_stat_value + other_stat_value
+        stat_total_text = f"SHOTS: {stat_total}"
+        stat_total_text_coords = (50, 243)
+        stat_total_text_font = font_opensans_boldit_smaller
+        stat_rect_pref_topleft_y = 241
+    elif stat == "blocked shots":
+        stat_total = pref_stat_value + other_stat_value
+        stat_total_text = f"BLOCKED SHOTS: {stat_total}"
+        stat_total_text_font = custom_font_size(font_opensans_bolditalic, 23)
+        stat_total_text_coords = (50, 335)
+        stat_rect_pref_topleft_y = 328
+    elif stat == "hits":
+        stat_total = pref_stat_value + other_stat_value
+        stat_total_text = f"HITS: {stat_total}"
+        stat_total_text_font = font_opensans_boldit_smaller
+        stat_total_text_coords = (50, 510)
+        stat_rect_pref_topleft_y = 505
+    elif stat == "power play":
+        pref_powerplays, pref_ppg = pref_stat_value
+        other_powerplays, other_ppg = other_stat_value
+        power_play_pref = f"{int(pref_ppg)} / {int(pref_powerplays)}"
+        power_play_other = f"{int(other_ppg)} / {int(other_powerplays)}"
+
+        # Re-assign values
+        pref_stat_value = pref_powerplays
+        other_stat_value = other_powerplays
+
+        stat_total = pref_powerplays + other_powerplays
+        stat_total_text = f"POWER PLAYS: {int(stat_total)}"
+        stat_total_text_font = custom_font_size(font_opensans_bolditalic, 23)
+        stat_total_text_coords = (50, 423)
+        stat_rect_pref_topleft_y = 416
+    elif stat == "penalty minutes":
+        stat_total = pref_stat_value + other_stat_value
+        stat_total_text = f"PENALTY MINUTES: {stat_total}"
+        stat_total_text_font = custom_font_size(font_opensans_bolditalic, 20)
+        stat_total_text_coords = (50, 603)
+        stat_rect_pref_topleft_y = 592
+
+
+    # Calculate the remainder of the coordinates
+    stat_rect_width_pref = STATS_RECT_WIDTH * (pref_stat_value / stat_total)
+    stat_rect_width_other = STATS_RECT_WIDTH * (other_stat_value / stat_total)
+
+    stat_rect_pref_topleft_x = STATS_RECT_TOPLEFT_X
+    stat_rect_pref_bottomright_x = stat_rect_pref_topleft_x + stat_rect_width_pref
+    stat_rect_pref_bottomright_y = stat_rect_pref_topleft_y + STATS_RECT_HEIGHT
+    stat_text_pref_coords = (stat_rect_pref_topleft_x + 10, stat_rect_pref_topleft_y + 6)
+
+    stat_rect_other_topleft_x = stat_rect_pref_bottomright_x
+    stat_rect_other_topleft_y = stat_rect_pref_topleft_y
+    stat_rect_other_bottomright_x = stat_rect_other_topleft_x + stat_rect_width_other
+    stat_rect_other_bottomright_y = stat_rect_pref_bottomright_y
+    stat_text_other_coords = (stat_rect_other_topleft_x + 10, stat_rect_other_topleft_y + 6)
+
+    # Draw the text fields & bars
+    if stat == "power play":
+        draw.rectangle([stat_rect_pref_topleft_x, stat_rect_pref_topleft_y, stat_rect_pref_bottomright_x,
+                        stat_rect_pref_bottomright_y], outline=None, fill=pref_colors["bg"])
+        draw.rectangle([stat_rect_other_topleft_x, stat_rect_other_topleft_y, stat_rect_other_bottomright_x,
+                        stat_rect_other_bottomright_y], outline=None, fill=other_colors["bg"])
+        if pref_powerplays != 0:
+            draw.text(stat_text_pref_coords, power_play_pref, pref_colors["text"], font_opensans_bold_xs)
+        if other_powerplays != 0:
+            draw.text(stat_text_other_coords, power_play_other, other_colors["text"], font_opensans_bold_xs)
+        draw.text(stat_total_text_coords, stat_total_text, FONT_WHITE, stat_total_text_font)
+    else:
+        draw.rectangle([stat_rect_pref_topleft_x, stat_rect_pref_topleft_y, stat_rect_pref_bottomright_x,
+                        stat_rect_pref_bottomright_y], outline=None, fill=pref_colors["bg"])
+        draw.rectangle([stat_rect_other_topleft_x, stat_rect_other_topleft_y, stat_rect_other_bottomright_x,
+                        stat_rect_other_bottomright_y], outline=None, fill=other_colors["bg"])
+        draw.text(stat_text_pref_coords, str(pref_stat_value), pref_colors["text"], font_opensans_bold_xs)
+        draw.text(stat_text_other_coords, str(other_stat_value), other_colors["text"], font_opensans_bold_xs)
+        draw.text(stat_total_text_coords, stat_total_text, FONT_WHITE, stat_total_text_font)
+
+
+def stats_image_generator(game, bg_type, boxscore_preferred, boxscore_other):
+
+    logging.debug("Stats Image Generator Game: %s", game)
+    logging.debug("Stats Image Generator BG: %s", bg_type)
+    # logging.debug("Stats Image Generator BOXPREF: %s", boxscore_preferred)
+    # logging.debug("Stats Image Generator BOXOTHER: %s", boxscore_other)
+
+    # Define static values, text strings & coordinates
+    STATS_RECT_WIDTH = 437
+    STATS_RECT_TOPLEFT_X = 279
+    STATS_RECT_HEIGHT = 49
+    FONT_BLACK = (0, 0, 0)
+    FONT_WHITE = (255, 255, 255)
+
+    COORDS_PREF_LOGO = (840, 120)
+    COORDS_OTHER_LOGO = (1015, 120)
+    COORDS_PREF_RECORD = (910, 135)
+    COORDS_OTHER_RECORD = (1110, 135)
+    COORDS_LOGO_VS = (960, 130)
+    COORDS_TEAMS_VS_Y = 198
+    COORDS_TEAMS_VS_X = 275
+    WIDTH_TEAMS_VS = 447
+    COORDS_TEAMS_VS = (335, 198)
+    TEAMS_VS_W, TEAMS_VS_H = (447, 39)
+
+    # Load & Resize Logos
+    pref_logo = Image.open('resources/logos/{}.png'
+                           .format(game.preferred_team.team_name.replace(" ", "")))
+    other_logo = Image.open('resources/logos/{}.png'
+                            .format(game.other_team.team_name.replace(" ", "")))
+    resize = (120, 120)
+    pref_logo.thumbnail(resize, Image.ANTIALIAS)
+    other_logo.thumbnail(resize, Image.ANTIALIAS)
+
+    # Change background image based on intermission or game final
+    # Also change the "losing team" image to grayscale for final
+    if bg_type == "intermission":
+        bg = Image.open('resources/images/GamedayIntermissionFinal-V3Larger.png')
+        bg.paste(pref_logo, COORDS_PREF_LOGO, pref_logo)
+        bg.paste(other_logo, COORDS_OTHER_LOGO, other_logo)
+    else:
+        bg = Image.open('resources/images/GamedayRecapFinalV3-Larger.png')
+        COORDS_PREF_LOGO = (780, 120)
+        COORDS_OTHER_LOGO = (985, 120)
+        COORDS_LOGO_VS = (-100, -100)
+
+        if game.preferred_team.score > game.other_team.score:
+            bg.paste(pref_logo, COORDS_PREF_LOGO, pref_logo)
+            bg.paste(other_logo.convert('LA'), COORDS_OTHER_LOGO, other_logo)
+        else:
+            bg.paste(pref_logo.convert('LA'), COORDS_PREF_LOGO, pref_logo)
+            bg.paste(other_logo, COORDS_OTHER_LOGO, other_logo)
+
+    # Load all fonts to be used within the image generator
+    teams_font = 'resources/fonts/Adidas.otf'
+    details_font = 'resources/fonts/Impact.ttf'
+    font_opensans_regular = 'resources/fonts/OpenSans-Regular.ttf'
+    font_opensans_italic = 'resources/fonts/OpenSans-Italic.ttf'
+    font_opensans_bold = 'resources/fonts/OpenSans-Bold.ttf'
+    font_opensans_bolditalic = 'resources/fonts/OpenSans-BoldItalic.ttf'
+
+    # Static Font Sizes
+    font_opensans_regular_large = ImageFont.truetype(font_opensans_regular, 80)
+    font_opensans_regular_small = ImageFont.truetype(font_opensans_regular, 40)
+    font_opensans_regular_smaller = ImageFont.truetype(font_opensans_regular, 30)
+    font_opensans_regular_xxs = ImageFont.truetype(font_opensans_regular, 20)
+
+    font_opensans_italic_xs = ImageFont.truetype(font_opensans_italic, 25)
+    font_opensans_italic_xxs = ImageFont.truetype(font_opensans_italic, 20)
+
+    font_opensans_bold_large = ImageFont.truetype(font_opensans_bold, 90)
+    font_opensans_bold_small = ImageFont.truetype(font_opensans_bold, 40)
+    font_opensans_bold_smaller = ImageFont.truetype(font_opensans_bold, 30)
+    font_opensans_bold_xs = ImageFont.truetype(font_opensans_bold, 27)
+
+    font_opensans_boldit_small = ImageFont.truetype(font_opensans_bolditalic, 40)
+    font_opensans_boldit_smallish = ImageFont.truetype(font_opensans_bolditalic, 35)
+    font_opensans_boldit_smaller = ImageFont.truetype(font_opensans_bolditalic, 30)
+    font_opensans_boldit_xs = ImageFont.truetype(font_opensans_bolditalic, 25)
+    font_opensans_boldit_xxs = ImageFont.truetype(font_opensans_bolditalic, 20)
+
+    # Setup Colors (via functions)
+    pref_colors = nhl_game_events.team_colors(game.preferred_team.team_name)
+    other_colors = nhl_game_events.team_colors(game.other_team.team_name)
+
+    logging.debug("Pref Colors - %s // Other Colors - %s", pref_colors, other_colors)
+
+    if are_colors_similar(pref_colors["primary"]["bg"], other_colors["primary"]["bg"]):
+        logging.debug("Primary Colors are Similar!")
+        pref_colors_all = pref_colors["primary"]
+        pref_colors_bg = pref_colors["primary"]["bg"]
+        pref_colors_text = pref_colors["primary"]["text"]
+        other_colors_all = other_colors["secondary"]
+        other_colors_bg = other_colors["secondary"]["bg"]
+        other_colors_text = other_colors["secondary"]["text"]
+    else:
+        pref_colors_all = pref_colors["primary"]
+        pref_colors_bg = pref_colors["primary"]["bg"]
+        pref_colors_text = pref_colors["primary"]["text"]
+        other_colors_all = other_colors["primary"]
+        other_colors_bg = other_colors["primary"]["bg"]
+        other_colors_text = other_colors["primary"]["text"]
+
+    logging.debug("(After Similar) -- Pref Colors - %s // Other Colors - %s", pref_colors, other_colors)
+
+    # Draw the rest of the image
+    draw = ImageDraw.Draw(bg)
+    draw.fontmode = "0"
+
+    # Draw "VS" or Updated Record
+    if bg_type == "intermission":
+        draw.text(COORDS_LOGO_VS, "vs", FONT_WHITE, font_opensans_bold_small)
+    else:
+        # Update records & get new for final image (Playoffs)
+        if game.game_type == "P":
+            if game.preferred_team.score > game.other_team.score:
+                pref_outcome = "win"
+                other_outcome = "loss"
+            else:
+                other_outcome = "win"
+                pref_outcome = "loss"
+
+            pref_str = game.preferred_team.get_new_playoff_series(pref_outcome)
+            other_str = game.other_team.get_new_playoff_series(other_outcome)
+        else:
+            if game.preferred_team.score > game.other_team.score:
+                pref_outcome = "win"
+                other_outcome = "loss" if game.period.current < 4 else "ot"
+            else:
+                other_outcome = "win"
+                pref_outcome = "loss" if game.period.current < 4 else "ot"
+
+            pref_points_str = game.preferred_team.get_new_points(pref_outcome)
+            pref_record_str = game.preferred_team.get_new_record(pref_outcome)
+            other_points_str = game.other_team.get_new_points(other_outcome)
+            other_record_str = game.other_team.get_new_record(other_outcome)
+
+            pref_str = f"{pref_points_str} PTS\n{pref_record_str}"
+            other_str = f"{other_points_str} PTS\n{other_record_str}"
+
+        draw.text(COORDS_PREF_RECORD, pref_str, FONT_WHITE, custom_font_size(font_opensans_bold, 16), align="center")
+        draw.text(COORDS_OTHER_RECORD, other_str, FONT_WHITE, custom_font_size(font_opensans_bold, 16), align="center")
+
+    # Create Team Name String & Calculate Center
+    teams_vs_text = f"{game.preferred_team.short_name} vs. {game.other_team.short_name}".upper()
+    w, h = draw.textsize(teams_vs_text, font_opensans_bold_smaller)
+    if w < WIDTH_TEAMS_VS:
+        coords_teams_vs_calc = (COORDS_TEAMS_VS_X + ((TEAMS_VS_W - w) / 2), COORDS_TEAMS_VS_Y)
+        draw.text(coords_teams_vs_calc, teams_vs_text, FONT_BLACK, font_opensans_bold_smaller)
+    else:
+        w, h = draw.textsize(teams_vs_text, font_opensans_bold_xs)
+        coords_teams_vs_calc = (COORDS_TEAMS_VS_X + ((TEAMS_VS_W - w) / 2), COORDS_TEAMS_VS_Y)
+        draw.text(coords_teams_vs_calc, teams_vs_text, FONT_BLACK, font_opensans_bold_smaller)
+
+    # Draw the stats bars
+    preferred_stats = boxscore_preferred["teamStats"]["teamSkaterStats"]
+    other_stats = boxscore_other["teamStats"]["teamSkaterStats"]
+    stats_image_bar_generator(draw, "shots", preferred_stats["shots"],
+                              other_stats["shots"], pref_colors_all, other_colors_all)
+    stats_image_bar_generator(draw, "blocked shots", preferred_stats["blocked"],
+                              other_stats["blocked"], pref_colors_all, other_colors_all)
+    stats_image_bar_generator(draw, "hits", preferred_stats["hits"],
+                              other_stats["hits"], pref_colors_all, other_colors_all)
+    stats_image_bar_generator(draw, "penalty minutes", preferred_stats["pim"],
+                              other_stats["pim"], pref_colors_all, other_colors_all)
+
+    # Power Play requires a Tuple to be passed in (instead of a integer)
+    pref_powerplay = (preferred_stats["powerPlayOpportunities"], preferred_stats["powerPlayGoals"])
+    other_powerplay = (other_stats["powerPlayOpportunities"], other_stats["powerPlayGoals"])
+    logging.debug("Calling Stats Bar: pref_pp - %s, other_pp - %s, pref_colors - %s, other_colors - %s",
+                   pref_powerplay, other_powerplay, pref_colors_all, other_colors_all)
+    stats_image_bar_generator(draw, "power play", pref_powerplay, other_powerplay,
+                              pref_colors_all, other_colors_all)
+
+    # Setup & Draw Faceoff Graph (including inner / outer circles)
+    logging.debug("Generating Faceoff Stats for Image.")
+    text_title_faceoff = "FACEOFF %"
+    coords_faceoff_title = (950, 500)
+    coords_faceoff_pref = (950, 550)
+    coords_faceoff_other = (950, 575)
+    coords_faceoff_box = [780, 475, 920, 615]
+    coords_faceoff_box_inner_black = [810, 505, 890, 585]
+    coords_faceoff_box_inner_white = [809, 504, 891, 586]
+
+    pref_faceoff = float(preferred_stats["faceOffWinPercentage"])
+    text_faceoff_pref = f"{game.preferred_team.short_name}: {pref_faceoff}%".upper()
+    other_faceoff = float(other_stats["faceOffWinPercentage"])
+    text_faceoff_other = f"{game.other_team.short_name}: {other_faceoff}%".upper()
+    faceoff_angle = (pref_faceoff / 100) * 360
+
+    logging.debug("Preferred Faceoff: %s", pref_faceoff)
+    logging.debug("Faceoff Angle: %s", faceoff_angle)
+
+    text_title_faceoff = "FACEOFF %"
+    draw.text(coords_faceoff_title, text_title_faceoff, FONT_WHITE, font_opensans_boldit_small)
+    draw.text(coords_faceoff_pref, text_faceoff_pref, FONT_WHITE, font_opensans_regular_xxs)
+    draw.text(coords_faceoff_other, text_faceoff_other, FONT_WHITE, font_opensans_regular_xxs)
+    draw.pieslice(coords_faceoff_box, 0, faceoff_angle, fill=pref_colors_bg)
+    draw.pieslice(coords_faceoff_box, faceoff_angle, 360, fill=other_colors_bg)
+
+    # Draw outlines & inner circles
+    draw.pieslice(coords_faceoff_box_inner_white, 0, 360, fill=(255, 255, 255))
+    draw.pieslice(coords_faceoff_box_inner_black, 0, 360, fill=(0, 0, 0))
+
+    # Draw Goals & Score Text
+    coords_pref_score = (1095, 198)
+    coords_pref_score_goals_box = [760, 210, 873, 246]
+    coords_pref_score_goals_text = (764, 215)
+    coords_goals_pref = (775, 256)
+    coords_other_score = (1095, 328)
+    coords_other_score_goals_box = [760, 336, 873, 372]
+    coords_other_score_goals_text = (764, 341)
+    coords_goals_other = (775, 378)
+
+    text_pref_score = game.preferred_team.score
+    text_other_score = game.other_team.score
+    text_pref_goal_title = f"{game.preferred_team.tri_code} GOALS".upper()
+    text_other_goal_title = f"{game.other_team.tri_code} GOALS".upper()
+    pref_goals_array = []
+    other_goals_array = []
+
+    logging.debug("Looping through preferred goals for stat box.")
+    preferred_boxscore_players = boxscore_preferred["players"]
+    for id, player in preferred_boxscore_players.items():
+        try:
+            if player["stats"]["skaterStats"]["goals"] == 1:
+                player_name = player["person"]["fullName"]
+                player_first_name = player_name.split()[0]
+                player_first_letter = player_first_name[0]
+                player_last_name = player_name.split()[1]
+                player_abbrev_name = f"{player_first_letter}. {player_last_name}"
+                pref_goals_array.append(player_abbrev_name)
+            elif player["stats"]["skaterStats"]["goals"] > 1:
+                player_goals = player["stats"]["skaterStats"]["goals"]
+                player_name = player["person"]["fullName"]
+                player_first_name = player_name.split()[0]
+                player_first_letter = player_first_name[0]
+                player_last_name = player_name.split()[1]
+                player_abbrev_name = f"{player_first_letter}. {player_last_name} [{player_goals}]"
+                pref_goals_array.append(player_abbrev_name)
+        except KeyError:
+            logging.debug("Stats for %s not available.", player["person"]["fullName"])
+
+    logging.debug("Looping through preferred goals for stat box.")
+    other_boxscore_players = boxscore_other["players"]
+    for id, player in other_boxscore_players.items():
+        try:
+            if player["stats"]["skaterStats"]["goals"] == 1:
+                player_name = player["person"]["fullName"]
+                player_first_name = player_name.split()[0]
+                player_first_letter = player_first_name[0]
+                player_last_name = player_name.split()[1]
+                player_abbrev_name = f"{player_first_letter}. {player_last_name}"
+                other_goals_array.append(player_abbrev_name)
+            elif player["stats"]["skaterStats"]["goals"] > 1:
+                player_goals = player["stats"]["skaterStats"]["goals"]
+                player_name = player["person"]["fullName"]
+                player_first_name = player_name.split()[0]
+                player_first_letter = player_first_name[0]
+                player_last_name = player_name.split()[1]
+                player_abbrev_name = f"{player_first_letter}. {player_last_name} [{player_goals}]"
+                other_goals_array.append(player_abbrev_name)
+        except KeyError:
+            logging.debug("Stats for %s not available.", player["person"]["fullName"])
+
+    logging.debug("Pref Goals: %s // Other Goals: %s", pref_goals_array, other_goals_array)
+    if len(pref_goals_array) < 4:
+        text_goals_pref = ", ".join(pref_goals_array)
+        logging.debug("Length: %s // String: %s", len(pref_goals_array), text_goals_pref)
+    else:
+        for idx, scorer in enumerate(pref_goals_array):
+            logging.debug("%s: %s", idx, scorer)
+        text_goals_pref = ", ".join(pref_goals_array[0:3])
+        text_goals_pref = text_goals_pref + "\n" + ", ".join(pref_goals_array[3:])
+        logging.debug("Length: %s // String: %s", len(pref_goals_array), text_goals_pref)
+
+    if len(other_goals_array) < 4:
+        text_goals_other = ", ".join(other_goals_array)
+    else:
+        text_goals_other = ", ".join(other_goals_array[0:3])
+        text_goals_other = text_goals_other + "\n" +  ", ".join(other_goals_array[3:])
+
+    logging.debug("Drawing team score text.")
+    draw.text(coords_pref_score, str(text_pref_score), pref_colors_bg, font_opensans_bold_large)
+    draw.text(coords_other_score, str(text_other_score), other_colors_bg, font_opensans_bold_large)
+
+    logging.debug("Drawing team goal rects & title.")
+    draw.rectangle(coords_pref_score_goals_box, outline=None, fill=pref_colors_bg)
+    draw.rectangle(coords_other_score_goals_box, outline=None, fill=other_colors_bg)
+    draw.text(coords_pref_score_goals_text, text_pref_goal_title, FONT_WHITE, custom_font_size(font_opensans_bold, 18))
+    draw.text(coords_other_score_goals_text, text_other_goal_title, FONT_WHITE, custom_font_size(font_opensans_bold, 18))
+
+    logging.debug("Drawing goal scorer text.")
+    draw.multiline_text(coords_goals_pref, text_goals_pref, FONT_WHITE, custom_font_size(font_opensans_bold, 16))
+    draw.multiline_text(coords_goals_other, text_goals_other, FONT_WHITE, custom_font_size(font_opensans_bold, 16))
 
     return bg
 
@@ -615,6 +1197,14 @@ def is_game_today(team_id):
     now = datetime.now()
     if args.yesterday:
         now = now - timedelta(days=1)
+    elif args.date is not None:
+        try:
+            now = datetime.strptime(args.date, '%Y-%m-%d')
+        except ValueError as e:
+            logging.error("Invalid override date - exiting.")
+            logging.error(e)
+            sys.exit()
+
     url = ("{}/api/v1/schedule?teamId={}&expand="
            "schedule.broadcasts,schedule.teams&date={:%Y-%m-%d}"
            .format(NHLAPI_BASEURL, team_id, now))
@@ -627,6 +1217,23 @@ def is_game_today(team_id):
 
     if games_total == 1:
         games_info = schedule["dates"][0]["games"][0]
+        return True, games_info
+    elif games_total == 2:
+        dirname = os.path.dirname(os.path.realpath(__file__))
+        if args.split is False:
+            logging.info("Split squad detected, spawning a second process to pick up second game.")
+            game_index = 0
+            if args.date is not None:
+                spawn_args = ' '.join(sys.argv[1:])
+                logging.debug("Spawning Process: python3 %s/hockey_twitter_bot.py --split %s", dirname, spawn_args)
+                Popen(['python3 ' + dirname + '/hockey_twitter_bot.py --split ' + spawn_args], shell=True)
+            else:
+                Popen(['nohup python3 ' + dirname + '/hockey_twitter_bot.py --split &'], shell=True)
+        else:
+            logging.info("Split squad detected, this is the second spawned process to pick up second game (sleep for 5 seconds).")
+            time.sleep(5)
+            game_index = 1
+        games_info = schedule["dates"][0]["games"][game_index]
         return True, games_info
     return False, None
 
@@ -683,6 +1290,17 @@ def get_lineup(game, period, on_ice, players):
             # If for some reason a goalie isn't detected on ice
             tweet_text = ("On the ice to start overtime for your {} are:\n\n{}\n\n{}"
                         .format(game.preferred_team.team_name, tweet_players, game.game_hashtag))
+        send_tweet(tweet_text)
+
+    elif period > 3 and game.game_type == "P":
+        ot_number = period - 3
+        tweet_forwards = "-".join(forwards)
+        tweet_defense = "-".join(defense)
+        tweet_goalie = goalies[0]
+
+        tweet_text = ("On the ice to start OT{} for your {} -\n\n{}\n{}\n{}"
+                      .format(ot_number, game.preferred_team.team_name,
+                              tweet_forwards, tweet_defense, tweet_goalie))
         send_tweet(tweet_text)
 
 
@@ -804,7 +1422,6 @@ def parse_penalty(play, game):
     penalty_tweet_id = send_tweet(penalty_tweet)
 
 
-
 def parse_regular_goal(play, game):
     """Parses attributes of a goal and tweets out the result.
 
@@ -862,7 +1479,10 @@ def parse_regular_goal(play, game):
         elif goal_eng:
             goal_announce = "{} Empty Net GOAL!".format(goal_team)
         else:
-            goal_announce = "{} GOAL!".format(goal_team)
+            if goal_score_preferred == 7:
+                goal_announce = "{} TOUCHDOWN!".format(goal_team)
+            else:
+                goal_announce = "{} GOAL!".format(goal_team)
     # Overtime goal announcements should be more exciting
     else:
         goal_announce = "{} OVERTIME GOAL!!".format(goal_team)
@@ -927,7 +1547,7 @@ def parse_regular_goal(play, game):
         num_lights = goal_score_home if game.preferred_team.home_away == "home" else goal_score_away
         # goal_lights_text = '🚨' * num_lights
         goal_lights_text = '\U0001F6A8' * num_lights
-        team_hashtag = nhl_game_events.team_hashtag(game.preferred_team.team_name)
+        team_hashtag = nhl_game_events.team_hashtag(game.preferred_team.team_name, game.game_type)
 
         if not assists:
             goal_text_player = "{}".format(goal_scorer_text)
@@ -956,7 +1576,7 @@ def parse_regular_goal(play, game):
         goal_thumbs_text = '\U0001F44E' * num_thumbs
 
         goal_announce = "{} scored. {}".format(goal_team, goal_thumbs_text)
-        goal_text_player = ("{} ({}s) - {} left in the {} period."
+        goal_text_player = ("{} ({}) - {} left in the {} period."
                             .format(goal_scorer_name, ordinal(goal_scorer_total),
                                     goal_period_remain, goal_period_ord))
         goal_text_score = ("Score - {}: {} / {}: {}"
@@ -1244,6 +1864,16 @@ def loop_game_events(json_feed, game):
             if recent_event(play):
                 get_lineup(game, event_period, on_ice, players)
 
+        elif event_type == "PERIOD_READY" and event_period > 3 and game.game_type == "P":
+            logging.info("Playoff overtime detected.")
+            preferred_team = game.preferred_team
+            preferred_homeaway = preferred_team.home_away
+            on_ice = json_feed["liveData"]["boxscore"]["teams"][preferred_homeaway]["onIce"]
+            # players = json_feed["liveData"]["boxscore"]["teams"][preferred_homeaway]["players"]
+            players = json_feed["gameData"]["players"]
+            if recent_event(play):
+                get_lineup(game, event_period, on_ice, players)
+
         elif event_type == "PERIOD_READY" and event_period == 5 and game.game_type in ("PR", "R"):
             if recent_event(play):
                 tweet_text = ("The shootout is ready to begin at {}!\n\n{}"
@@ -1254,6 +1884,7 @@ def loop_game_events(json_feed, game):
                 tweet_text = ("The puck has dropped between the {} & {} at {}!\n\n{}"
                               .format(game.preferred_team.short_name, game.other_team.short_name,
                                       game.venue, game.game_hashtag))
+
             elif event_period in (2, 3):
                 tweet_text = ("It's time for the {} period at {}.\n\n{}"
                               .format(event_period_ordinal, game.venue,
@@ -1261,6 +1892,11 @@ def loop_game_events(json_feed, game):
             elif event_period == 4 and game.game_type in ("PR", "R"):
                 tweet_text = ("Who will be the hero this time? 3-on-3 OT starts now at {}!\n\n{}"
                               .format(game.venue, game.game_hashtag))
+
+            elif event_period > 3 and game.game_type == "P":
+                ot_period = event_period - 3
+                tweet_text = ("Who will be the hero this time? OT{} starts now at {}!\n\n{}"
+                              .format(ot_period, game.venue, game.game_hashtag))
 
             if recent_event(play):
                 send_tweet(tweet_text)
@@ -1292,23 +1928,37 @@ def loop_game_events(json_feed, game):
                 else:
                     lead_trail_text = None
 
-                # Build end of period tweet
-                if lead_trail_text is None:
-                    tweet_text = ("The {} period of {} comes to an end.\n\n"
-                                "{}: {} ({} shots)\n{}: {} ({} shots)"
-                                .format(event_period_ordinal, game.game_hashtag,
-                                        game.preferred_team.short_name, game.preferred_team.score,
-                                        game.preferred_team.shots, game.other_team.short_name,
-                                        game.other_team.score, game.other_team.shots))
+                # Build end of period tweet & image
+                boxscore = json_feed["liveData"]["boxscore"]["teams"]
+                boxscore_away = boxscore["away"]
+                boxscore_home = boxscore["home"]
+                boxscore_preferred = boxscore_home if game.home_team.preferred else boxscore_away
+                boxscore_other = boxscore_away if game.home_team.preferred else boxscore_home
+                img = stats_image_generator(game, "intermission", boxscore_preferred, boxscore_other)
+                if args.notweets:
+                    img.show()
                 else:
-                    tweet_text = ("The {} period of {} comes to an end. {}\n\n"
-                                "{}: {} ({} shots)\n{}: {} ({} shots)"
-                                .format(event_period_ordinal, game.game_hashtag, lead_trail_text,
-                                        game.preferred_team.short_name, game.preferred_team.score,
-                                        game.preferred_team.shots, game.other_team.short_name,
-                                        game.other_team.score, game.other_team.shots))
+                    img_filename = ('resources/images/GamedayIntermission-{}-{}.png'
+                                    .format(event_period, game.preferred_team.games + 1))
+                    img.save(img_filename)
+
+
+                if lead_trail_text is None:
+                    # tweet_text = ("The {} period of {} comes to an end.\n\n"
+                    #             "{}: {} ({} shots)\n{}: {} ({} shots)"
+                    #             .format(event_period_ordinal, game.game_hashtag,
+                    #                     game.preferred_team.short_name, game.preferred_team.score,
+                    #                     game.preferred_team.shots, game.other_team.short_name,
+                    #                     game.other_team.score, game.other_team.shots))
+                    tweet_text = ("The {} period of {} comes to an end."
+                                  .format(event_period_ordinal, game.game_hashtag))
+                else:
+                    tweet_text = ("The {} period of {} comes to an end. {}"
+                                .format(event_period_ordinal, game.game_hashtag, lead_trail_text))
+
                 if recent_event(play):
-                    send_tweet(tweet_text)
+                    api = get_api()
+                    api.update_with_media(img_filename, tweet_text)
 
                 # 1st and 2nd intermission is 18 minutes - sleep for that long
                 linescore = json_feed["liveData"]["linescore"]
@@ -1324,6 +1974,17 @@ def loop_game_events(json_feed, game):
                               "{} and {} headed to overtime tied at {}.\n\n{}"
                               .format(game.preferred_team.short_name, game.other_team.short_name,
                                       game.preferred_team.score, game.game_hashtag))
+                if recent_event(play):
+                    send_tweet(tweet_text)
+
+            elif event_period > 3 and (game.preferred_team.score == game.other_team.score) and game.game_type == "P":
+                ot_period = event_period - 3
+                next_ot = ot_period + 1
+                ot_string = "overtime wasn't" if ot_period == 1 else "overtimes weren't"
+                tweet_text = ("{} {} to decide this game. "
+                              "{} and {} headed to OT{} tied at {}.\n\n{}"
+                              .format(ot_period, ot_string, game.preferred_team.short_name, game.other_team.short_name,
+                                      next_ot, game.preferred_team.score, game.game_hashtag))
                 if recent_event(play):
                     send_tweet(tweet_text)
 
@@ -1375,7 +2036,7 @@ def parse_end_of_game(json_feed, game):
     boxscore_other = boxscore_away if game.home_team.preferred else boxscore_home
 
     preferred_home_text = "on the road" if game.preferred_team.home_away == "away" else "at home"
-    preferred_hashtag = nhl_game_events.team_hashtag(game.preferred_team.team_name)
+    preferred_hashtag = nhl_game_events.team_hashtag(game.preferred_team.team_name, game.game_type)
     perferred_final_score = game.preferred_team.score
     other_final_score = game.other_team.score
 
@@ -1391,7 +2052,8 @@ def parse_end_of_game(json_feed, game):
                                     game.other_team.score))
 
     # Generate Final Image
-    img = final_image(game, boxscore_preferred, boxscore_other)
+    # img = final_image(game, boxscore_preferred, boxscore_other)
+    img = stats_image_generator(game, "final", boxscore_preferred, boxscore_other)
     final_score_tweet = ("{} {} {}"
                          .format(final_score_text, preferred_hashtag, game.game_hashtag))
 
@@ -1400,7 +2062,7 @@ def parse_end_of_game(json_feed, game):
             img.show()
             logging.info("%s", final_score_tweet)
         else:
-            img_filename = ('resources/images/GamedayFinal-{}.jpg'
+            img_filename = ('resources/images/GamedayFinal-{}.png'
                             .format(game.preferred_team.games + 1))
             img.save(img_filename)
             api = get_api()
@@ -1456,9 +2118,6 @@ def game_preview(game):
 
     logging.info("Game Date (UTC) - %s", game.date_time)
     logging.info("Game Date (LCL) - %s", game.game_time_local)
-    logging.info("Game State is Preview - try to get preview image, "
-                 "send preview tweet & sleep for %s seconds.",
-                 game.game_time_countdown)
 
     # Get preferred & other team from Game object
     (preferred_team, other_team) = game.get_preferred_team()
@@ -1466,10 +2125,17 @@ def game_preview(game):
     # Format & send preview tweet
     clock_emoji = nhl_game_events.clock_emoji(game.game_time_local)
 
-    preview_text_teams = (
-        "Tune in {} when the {} take on the {} at {}."
-        .format(game.game_time_of_day, preferred_team.team_name, other_team.team_name, game.venue)
-    )
+    if game.game_type == "P":
+        preview_text_teams = (
+            "Tune in {} for Game #{} when the {} take on the {} at {}."
+            .format(game.game_time_of_day, game.game_id_playoff_game ,preferred_team.team_name, other_team.team_name, game.venue)
+        )
+    else:
+        preview_text_teams = (
+            "Tune in {} when the {} take on the {} at {}."
+            .format(game.game_time_of_day, preferred_team.team_name, other_team.team_name, game.venue)
+        )
+
     preview_text_emojis = (
         "{}: {}\n\U0001F4FA: {}\n\U00000023\U0000FE0F\U000020E3: {}"
         .format(clock_emoji, game.game_time_local, preferred_team.tv_channel, game.game_hashtag)
@@ -1478,25 +2144,30 @@ def game_preview(game):
     # logging.info("[TWEET] \n%s", preview_tweet_text)
     # Sleep script until game time.
 
+    # Get Team Hashtags
+    pref_hashtag = nhl_game_events.team_hashtag(game.preferred_team.team_name, game.game_type)
+    other_hashtag = nhl_game_events.team_hashtag(game.other_team.team_name, game.game_type)
+
     # Get Season Series
     season_series_strings = nhl_game_events.season_series(game.game_id, game.preferred_team,
                                                           game.other_team)
 
     season_series_str = season_series_strings[0]
     if season_series_str is None:
-        season_series_tweet = ("This is the first meeting of the season between"
+        season_series_tweet = ("This is the first meeting of the season between "
                                "the {} & the {}.\n\n{} {} {}"
                                .format(game.preferred_team.short_name, game.other_team.short_name,
-                                       game.preferred_team.team_hashtag,
-                                       game.other_team.team_hashtag, game.game_hashtag))
+                                       pref_hashtag, other_hashtag, game.game_hashtag))
     else:
         points_leader_str = season_series_strings[1]
         toi_leader_str = season_series_strings[2]
+        if game.game_type == "P":
+            # season_series_str = season_series_str.replace("season series", "regular season series")
+            season_series_str = "Regular Season Stats -\n\n{}".format(season_series_str)
 
         season_series_tweet = ("{}\n{}\n{}\n\n{} {} {}"
                                .format(season_series_str, points_leader_str, toi_leader_str,
-                                       game.preferred_team.team_hashtag,
-                                       game.other_team.team_hashtag, game.game_hashtag))
+                                       pref_hashtag, other_hashtag, game.game_hashtag))
 
     # Get Goalie Projection
     pref_team_name = game.preferred_team.team_name
@@ -1505,12 +2176,13 @@ def game_preview(game):
     pref_goalie, other_goalie = nhl_game_events.dailyfaceoff_goalies(
                                 preferred_team, other_team, pref_team_homeaway)
     pref_goalie_tweet = ("Projected {} Goalie for {}:\n{}"
-                  .format(game.game_hashtag, game.preferred_team.team_hashtag, pref_goalie))
+                  .format(game.game_hashtag, pref_hashtag, pref_goalie))
     other_goalie_tweet = ("Projected {} Goalie for {}:\n{}"
-                  .format(game.game_hashtag, game.other_team.team_hashtag, other_goalie))
+                  .format(game.game_hashtag, other_hashtag, other_goalie))
 
 
-    img = preview_image(game)
+    # img = preview_image(game)
+    img = pregame_image(game)
     if args.notweets:
         img.show()
         logging.info("%s", preview_tweet_text)
@@ -1519,7 +2191,7 @@ def game_preview(game):
         logging.info("%s", season_series_tweet)
     else:
         if img is not None:
-            img_filename = 'resources/images/Gameday-{}.jpg'.format(game.preferred_team.games + 1)
+            img_filename = 'resources/images/Gameday-{}.png'.format(game.preferred_team.games + 1)
             img.save(img_filename)
             api = get_api()
             image_tweet = api.update_with_media(img_filename, preview_tweet_text)
@@ -1529,6 +2201,9 @@ def game_preview(game):
             other_goalie_tweet_id = send_tweet(other_goalie_tweet, reply=pref_goalie_tweet_id)
             send_tweet(season_series_tweet, reply=other_goalie_tweet_id)
 
+    logging.info("Game State is Preview - try to get preview image, "
+                "send preview tweet & sleep for %s seconds.",
+                game.game_time_countdown)
     time.sleep(game.game_time_countdown)
 
 
@@ -1552,8 +2227,12 @@ if __name__ == '__main__':
     # Log script start lines
     logging.info('#' * 80)
     logging.info('New instance of the Hockey Twitter Bot started...')
-    logging.info('ARGS - notweets: %s, console: %s, team: %s',
+    logging.info('ARGS - notweets: %s, console: %s, teamoverride: %s',
                  args.notweets, args.console, args.team)
+    logging.info('ARGS - debug: %s, debugtweets: %s, yesterday: %s',
+                 args.debug, args.debugtweets, args.yesterday)
+    logging.info('ARGS - date: %s, split: %s, localdata: %s',
+                 args.date, args.split, args.localdata)
     logging.info("%s\n", "#" * 80)
 
     # Create a requests object to maintain session
@@ -1571,6 +2250,9 @@ if __name__ == '__main__':
             logging.info("No game scheduled for today - exiting script.")
         sys.exit()
 
+    # For debugging purposes, print all game_info
+    logging.debug("Game Information: %s", game_info)
+
     # Create a Game Object
     gameobj_game_id = game_info["gamePk"]
     gameobj_game_type = game_info["gameType"]
@@ -1578,29 +2260,42 @@ if __name__ == '__main__':
     gameobj_game_state = game_info["status"]["abstractGameState"]
     if args.localdata or args.yesterday:
         gameobj_game_state = "Live"
-    gameobj_venue = game_info["venue"]["name"]
+
+    # If venue is null for some reason, extract from home_team
+    try:
+        gameobj_venue = game_info["venue"]["name"]
+    except KeyError:
+        gameobj_venue = game_info["teams"]["home"]["team"]["venue"]["name"]
     gameobj_live_feed = game_info["link"]
 
     gameobj_broadcasts = {}
-    broadcasts = game_info["broadcasts"]
-    for broadcast in broadcasts:
-        broadcast_team = broadcast["type"]
-        if broadcast_team == "national":
-            gameobj_broadcasts["away"] = broadcast["name"]
-            gameobj_broadcasts["home"] = broadcast["name"]
-            break
-        else:
-            broadcast_channel = broadcast["name"]
-            gameobj_broadcasts[broadcast_team] = broadcast_channel
+    try:
+        broadcasts = game_info["broadcasts"]
+        for broadcast in broadcasts:
+            broadcast_team = broadcast["type"]
+            if broadcast_team == "national":
+                gameobj_broadcasts["away"] = broadcast["name"]
+                gameobj_broadcasts["home"] = broadcast["name"]
+                break
+            else:
+                broadcast_channel = broadcast["name"]
+                gameobj_broadcasts[broadcast_team] = broadcast_channel
+    except KeyError:
+        logging.warning("Broadcasts not available - setting them to TBD.")
+        gameobj_broadcasts["home"] = "TBD"
+        gameobj_broadcasts["home"] = "TBD"
 
     # Create Team Objects
-    # Note: Schedule endpoint calls 3-character 'abbreviation' - not 'triCcode')
+    # Note: Schedule endpoint calls 3-character 'abbreviation' - not 'triCode')
     # TODO: Review record / games played for playoffs
     team_objs_season_id = str(gameobj_game_id)[0:4]
     team_objs_season = "{}{}".format(team_objs_season_id, int(team_objs_season_id) + 1)
     awayteam_info = game_info["teams"]["away"]["team"]
     awayteam_record = game_info["teams"]["away"]["leagueRecord"]
-    awayteamobj_games = awayteam_record["wins"] + awayteam_record["losses"] + awayteam_record["ot"]
+    if gameobj_game_type == config['GAMETYPE']['PLAYOFFS'] or gameobj_game_type == config['GAMETYPE']['PRESEASON']:
+        awayteamobj_games = awayteam_record["wins"] + awayteam_record["losses"]
+    else:
+        awayteamobj_games = awayteam_record["wins"] + awayteam_record["losses"] + awayteam_record["ot"]
     awayteamobj_name = awayteam_info["name"]
     awayteamobj_id = awayteam_info["id"]
     awayteamobj_shortname = awayteam_info["teamName"]
@@ -1615,7 +2310,10 @@ if __name__ == '__main__':
 
     hometeam_info = game_info["teams"]["home"]["team"]
     hometeam_record = game_info["teams"]["home"]["leagueRecord"]
-    hometeamobj_games = hometeam_record["wins"] + hometeam_record["losses"] + hometeam_record["ot"]
+    if gameobj_game_type == config['GAMETYPE']['PLAYOFFS'] or gameobj_game_type == config['GAMETYPE']['PRESEASON']:
+        hometeamobj_games = hometeam_record["wins"] + hometeam_record["losses"]
+    else:
+        hometeamobj_games = hometeam_record["wins"] + hometeam_record["losses"] + hometeam_record["ot"]
     hometeamobj_name = hometeam_info["name"]
     hometeamobj_id = hometeam_info["id"]
     hometeamobj_shortname = hometeam_info["teamName"]
@@ -1642,7 +2340,8 @@ if __name__ == '__main__':
     while True:
         if game_obj.game_state == "Preview":
             if game_obj.game_time_countdown > 0:
-                # show_all_objects()
+                if args.debug:
+                    show_all_objects()
                 game_preview(game_obj)
             else:
                 logging.info(
