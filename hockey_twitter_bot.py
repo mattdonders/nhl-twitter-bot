@@ -30,6 +30,7 @@ from subprocess import Popen
 
 # 3rd Party Imports
 import linode
+import pytz
 import requests
 import tweepy
 from PIL import Image, ImageDraw, ImageFont
@@ -131,7 +132,6 @@ def parse_env_variables(args):
     Output:
     None
     """
-    print(os.environ)
 
     if "ARGS_NOTWEETS" in os.environ and os.environ['ARGS_NOTWEETS'] == "TRUE":
         args.notweets = True
@@ -2254,24 +2254,62 @@ if __name__ == '__main__':
             print("[ERROR] Timezone environment variable not set, please add to `docker run` commmand.")
             sys.exit()
 
+        if os.environ["TZ"] not in pytz.all_timezones:
+            print(f"[ERROR] {os.environ['TZ']} is not a valid time zone, please fix in `docker run` commmand.")
+            sys.exit()
+
+        # Force console argument & parse the remainder of the environment variables
         args.console = True
         parse_env_variables(args)
+
+        # Standardize Twitter Tokens (if being used via Docker)
+        if not args.notweets:
+            try:
+                if args.debugtweets:
+                    debug_consumer_key = os.environ["TWTR_CONSUMER_KEY"]
+                    debug_consumer_secret = os.environ["TWTR_CONSUMER_SECRET"]
+                    debug_access_token = os.environ["TWTR_ACCESS_TOKEN"]
+                    debug_access_secret = os.environ["TWTR_ACCESS_SECRET"]
+                else:
+                    consumer_key = os.environ["TWTR_CONSUMER_KEY"]
+                    consumer_secret = os.environ["TWTR_CONSUMER_SECRET"]
+                    access_token = os.environ["TWTR_ACCESS_TOKEN"]
+                    access_secret = os.environ["TWTR_ACCESS_SECRET"]
+            except KeyError:
+                print("[ERROR] Twitter API keys are not set, please add to `docker run` command.")
+                sys.exit()
+
 
     # Setup Logging for this script
     setup_logging()
 
-    if args.debugtweets:
-        TWITTER_ID = config['ENDPOINTS']['DEBUG_TWITTER_HANDLE']
+    if args.docker and not args.notweets:
+        try:
+            TWITTER_ID = os.environ["TWTR_HANDLE"]
+        except KeyError:
+            print("[ERROR] Twitter handle is not set, please add to `docker run` command.")
+            sys.exit()
+    else:
+        if args.debugtweets:
+            TWITTER_ID = config['ENDPOINTS']['DEBUG_TWITTER_HANDLE']
 
     # If --team is specified, override TEAM_BOT constant
-    if args.team is not None:
-        TEAM_BOT = args.team
+    if args.docker:
+        try:
+            TEAM_BOT = args.team
+        except KeyError:
+            print("[ERROR] NHL Team is not set, please add to `docker run` command.")
+            sys.exit()
+    else:
+        if args.team is not None:
+            TEAM_BOT = args.team
 
     # Log script start lines
     logging.info('#' * 80)
     logging.info('New instance of the Hockey Twitter Bot started.')
     if args.docker:
         logging.info('Running in a Docker container - environment variables parsed.')
+    logging.info('TIME: %s', datetime.now())
     logging.info('ARGS - notweets: %s, console: %s, teamoverride: %s',
                  args.notweets, args.console, args.team)
     logging.info('ARGS - debug: %s, debugtweets: %s, yesterday: %s',
