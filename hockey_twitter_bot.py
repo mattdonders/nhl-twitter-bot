@@ -37,7 +37,14 @@ from PIL import Image, ImageDraw, ImageFont
 
 # My Local / Custom Imports
 import nhl_game_events
-from secret import *
+
+# If running via Docker, there is no secret.py file
+# Config is done via ENV variables - just pass through this error
+try:
+    from secret import *
+except ImportError:
+    pass
+
 
 # ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
@@ -528,14 +535,17 @@ def pregame_image(game):
     draw.rectangle([COORDS_GAMEINFO_LINE3_RECT_TOPLEFT, COORDS_GAMEINFO_LINE3_RECT_BOTRIGHT], FONT_COLOR_WHITE)
 
     # Build Day / Date Line
+    line1_chars = len(game.day_of_game_local + game.month_day_local)
+    line1_fontsize = int((COORDS_GAMEINFO_WIDTH / line1_chars) + 20)
+
     gameinfo_day = game.day_of_game_local.upper()
-    day_w, day_h = draw.textsize(gameinfo_day, font=custom_font_size(FONT_OPENSANS_EXTRABOLD, 50))
-    draw.text(COORDS_GAMEINFO_DAY, gameinfo_day, fill=pref_color_primary, font=custom_font_size(FONT_OPENSANS_EXTRABOLD, 52))
+    day_w, day_h = draw.textsize(gameinfo_day, font=custom_font_size(FONT_OPENSANS_EXTRABOLD, line1_fontsize))
+    draw.text(COORDS_GAMEINFO_DAY, gameinfo_day, fill=pref_color_primary, font=custom_font_size(FONT_OPENSANS_EXTRABOLD, line1_fontsize))
 
     gameinfo_date = game.month_day_local.upper()
-    date_w, date_h = draw.textsize(gameinfo_date, font=custom_font_size(FONT_OPENSANS_SEMIBOLD, 52))
+    date_w, date_h = draw.textsize(gameinfo_date, font=custom_font_size(FONT_OPENSANS_SEMIBOLD, line1_fontsize))
     coords_gameinfo_date = (COORDS_GAMEINFO_DAY_X + (COORDS_GAMEINFO_WIDTH - date_w), COORDS_GAMEINFO_DAY_Y)
-    draw.text(coords_gameinfo_date, gameinfo_date, fill=pref_color_primary, font=custom_font_size(FONT_OPENSANS_SEMIBOLD, 52))
+    draw.text(coords_gameinfo_date, gameinfo_date, fill=pref_color_primary, font=custom_font_size(FONT_OPENSANS_SEMIBOLD, line1_fontsize))
 
     # Build Game Info Line 2 (Time & Venue)
     gameinfo_venue = game.venue
