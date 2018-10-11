@@ -453,18 +453,19 @@ def custom_font_size(fontName, size):
 
 
 def pregame_image(game):
-    # Check if the preview tweet has been sent already
-    api = get_api()
-    search_text = "{} tune".format(TWITTER_ID)
-    search_results = api.search(q=search_text, count=1)
-    if len(search_results) > 0:
-        logging.info("Found an old tune-in tweet - checking if sent today.")
-        latest_tweet_date = search_results[0].created_at
+    if not args.notweets:
+        # Check if the preview tweet has been sent already
+        api = get_api()
+        search_text = "{} tune".format(TWITTER_ID)
+        search_results = api.search(q=search_text, count=1)
+        if len(search_results) > 0:
+            logging.info("Found an old tune-in tweet - checking if sent today.")
+            latest_tweet_date = search_results[0].created_at
 
-        # If preview tweet was sent today, return False and skip this section
-        logging.info("Previous tune in tweet - %s", latest_tweet_date)
-        if latest_tweet_date.date() == datetime.now().date():
-            return None
+            # If preview tweet was sent today, return False and skip this section
+            logging.info("Previous tune in tweet - %s", latest_tweet_date)
+            if latest_tweet_date.date() == datetime.now().date():
+                return None
 
     # Load Required Fonts
     FONT_OPENSANS_BOLD = os.path.join(PROJECT_ROOT, 'resources/fonts/OpenSans-Bold.ttf')
@@ -2220,15 +2221,26 @@ def game_preview(game):
     other_goalie_tweet = ("Projected {} Goalie for {}:\n{}"
                   .format(game.game_hashtag, other_hashtag, other_goalie))
 
+    # Get Fantasy Labs lineups
+    lineups = nhl_game_events.fantasy_lab_lines(game, game.preferred_team)
+    lineups_confirmed = lineups['confirmed']
 
     # img = preview_image(game)
     img = pregame_image(game)
     if args.notweets:
         img.show()
         logging.info("%s", preview_tweet_text)
+        if lineups_confirmed:
+            fwd_def_lines_tweet = lineups.get('fwd_def_lines_tweet')
+            power_play_lines_tweet = lineups.get('power_play_lines_tweet')
+            logging.info("%s", fwd_def_lines_tweet)
+            logging.info("%s", power_play_lines_tweet)
         logging.info("%s", pref_goalie_tweet)
         logging.info("%s", other_goalie_tweet)
         logging.info("%s", season_series_tweet)
+
+        logging.info("Since we are not sending tweets, just sleep until game time.")
+        time.sleep(game.game_time_countdown)
     else:
         if img is not None:
             img_filename = os.path.join(PROJECT_ROOT, 'resources/images/Gameday-{}.png'.format(game.preferred_team.games + 1))
@@ -2236,15 +2248,53 @@ def game_preview(game):
             api = get_api()
             image_tweet = api.update_with_media(img_filename, preview_tweet_text)
             image_tweet_id = image_tweet.id_str
+        else:
+            image_tweet_id = send_tweet(preview_tweet_text)
 
+        if lineups_confirmed:
+            fwd_def_lines_tweet = lineups.get('fwd_def_lines_tweet')
+            power_play_lines_tweet = lineups.get('power_play_lines_tweet')
+
+            fwd_def_lines_tweet_id = send_tweet(fwd_def_lines_tweet, reply=image_tweet_id)
+            power_play_lines_tweet_id = send_tweet(power_play_lines_tweet, reply=fwd_def_lines_tweet_id)
+            pref_goalie_tweet_id = send_tweet(pref_goalie_tweet, reply=power_play_lines_tweet_id)
+            other_goalie_tweet_id = send_tweet(other_goalie_tweet, reply=pref_goalie_tweet_id)
+            season_series_tweet_id = send_tweet(season_series_tweet, reply=other_goalie_tweet_id)
+
+            # All tweets are sent, sleep until game time
+            logging.info("Game State is Preview & all tweets are sent. "
+                            "Sleep for %s seconds until game time.", game.game_time_countdown)
+            time.sleep(game.game_time_countdown)
+        else:
             pref_goalie_tweet_id = send_tweet(pref_goalie_tweet, reply=image_tweet_id)
             other_goalie_tweet_id = send_tweet(other_goalie_tweet, reply=pref_goalie_tweet_id)
-            send_tweet(season_series_tweet, reply=other_goalie_tweet_id)
+            season_series_tweet_id = send_tweet(season_series_tweet, reply=other_goalie_tweet_id)
 
-    logging.info("Game State is Preview - try to get preview image, "
-                "send preview tweet & sleep for %s seconds.",
-                game.game_time_countdown)
-    time.sleep(game.game_time_countdown)
+            # Lineup tweets are not sent, sleep for an hour & try again
+            logging.info("Game State is Preview & lineup tweets are not sent. "
+                            "Sleep for 1 hour & check lineups again.")
+            time.sleep(3600)
+
+            while True:
+                logging.info("Waking up & checking lineups again.")
+                # Get Fantasy Labs lineups
+                lineups = nhl_game_events.fantasy_lab_lines(game, game.preferred_team)
+                lineups_confirmed = lineups['confirmed']
+                if lineups_confirmed:
+                    logging.info("Lines are confirmed - tweeting & sleeping until game time!")
+                    fwd_def_lines_tweet = lineups.get('fwd_def_lines_tweet')
+                    power_play_lines_tweet = lineups.get('power_play_lines_tweet')
+                    fwd_def_lines_tweet_id = send_tweet(fwd_def_lines_tweet, reply=season_series_tweet_id)
+                    power_play_lines_tweet_id = send_tweet(power_play_lines_tweet, reply=fwd_def_lines_tweet_id)
+
+                    # All tweets are sent, sleep until game time
+                    logging.info("Game State is Preview & all tweets are sent. "
+                            "Sleep for %s seconds until game time.", game.game_time_countdown)
+                    time.sleep(game.game_time_countdown)
+                    break
+                else:
+                    logging.info("Lines not yet confirmed - sleeping for an hour again!")
+                    time.sleep(3600)
 
 
 # ------------------------------------------------------------------------------

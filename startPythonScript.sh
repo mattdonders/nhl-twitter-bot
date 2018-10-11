@@ -21,6 +21,6 @@ touch $SCRIPTPATH/$LOGNAME
 
 # Start command using nohup & send to background
 # /usr/bin/python3 /home/twitter/python/devilstwittergoalbot/checkGameStatus.py onreboot
-nohup python3 $SCRIPTPATH/hockey_twitter_bot.py &
+nohup python3.6 $SCRIPTPATH/hockey_twitter_bot.py &
 
 exit 0

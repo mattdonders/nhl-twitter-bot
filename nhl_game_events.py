@@ -128,7 +128,7 @@ class Game(object):
         game_date = datetime.datetime.strptime(
             self.date_time, '%Y-%m-%dT%H:%M:%SZ')
         game_date_local = game_date + self.localoffset
-        game_date_local_api = game_date_local.strftime('%Y-m-d')
+        game_date_local_api = game_date_local.strftime('%Y-%m-%d')
         return game_date_local_api
 
     @property
@@ -854,6 +854,7 @@ def hockey_ref_goalie_against_team(goalie, opponent):
 
     goalie_name_camel = goalie
     goalie_name = goalie_name_camel.lower()
+    goalie_name = hockey_ref_alt_names(goalie_name)
 
     goalie_name_split = goalie_name.split(" ")
     goalie_first_name = goalie_name_split[0]
@@ -900,6 +901,94 @@ def hockey_ref_goalie_against_team(goalie, opponent):
             goalie_stats_split = ("{}-{}-{} W-L | {} GAA | 0{} SV% | {} SO"
                                   .format(wins, loss, ot, gaa, sv_percent, shutout))
             return goalie_stats_split
+
+
+def hockey_ref_alt_names(goalie_name):
+    hockey_ref_alts = {
+        "jimmy howard": "james howard"
+    }
+
+    return hockey_ref_alts.get(goalie_name, goalie_name)
+
+
+def fantasy_lab_lines(game, team):
+    """Use the Fantasy Labs API to get confirmed lineup.
+
+    Args:
+        game (game): An NHL Game Event game object.
+        team (Team): A NHL Game Event team object.
+
+    Returns:
+        Dictionary: confirmed, forwards, defense, powerplay
+    """
+
+    # Instantiate blank return dictionary
+    return_dict = {}
+    return_dict['forwards'] = ""
+    return_dict['defense'] = ""
+    return_dict['powerplay1'] = ""
+    return_dict['powerplay2'] = ""
+
+
+    FANTASY_LABS_BASE_URL = 'https://www.fantasylabs.com/api/lines/4'
+    lineup_date = game.game_date_local
+    lineup_team = team.team_name
+
+    logging.info("Checking Fantasy Labs for today's lineup for %s", lineup_team)
+    fantasy_labs_url = f"{FANTASY_LABS_BASE_URL}/{lineup_team}/{lineup_date}"
+    r = requests.get(fantasy_labs_url).json()
+
+    # Check if lineup is confirmed (return false if not)
+    confirmed = r.get('NextMatchupData')[0].get('Properties').get('LineupConfirmed', False)
+    confirmed_datetime = r.get('NextMatchupData')[0].get('Properties').get('LineupConfirmedDateTime', 'N/A')
+    return_dict['confirmed'] = confirmed
+    return_dict['confirmed_datetime'] = confirmed_datetime
+    if not confirmed:
+        return return_dict
+
+    # Create a dictionary of players and their positions
+    lines_dict = {}
+    players = r['PlayerLines']
+    for player in players:
+        properties = player['Properties']
+        position = properties['Position']
+        full_name = properties['FullName']
+        last_name = full_name.split()[1]
+        lines_dict[position] = last_name
+
+    for i in range(1, 5):
+        C = lines_dict.get(str(i) + 'C', 'N/A')
+        LW = lines_dict.get(str(i) + 'LW', 'N/A')
+        RW = lines_dict.get(str(i) + 'RW', 'N/A')
+        line = f"{LW} - {C} - {RW}\n"
+        return_dict['forwards'] += line
+
+    for i in range(1, 4):
+        LD = lines_dict.get(str(i) + 'LD', 'N/A')
+        RD = lines_dict.get(str(i) + 'RD', 'N/A')
+        pairing = f"{LD} - {RD}\n"
+        return_dict['defense'] += pairing
+
+    for i in range(1, 3):
+        F1 = lines_dict.get('PP' + str(i) + 'F1', 'N/A')
+        F2 = lines_dict.get('PP' + str(i) + 'F2', 'N/A')
+        F3 = lines_dict.get('PP' + str(i) + 'F3', 'N/A')
+        D1 = lines_dict.get('PP' + str(i) + 'D1', 'N/A')
+        D2 = lines_dict.get('PP' + str(i) + 'D2', 'N/A')
+        pp_line = f"{F1} - {F2} - {F3}\n{D1} - {D2}\n"
+        return_dict[f'powerplay{i}'] = pp_line
+
+    # Generate Tweet Strings
+    pref_hashtag = team_hashtag(team.team_name, game.game_type)
+    fwd_def_lines_tweet = (f"{pref_hashtag} Forwards:\n{return_dict.get('forwards')}\n\n"
+                                f"{pref_hashtag} Defense:\n{return_dict.get('defense')}")
+    power_play_lines_tweet = (f"{pref_hashtag} Power Play 1:\n{return_dict.get('powerplay1')}\n\n"
+                                f"{pref_hashtag} Power Play 2:\n{return_dict.get('powerplay2')}")
+
+    return_dict['fwd_def_lines_tweet'] = fwd_def_lines_tweet
+    return_dict['power_play_lines_tweet'] = power_play_lines_tweet
+
+    return return_dict
 
 
 def team_hashtag(team, game_type):
