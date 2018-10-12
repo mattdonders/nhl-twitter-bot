@@ -303,12 +303,10 @@ def update_object_attributes(json_feed, game):
     """
 
     # logging.info("Updating game & team object attributes.")
-
     linescore = json_feed["liveData"]["linescore"]
 
     # Updated game related attributes
     game.game_state = json_feed["gameData"]["status"]["abstractGameState"]
-    game.power_play_strength = json_feed["liveData"]["linescore"]["powerPlayStrength"]
 
     # Update period related attributes
     if game.game_state != "Preview":
@@ -321,18 +319,51 @@ def update_object_attributes(json_feed, game):
     linescore_home = linescore["teams"]["home"]
     linescore_away = linescore["teams"]["away"]
 
-    game.home_team.skaters = linescore_home["numSkaters"]
     game.home_team.score = linescore_home["goals"]
     game.home_team.shots = linescore_home["shotsOnGoal"]
-    game.home_team.power_play = linescore_home["powerPlay"]
     # game.home_team.goalie_pulled = linescore_home["goaliePulled"]
 
-
-    game.away_team.skaters = linescore_away["numSkaters"]
     game.away_team.score = linescore_away["goals"]
     game.away_team.shots = linescore_away["shotsOnGoal"]
-    game.away_team.power_play = linescore_away["powerPlay"]
     # game.away_team.goalie_pulled = linescore_away["goaliePulled"]
+
+    # Logic for tracking if a team kills a penalty
+    last_power_player_strength = game.power_play_strength
+    last_home_power_play = game.home_team.power_play
+    last_home_skaters = game.home_team.skaters
+    last_away_power_play = game.away_team.power_play
+    last_away_skaters = game.away_team.skaters
+
+    game.power_play_strength = json_feed["liveData"]["linescore"]["powerPlayStrength"]
+    game.home_team.power_play = linescore_home["powerPlay"]
+    game.home_team.skaters = linescore_home["numSkaters"]
+    game.away_team.power_play = linescore_away["powerPlay"]
+    game.away_team.skaters = linescore_away["numSkaters"]
+
+
+    # One of the teams previously was on a power play
+    # if last_power_player_strength
+    penalty_killed_flag = False
+    if last_home_power_play and not game.home_team.power_play:
+        logging.info("Home team was on a power play, but now aren't anymore.")
+        penalty_killed_flag = True
+    elif last_away_power_play and not game.away_team.power_play:
+        logging.info("Away team was on a power play, but now aren't anymore.")
+        penalty_killed_flag = True
+    elif last_home_skaters == 3 and game.home_team.skaters != 3:
+        logging.info("Home team MIGHT be coming off a 5-on-3.")
+        penalty_killed_flag = True
+    elif last_away_skaters == 3 and game.away_team.skaters != 3:
+        logging.info("Away team MIGHT be coming off a 5-on-3.")
+        penalty_killed_flag = True
+
+    if penalty_killed_flag:
+        logging.info("Previous Home Skaters: %s | Current Home Skaters: %s",
+                     last_home_skaters, game.home_team.skaters)
+        logging.info("Previous Away Skaters: %s | Current Away Skaters: %s",
+                     last_away_skaters, game.away_team.skaters)
+        logging.info("Debug Linescore: %s", linescore)
+
 
 
     # Logic for keeping goalie pulled with events in between
@@ -400,7 +431,7 @@ def recent_event(event):
     seconds_since_event = int((now - date_time_local).total_seconds())
     logging.info("Event #%s (%s) occurred %s second(s) in the past - if greater than 120, skip.",
                  event_idx, event_type, seconds_since_event)
-    return bool(seconds_since_event < 120)
+    return bool(seconds_since_event < config['SCRIPT']['EVENT_TIMEOUT'])
 
 
 def show_all_objects():
