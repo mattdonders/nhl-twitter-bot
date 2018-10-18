@@ -38,7 +38,7 @@ class Game(object):
     # A Game has a lot of attributes that cannot be subclassed.
 
     def __init__(self, game_id, game_type, date_time, game_state, venue,
-                 home, away, preferred, live_feed):
+                 home, away, preferred, live_feed, season):
 
         # pylint: disable-msg=too-many-arguments
         # pylint: disable-msg=too-many-locals
@@ -51,6 +51,7 @@ class Game(object):
         self._live_feed = live_feed
         self.home_team = home
         self.away_team = away
+        self.season = season
 
         # Not passed in at object creation time
         if preferred == "home":
@@ -68,13 +69,19 @@ class Game(object):
         self.shootout = Shootout()
         self.period = Period()
 
+        # Initialize Pregame Tweets dictionary
+        self.pregame_lasttweet = None
+        self.pregametweets = {"lineups": False, "refs": False}
+
         # Initialize Final Tweets dictionary
-        self.finaltweets = {"finalscore": False, "stars": False}
+        self.finaltweets = {"finalscore": False, "stars": False,
+                            "opposition": False, "advstats": False}
 
         # Parse Game ID to get attributes
         game_id_string = str(self.game_id)
         self.game_id_season = game_id_string[0:4]
         self.game_id_gametype_id = game_id_string[4:6]
+        self.game_id_gametype_shortid = game_id_string[5:6]
         self.game_id_shortid = game_id_string[6:]
 
         if self.game_id_gametype_id == "01":
@@ -215,6 +222,8 @@ class Team(object):
         self._goalie_pulled = False
         self.preferred = False
         self.goals = []
+        self.lines = {}
+        self.nss_gamelog = None
 
         # Break-up the record into wins, losses, ot
         self.wins = record["wins"]
@@ -353,6 +362,33 @@ class Team(object):
         stat = self.team_stats[attr]
         rank = self.rank_stats[attr]
         return stat, rank
+
+
+    @property
+    def roster_dict_by_name(self):
+        roster_dict = {}
+        for player in self.roster:
+            person = player.get('person')
+            id = person.get('id')
+            name = person.get('fullName')
+            number = player.get('jerseyNumber')
+            roster_dict[name] = {}
+            roster_dict[name]['id'] = id
+            roster_dict[name]['jerseyNumber'] = number
+        return roster_dict
+
+    @property
+    def roster_dict_by_number(self):
+        roster_dict = {}
+        for player in self.roster:
+            person = player.get('person')
+            id = person.get('id')
+            name = person.get('fullName')
+            number = player.get('jerseyNumber')
+            roster_dict[number] = {}
+            roster_dict[number]['id'] = id
+            roster_dict[number]['name'] = name
+        return roster_dict
 
 
     @property
@@ -954,27 +990,33 @@ def fantasy_lab_lines(game, team):
         position = properties['Position']
         full_name = properties['FullName']
         last_name = full_name.split()[1]
-        lines_dict[position] = last_name
+        lines_dict[position] = full_name
 
     for i in range(1, 5):
-        C = lines_dict.get(str(i) + 'C', 'N/A')
-        LW = lines_dict.get(str(i) + 'LW', 'N/A')
-        RW = lines_dict.get(str(i) + 'RW', 'N/A')
+        C = lines_dict.get(str(i) + 'C', 'N/A').split()[1]
+        LW = lines_dict.get(str(i) + 'LW', 'N/A').split()[1]
+        RW = lines_dict.get(str(i) + 'RW', 'N/A').split()[1]
         line = f"{LW} - {C} - {RW}\n"
+
+        line_key = 'F' + str(i)
+        return_dict[line_key] = line
         return_dict['forwards'] += line
 
     for i in range(1, 4):
-        LD = lines_dict.get(str(i) + 'LD', 'N/A')
-        RD = lines_dict.get(str(i) + 'RD', 'N/A')
+        LD = lines_dict.get(str(i) + 'LD', 'N/A').split()[1]
+        RD = lines_dict.get(str(i) + 'RD', 'N/A').split()[1]
         pairing = f"{LD} - {RD}\n"
+
+        pair_key = 'D' + str(i)
+        return_dict[pair_key] = pairing
         return_dict['defense'] += pairing
 
     for i in range(1, 3):
-        F1 = lines_dict.get('PP' + str(i) + 'F1', 'N/A')
-        F2 = lines_dict.get('PP' + str(i) + 'F2', 'N/A')
-        F3 = lines_dict.get('PP' + str(i) + 'F3', 'N/A')
-        D1 = lines_dict.get('PP' + str(i) + 'D1', 'N/A')
-        D2 = lines_dict.get('PP' + str(i) + 'D2', 'N/A')
+        F1 = lines_dict.get('PP' + str(i) + 'F1', 'N/A').split()[1]
+        F2 = lines_dict.get('PP' + str(i) + 'F2', 'N/A').split()[1]
+        F3 = lines_dict.get('PP' + str(i) + 'F3', 'N/A').split()[1]
+        D1 = lines_dict.get('PP' + str(i) + 'D1', 'N/A').split()[1]
+        D2 = lines_dict.get('PP' + str(i) + 'D2', 'N/A').split()[1]
         pp_line = f"{F1} - {F2} - {F3}\n{D1} - {D2}\n"
         return_dict[f'powerplay{i}'] = pp_line
 
@@ -985,9 +1027,11 @@ def fantasy_lab_lines(game, team):
     power_play_lines_tweet = (f"{pref_hashtag} Power Play 1:\n{return_dict.get('powerplay1')}\n\n"
                                 f"{pref_hashtag} Power Play 2:\n{return_dict.get('powerplay2')}")
 
+    return_dict['lines'] = lines_dict
     return_dict['fwd_def_lines_tweet'] = fwd_def_lines_tweet
     return_dict['power_play_lines_tweet'] = power_play_lines_tweet
 
+    team.lines = lines_dict
     return return_dict
 
 

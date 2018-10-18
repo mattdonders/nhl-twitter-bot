@@ -37,6 +37,9 @@ from PIL import Image, ImageDraw, ImageFont
 
 # My Local / Custom Imports
 import nhl_game_events
+import advanced_stats
+import other_game_info
+import hockey_bot_imaging
 
 # If running via Docker, there is no secret.py file
 # Config is done via ENV variables - just pass through this error
@@ -254,6 +257,7 @@ def send_tweet(tweet_text, reply=None):
             tweet_id = status.id_str
         else:
             logging.warning("A tweet longer than 280 characters was detected.")
+            logging.warning("Tweet: %s", tweet_text)
             tweet_id = TWITTER_URL
             # tweet_array = []
             # tweets_needed = math.ceil(tweet_length / 280)
@@ -431,7 +435,7 @@ def recent_event(event):
     seconds_since_event = int((now - date_time_local).total_seconds())
     logging.info("Event #%s (%s) occurred %s second(s) in the past - if greater than 120, skip.",
                  event_idx, event_type, seconds_since_event)
-    return bool(seconds_since_event < config['SCRIPT']['EVENT_TIMEOUT'])
+    return bool(seconds_since_event < int(config['SCRIPT']['EVENT_TIMEOUT']))
 
 
 def show_all_objects():
@@ -2123,11 +2127,42 @@ def parse_end_of_game(json_feed, game):
                                     game.other_team.short_name, game.preferred_team.score,
                                     game.other_team.score))
 
+
+    # Get next game on the schedule (bottom of the final tweet)
+    pref_team_id = game.preferred_team.team_id
+    next_game_url = f'{NHLAPI_BASEURL}/api/v1/teams/{pref_team_id}?expand=team.schedule.next'
+    logging.info(f"Going to get next game information via URL - {next_game_url}")
+    next_game_json = req_session.get(next_game_url).json()
+    next_game_sched = next_game_json.get('teams')[0].get('nextGameSchedule')
+    next_game = next_game_sched.get('dates')[0].get('games')[0]
+
+    # Commands used to calculate time related attributes
+    localtz = dateutil.tz.tzlocal()
+    localoffset = localtz.utcoffset(datetime.now(localtz))
+    next_game_date = next_game.get('gameDate')
+    next_game_datetime = datetime.strptime(next_game_date, '%Y-%m-%dT%H:%M:%SZ')
+    next_game_datetime_local = next_game_datetime + localoffset
+    next_game_date_string = datetime.strftime(next_game_datetime_local, '%A %B %d @ %I:%M%p')
+
+    # Get the Opponent for Next Game
+    next_game_teams = next_game.get('teams')
+    next_game_home = next_game_teams.get('home')
+    next_game_away = next_game_teams.get('away')
+    if next_game_home.get('team').get('id') == pref_team_id:
+        next_game_opponent = next_game_away.get('team').get('name')
+    else:
+        next_game_opponent = next_game_home.get('team').get('name')
+
+    next_game_venue = next_game.get('venue').get('name')
+    next_game_text = (f'Next Game: {next_game_date_string} vs. {next_game_opponent}'
+                      f' (at {next_game_venue})!')
+
     # Generate Final Image
     # img = final_image(game, boxscore_preferred, boxscore_other)
     img = stats_image_generator(game, "final", boxscore_preferred, boxscore_other)
-    final_score_tweet = ("{} {} {}"
-                         .format(final_score_text, preferred_hashtag, game.game_hashtag))
+    final_score_tweet = ("{} {} {}\n\n{}"
+                         .format(final_score_text, preferred_hashtag, game.game_hashtag,
+                                 next_game_text))
 
     if game.finaltweets["finalscore"] is False:
         if args.notweets:
@@ -2173,7 +2208,99 @@ def parse_end_of_game(json_feed, game):
     except KeyError:
         return False
 
+    # Perform Opposition Stats
+    if game.finaltweets["opposition"] is False:
+        try:
+            nss_opposition, nss_opposition_byline = advanced_stats.nss_opposition(game, game.preferred_team)
+            opp_tweet_fwd1 = (f"{game.preferred_team.team_name} Opposition Faced\n\n"
+                              f"{nss_opposition_byline.get('F1').get('line')}\n"
+                              f"Forward: {', '.join(nss_opposition_byline.get('F1').get('FWD'))}\n"
+                              f"Defense: {', '.join(nss_opposition_byline.get('F1').get('DEF'))}\n\n"
+                              f"{nss_opposition_byline.get('F2').get('line')}\n"
+                              f"Forward: {', '.join(nss_opposition_byline.get('F2').get('FWD'))}\n"
+                              f"Defense: {', '.join(nss_opposition_byline.get('F2').get('DEF'))}")
+            opp_tweet_fwd2 = (f"{nss_opposition_byline.get('F3').get('line')}\n"
+                              f"Forward: {', '.join(nss_opposition_byline.get('F3').get('FWD'))}\n"
+                              f"Defense: {', '.join(nss_opposition_byline.get('F3').get('DEF'))}\n\n"
+                              f"{nss_opposition_byline.get('F4').get('line')}\n"
+                              f"Forward: {', '.join(nss_opposition_byline.get('F4').get('FWD'))}\n"
+                              f"Defense: {', '.join(nss_opposition_byline.get('F4').get('DEF'))}")
+            opp_tweet_def1 = (f"{nss_opposition_byline.get('D1').get('line')}\n"
+                              f"Forward: {', '.join(nss_opposition_byline.get('D1').get('FWD'))}\n"
+                              f"Defense: {', '.join(nss_opposition_byline.get('D1').get('DEF'))}\n\n"
+                              f"{nss_opposition_byline.get('D2').get('line')}\n"
+                              f"Forward: {', '.join(nss_opposition_byline.get('D2').get('FWD'))}\n"
+                              f"Defense: {', '.join(nss_opposition_byline.get('D2').get('DEF'))}")
+            opp_tweet_def2 = (f"{nss_opposition_byline.get('D3').get('line')}\n"
+                              f"Forward: {', '.join(nss_opposition_byline.get('D3').get('FWD'))}\n"
+                              f"Defense: {', '.join(nss_opposition_byline.get('D3').get('DEF'))}\n\n"
+                              f"(all stats via @NatStatTrick)")
+            if args.notweets:
+                logging.info("%s", opp_tweet_fwd1)
+                logging.info("%s", opp_tweet_fwd2)
+                logging.info("%s", opp_tweet_def1)
+                logging.info("%s", opp_tweet_def2)
+            else:
+                opp_tweetid_1 = send_tweet(opp_tweet_fwd1)
+                opp_tweetid_2 = send_tweet(opp_tweet_fwd2, reply=opp_tweetid_1)
+                opp_tweetid_3 = send_tweet(opp_tweet_def1, reply=opp_tweetid_2)
+                send_tweet(opp_tweet_def2, reply=opp_tweetid_3)
+            game.finaltweets["opposition"] = True
+            logging.debug("Opposition by Player - \n%s\n", nss_opposition)
+            logging.debug("Opposition by Line - %s\n", nss_opposition_byline)
+        except Exception as e:
+            logging.error(e)
+
+    # Perform Line-By-Line Advanced Stats
+    if game.finaltweets["advstats"] is False:
+        try:
+            # Run the Advanced Stats Function
+            nss_linetool, nss_linetool_dict = advanced_stats.nss_linetool(game, game.preferred_team)
+            # nss_linetool = advanced_stats.nss_linetool(game, game.preferred_team)
+
+            if nss_linetool is False or nss_linetool_dict is False:
+                raise IndexError('Line tool not yet available for this game - try again shortly.')
+
+            # advstats_tweet_fwd1 = (f"{game.preferred_team.team_name} Advanced Stats\n\n"
+            #                        f"Forward 1: {nss_linetool.get('F1')}\n\n"
+            #                        f"Forward 2:{nss_linetool.get('F2')}")
+            # advstats_tweet_fwd2 = (f"Forward 3: {nss_linetool.get('F3')}\n\n"
+            #                        f"Forward 4: {nss_linetool.get('F4')}")
+            # advstats_tweet_def1 = (f"Defense 1: {nss_linetool.get('D1')}\n\n"
+            #                        f"Defense 2: {nss_linetool.get('D2')}")
+            # advstats_tweet_def2 = (f"Defense 3: {nss_linetool.get('D3')}\n\n"
+            #                        f"(all stats via @NatStatTrick)")
+            # if args.notweets:
+            #     logging.info("%s", advstats_tweet_fwd1)
+            #     logging.info("%s", advstats_tweet_fwd2)
+            #     logging.info("%s", advstats_tweet_def1)
+            #     logging.info("%s", advstats_tweet_def2)
+            # else:
+            #     advstats_tweetid_1 = send_tweet(advstats_tweet_fwd1)
+            #     advstats_tweetid_2 = send_tweet(advstats_tweet_fwd2, reply=advstats_tweetid_1)
+            #     advstats_tweetid_3 = send_tweet(advstats_tweet_def1, reply=advstats_tweetid_2)
+            #     send_tweet(advstats_tweet_def2, reply=advstats_tweetid_3)
+
+            adv_stats_tweet_text = (f'{game.preferred_team.team_name} Advanced Stats\n'
+                                    f'(via @NatStatTrick)')
+            img = hockey_bot_imaging.image_generator_nss_linetool(nss_linetool_dict)
+
+            if args.notweets:
+                img.show()
+                logging.info("%s", adv_stats_tweet_text)
+            else:
+                img_filename = os.path.join(PROJECT_ROOT,
+                                            'resources/images/GamedayAdvStats-{}.png'
+                                            .format(game.preferred_team.games + 1))
+                img.save(img_filename)
+                api = get_api()
+                api.update_with_media(img_filename, adv_stats_tweet_text)
+            game.finaltweets["advstats"] = True
+        except Exception as e:
+            logging.error(e)
+
     all_tweets_sent = all(value is True for value in game.finaltweets.values())
+    logging.info("All Tweets Info: %s", game.finaltweets)
     return all_tweets_sent
 
 
@@ -2252,13 +2379,14 @@ def game_preview(game):
     other_goalie_tweet = ("Projected {} Goalie for {}:\n{}"
                   .format(game.game_hashtag, other_hashtag, other_goalie))
 
-    # Get Fantasy Labs lineups
-    lineups = nhl_game_events.fantasy_lab_lines(game, game.preferred_team)
-    lineups_confirmed = lineups['confirmed']
-
     # img = preview_image(game)
     img = pregame_image(game)
     if args.notweets:
+        lineups = nhl_game_events.fantasy_lab_lines(game, game.preferred_team)
+        lineups_confirmed = lineups.get('confirmed')
+        officials = other_game_info.scouting_the_refs(game, game.preferred_team)
+        officials_confirmed = officials.get('confirmed')
+
         img.show()
         logging.info("%s", preview_tweet_text)
         if lineups_confirmed:
@@ -2266,6 +2394,8 @@ def game_preview(game):
             power_play_lines_tweet = lineups.get('power_play_lines_tweet')
             logging.info("%s", fwd_def_lines_tweet)
             logging.info("%s", power_play_lines_tweet)
+        if officials_confirmed:
+            logging.info("%s", officials.get('tweet'))
         logging.info("%s", pref_goalie_tweet)
         logging.info("%s", other_goalie_tweet)
         logging.info("%s", season_series_tweet)
@@ -2279,53 +2409,62 @@ def game_preview(game):
             api = get_api()
             image_tweet = api.update_with_media(img_filename, preview_tweet_text)
             image_tweet_id = image_tweet.id_str
+            game.pregame_lasttweet = image_tweet_id
         else:
             image_tweet_id = send_tweet(preview_tweet_text)
 
-        if lineups_confirmed:
-            fwd_def_lines_tweet = lineups.get('fwd_def_lines_tweet')
-            power_play_lines_tweet = lineups.get('power_play_lines_tweet')
 
-            fwd_def_lines_tweet_id = send_tweet(fwd_def_lines_tweet, reply=image_tweet_id)
-            power_play_lines_tweet_id = send_tweet(power_play_lines_tweet, reply=fwd_def_lines_tweet_id)
-            pref_goalie_tweet_id = send_tweet(pref_goalie_tweet, reply=power_play_lines_tweet_id)
-            other_goalie_tweet_id = send_tweet(other_goalie_tweet, reply=pref_goalie_tweet_id)
-            season_series_tweet_id = send_tweet(season_series_tweet, reply=other_goalie_tweet_id)
+        # Send Season Series tweet (only tweet not waiting on confirmation)
+        game.pregame_lasttweet = send_tweet(season_series_tweet, reply=game.prefgame_lasttweet)
 
-            # All tweets are sent, sleep until game time
-            logging.info("Game State is Preview & all tweets are sent. "
-                            "Sleep for %s seconds until game time.", game.game_time_countdown)
-            time.sleep(game.game_time_countdown)
-        else:
-            pref_goalie_tweet_id = send_tweet(pref_goalie_tweet, reply=image_tweet_id)
-            other_goalie_tweet_id = send_tweet(other_goalie_tweet, reply=pref_goalie_tweet_id)
-            season_series_tweet_id = send_tweet(season_series_tweet, reply=other_goalie_tweet_id)
+        #TODO: Only send goalies on (Likely or Confirmed Status)
+        game.pregame_lasttweet = send_tweet(pref_goalie_tweet, reply=game.pregame_lasttweet)
+        game.pregame_lasttweet = send_tweet(other_goalie_tweet, reply=game.pregame_lasttweet)
 
-            # Lineup tweets are not sent, sleep for an hour & try again
-            logging.info("Game State is Preview & lineup tweets are not sent. "
-                            "Sleep for 1 hour & check lineups again.")
-            time.sleep(3600)
 
-            while True:
-                logging.info("Waking up & checking lineups again.")
-                # Get Fantasy Labs lineups
+        while True:
+            # Get Fantasy Labs lineups (only if tweet not sent)
+            if not game.pregametweets['lines']:
                 lineups = nhl_game_events.fantasy_lab_lines(game, game.preferred_team)
                 lineups_confirmed = lineups['confirmed']
+
+                # Only send lineups tweet if confirmed
                 if lineups_confirmed:
-                    logging.info("Lines are confirmed - tweeting & sleeping until game time!")
                     fwd_def_lines_tweet = lineups.get('fwd_def_lines_tweet')
                     power_play_lines_tweet = lineups.get('power_play_lines_tweet')
-                    fwd_def_lines_tweet_id = send_tweet(fwd_def_lines_tweet, reply=season_series_tweet_id)
-                    power_play_lines_tweet_id = send_tweet(power_play_lines_tweet, reply=fwd_def_lines_tweet_id)
+                    game.pregame_lasttweet = send_tweet(fwd_def_lines_tweet, reply=game.pregame_lasttweet)
+                    game.pregame_lasttweet = send_tweet(power_play_lines_tweet, reply=game.pregame_lasttweet)
+                    game.pregametweets['lines'] = True
 
-                    # All tweets are sent, sleep until game time
-                    logging.info("Game State is Preview & all tweets are sent. "
-                            "Sleep for %s seconds until game time.", game.game_time_countdown)
-                    time.sleep(game.game_time_countdown)
-                    break
-                else:
-                    logging.info("Lines not yet confirmed - sleeping for an hour again!")
-                    time.sleep(3600)
+            # Get Officials via Scouting the Refs (if tweet not sent)
+            if not game.pregametweets['refs']:
+                officials = other_game_info.scouting_the_refs(game, game.preferred_team)
+                officials_confirmed = officials.get('confirmed')
+
+                # Only send officials tweet if confirmed
+                if officials_confirmed:
+                    officials_tweet = officials.get('tweet')
+                    game.pregame_lasttweet = send_tweet(officials_tweet, reply=game.pregame_lasttweet)
+                    game.pregametweets['refs'] = True
+
+
+            # Check if all tweets are sent
+            all_pregametweets_sent = all(value is True for value in game.pregametweets.values())
+
+            if all_pregametweets_sent and game.game_time_countdown > 3600:
+                logging.info("Game State is Preview & all pre-game tweets are not sent. "
+                             "Sleep for 1 hour & check again.")
+                time.sleep(3600)
+            elif all_pregametweets_sent and game.game_time_countdown > 3600:
+                logging.warn("Game State is Preview & all pre-game tweets are not sent. "
+                             "Less than an hour until game time so we skip these today.")
+                time.sleep(game.game_time_countdown)
+                break
+            else:
+                logging.info("Game State is Preview & all tweets are sent. "
+                             "Sleep for %s seconds until game time.", game.game_time_countdown)
+                time.sleep(game.game_time_countdown)
+                break
 
 
 # ------------------------------------------------------------------------------
@@ -2429,6 +2568,7 @@ if __name__ == '__main__':
 
     # Create a Game Object
     gameobj_game_id = game_info["gamePk"]
+    gameobj_game_season = game_info["season"]
     gameobj_game_type = game_info["gameType"]
     gameobj_date_time = game_info["gameDate"]
     gameobj_game_state = game_info["status"]["abstractGameState"]
@@ -2507,7 +2647,8 @@ if __name__ == '__main__':
 
     game_obj = nhl_game_events.Game(gameobj_game_id, gameobj_game_type, gameobj_date_time,
                                     gameobj_game_state, gameobj_venue, home_team_obj,
-                                    away_team_obj, preferred_indicator, gameobj_live_feed)
+                                    away_team_obj, preferred_indicator, gameobj_live_feed,
+                                    gameobj_game_season)
 
 
     # All objects are created, start the game loop
