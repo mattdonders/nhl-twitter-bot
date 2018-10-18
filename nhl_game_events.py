@@ -71,7 +71,8 @@ class Game(object):
 
         # Initialize Pregame Tweets dictionary
         self.pregame_lasttweet = None
-        self.pregametweets = {"lineups": False, "refs": False}
+        self.pregametweets = {"lineups": False, "refs": False,
+                              "goalies_pref": False, "goalies_other": False}
 
         # Initialize Final Tweets dictionary
         self.finaltweets = {"finalscore": False, "stars": False,
@@ -795,93 +796,6 @@ def preferred_teams(home_team, away_team):
 
     # Away Team is preferred
     return (away_team, home_team)
-
-
-def dailyfaceoff_goalies(pref_team, other_team, pref_homeaway):
-    """Scrapes Daily Faceoff for starting goalies for the night.
-
-    Args:
-        pref_team (Team): Preferred team object.
-        other_team (Team): Other team object.
-        pref_homeaway (str): Is preferred team home or away?
-
-    Returns:
-        Tuple: preferred goalie text, other goalie text
-    """
-    pref_team_name = pref_team.team_name
-    home_team_short = pref_team.short_name if pref_homeaway == "home" else other_team.short_name
-    away_team_short = pref_team.short_name if pref_homeaway == "away" else other_team.short_name
-
-    url = 'https://www.dailyfaceoff.com/starting-goalies/'
-    r = requests.get(url)
-    soup = BeautifulSoup(r.content, 'lxml')
-
-    games = soup.find_all("div", class_="starting-goalies-card stat-card")
-    team_playing_today = any(pref_team_name in game.text for game in games)
-    if len(games) > 0 and team_playing_today:
-        for game in games:
-            teams = game.find("h4", class_="top-heading-heavy")
-            teams = teams.text
-            if pref_team_name in teams:
-                teams_split = teams.split(" at ")
-                home_team = teams_split[1]
-                away_team = teams_split[0]
-                goalies = game.find("div", class_="stat-card-main-contents")
-
-                away_goalie_info = goalies.find("div", class_="away-goalie")
-                away_goalie_name = away_goalie_info.find("h4")
-                away_goalie_name = away_goalie_name.text.strip()
-                away_goalie_confirm = away_goalie_info.find("h5", class_="news-strength")
-                away_goalie_confirm = str(away_goalie_confirm.text.strip())
-
-                away_goalie_stats = away_goalie_info.find("p", class_="goalie-record")
-                away_goalie_stats_str = away_goalie_stats.text.strip()
-                away_goalie_stats_str = " ".join(away_goalie_stats_str.split())
-                away_goalie_stats_split = hockey_ref_goalie_against_team(away_goalie_name, home_team)
-                away_goalie_str = "{} ({})\nSeason Stats: {}\nCareer (vs {}): {}".format(away_goalie_name,
-                                                    away_goalie_confirm, away_goalie_stats_str,
-                                                    home_team_short, away_goalie_stats_split)
-
-                home_goalie_info = goalies.find("div", class_="home-goalie")
-                home_goalie_name = home_goalie_info.find("h4")
-                home_goalie_name = home_goalie_name.text.strip()
-                home_goalie_confirm = home_goalie_info.find("h5", class_="news-strength")
-                home_goalie_confirm = str(home_goalie_confirm.text.strip())
-
-                home_goalie_stats = home_goalie_info.find("p", class_="goalie-record")
-                home_goalie_stats_str = home_goalie_stats.text.strip()
-                home_goalie_stats_str = " ".join(home_goalie_stats_str.split())
-                home_goalie_stats_split = hockey_ref_goalie_against_team(home_goalie_name, away_team)
-                home_goalie_str = "{} ({})\nSeason Stats: {}\nCareer (vs {}): {}".format(home_goalie_name,
-                                                    home_goalie_confirm, home_goalie_stats_str,
-                                                    away_team_short, home_goalie_stats_split)
-
-                if pref_homeaway == "home":
-                    pref_goalie_str = home_goalie_str
-                    other_goalie_str = away_goalie_str
-                else:
-                    pref_goalie_str = away_goalie_str
-                    other_goalie_str = home_goalie_str
-
-                return pref_goalie_str, other_goalie_str
-    else:
-        # Get one goalie from each team
-        url_team_name_pref = pref_team.team_name.replace(" ","-").replace("é","e").lower()
-        url_team_name_other = other_team.team_name.replace(" ", "-").replace("é","e").lower()
-        faceoff_url_pref = "https://www.dailyfaceoff.com/teams/{}/line-combinations".format(url_team_name_pref)
-        faceoff_url_other = "https://www.dailyfaceoff.com/teams/{}/line-combinations".format(url_team_name_other)
-
-        r = requests.get(faceoff_url_pref)
-        soup = BeautifulSoup(r.content, 'lxml')
-        goalie_table = soup.find("table", attrs={"summary":"Goalies"}).find("tbody").find_all("tr")
-        pref_goalie_name = goalie_table[0].find_all("td")[0].find("a").text
-
-        r = requests.get(faceoff_url_other)
-        soup = BeautifulSoup(r.content, 'lxml')
-        goalie_table = soup.find("table", attrs={"summary":"Goalies"}).find("tbody").find_all("tr")
-        other_goalie_name = goalie_table[0].find_all("td")[0].find("a").text
-
-        return pref_goalie_name, other_goalie_name
 
 
 def hockey_ref_goalie_against_team(goalie, opponent):

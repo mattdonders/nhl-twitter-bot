@@ -2320,6 +2320,7 @@ def game_preview(game):
 
     # Get preferred & other team from Game object
     (preferred_team, other_team) = game.get_preferred_team()
+    pref_team_homeaway = game.preferred_team.home_away
 
     # Format & send preview tweet
     clock_emoji = nhl_game_events.clock_emoji(game.game_time_local)
@@ -2368,17 +2369,6 @@ def game_preview(game):
                                .format(season_series_str, points_leader_str, toi_leader_str,
                                        pref_hashtag, other_hashtag, game.game_hashtag))
 
-    # Get Goalie Projection
-    pref_team_name = game.preferred_team.team_name
-    pref_team_homeaway = game.preferred_team.home_away
-    other_team_name = game.other_team.team_name
-    pref_goalie, other_goalie = nhl_game_events.dailyfaceoff_goalies(
-                                preferred_team, other_team, pref_team_homeaway)
-    pref_goalie_tweet = ("Projected {} Goalie for {}:\n{}"
-                  .format(game.game_hashtag, pref_hashtag, pref_goalie))
-    other_goalie_tweet = ("Projected {} Goalie for {}:\n{}"
-                  .format(game.game_hashtag, other_hashtag, other_goalie))
-
     # img = preview_image(game)
     img = pregame_image(game)
     if args.notweets:
@@ -2386,6 +2376,8 @@ def game_preview(game):
         lineups_confirmed = lineups.get('confirmed')
         officials = other_game_info.scouting_the_refs(game, game.preferred_team)
         officials_confirmed = officials.get('confirmed')
+        goalies = other_game_info.dailyfaceoff_goalies(
+                  preferred_team, other_team, pref_team_homeaway)
 
         img.show()
         logging.info("%s", preview_tweet_text)
@@ -2396,6 +2388,12 @@ def game_preview(game):
             logging.info("%s", power_play_lines_tweet)
         if officials_confirmed:
             logging.info("%s", officials.get('tweet'))
+        pref_goalie_tweet_text = goalies.get('pref_goalie')
+        other_goalie_tweet_text = goalies.get('other_goalie')
+        pref_goalie_tweet = (f'Projected {game.game_hashtag} Goalie '
+                             f'for {pref_hashtag}:\n{pref_goalie_tweet_text}')
+        other_goalie_tweet = (f'Projected {game.game_hashtag} Goalie '
+                              f'for {other_hashtag}:\n{other_goalie_tweet_text}')
         logging.info("%s", pref_goalie_tweet)
         logging.info("%s", other_goalie_tweet)
         logging.info("%s", season_series_tweet)
@@ -2417,12 +2415,34 @@ def game_preview(game):
         # Send Season Series tweet (only tweet not waiting on confirmation)
         game.pregame_lasttweet = send_tweet(season_series_tweet, reply=game.prefgame_lasttweet)
 
-        #TODO: Only send goalies on (Likely or Confirmed Status)
-        game.pregame_lasttweet = send_tweet(pref_goalie_tweet, reply=game.pregame_lasttweet)
-        game.pregame_lasttweet = send_tweet(other_goalie_tweet, reply=game.pregame_lasttweet)
-
-
         while True:
+            if not game.pregametweets['goalies_pref'] or not game.pregametweets['goalies_other']:
+                goalie_confirm_list = ('Confirmed', 'Likely')
+
+                # Get Goalies from Daily Faceoff
+                goalies = other_game_info.dailyfaceoff_goalies(
+                        preferred_team, other_team, pref_team_homeaway)
+                pref_goalie_tweet_text = goalies.get('pref_goalie')
+                other_goalie_tweet_text = goalies.get('other_goalie')
+                pref_goalie_confirm_text = goalies.get('pref_goalie_confirm')
+                other_goalie_confirm_text = goalies.get('other_goalie_confirm')
+
+                # Convert confirmations into True / False
+                pref_goalie_confirm = bool(pref_goalie_confirm_text in goalie_confirm_list)
+                other_goalie_confirm = bool(other_goalie_confirm_text in goalie_confirm_list)
+
+                if pref_goalie_confirm and not game.pregametweets['goalies_pref']:
+                    pref_goalie_tweet = (f'Projected {game.game_hashtag} Goalie '
+                                         f'for {pref_hashtag}:\n{pref_goalie_tweet_text}')
+                    game.pregame_lasttweet = send_tweet(pref_goalie_tweet, reply=game.pregame_lasttweet)
+                    game.pregametweets['goalies_pref'] = True
+
+                if other_goalie_confirm and not game.pregametweets['goalies_other']:
+                    other_goalie_tweet = (f'Projected {game.game_hashtag} Goalie '
+                                          f'for {other_hashtag}:\n{other_goalie_tweet_text}')
+                    game.pregame_lasttweet = send_tweet(other_goalie_tweet, reply=game.pregame_lasttweet)
+                    game.pregametweets['goalies_other'] = True
+
             # Get Fantasy Labs lineups (only if tweet not sent)
             if not game.pregametweets['lines']:
                 lineups = nhl_game_events.fantasy_lab_lines(game, game.preferred_team)
@@ -2450,6 +2470,7 @@ def game_preview(game):
 
             # Check if all tweets are sent
             all_pregametweets_sent = all(value is True for value in game.pregametweets.values())
+            logging.info("Pre-Game Tweets: %s", all_pregametweets_sent)
 
             if all_pregametweets_sent and game.game_time_countdown > 3600:
                 logging.info("Game State is Preview & all pre-game tweets are not sent. "
