@@ -64,6 +64,7 @@ class Game(object):
         self.past_start_time = False
         self.last_event_idx = 0
         self.power_play_strength = "Even"
+        self.penalty_killed_flag = False
         self.req_session = None
         self.assists_check = 0
         self.shootout = Shootout()

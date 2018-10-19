@@ -105,7 +105,7 @@ def nss_linetool(game, team):
     pref_team_cf = list(filter(None, pref_team_stats[5].text.split("\n")))[-1]
     pref_team_scf = list(filter(None, pref_team_stats[14].text.split("\n")))[-1]
     pref_team_hdcf = list(filter(None, pref_team_stats[17].text.split("\n")))[-1]
-    pref_team_gf = pref_team_hdcf = list(filter(None, pref_team_stats[20].text.split("\n")))[-1]
+    pref_team_gf = list(filter(None, pref_team_stats[20].text.split("\n")))[-1]
     return_dict_attrs['team'] = {}
     return_dict_attrs['team']['CF'] = pref_team_cf
     return_dict_attrs['team']['SCF'] = pref_team_scf
@@ -238,7 +238,7 @@ def nss_opposition(game, team):
     soup = BeautifulSoup(stats.content, 'html.parser')
     logging.info('Storing the Game Log Soup in the Team Object (for possible later use).')
     team.nss_gamelog = soup
-    
+
     search_string = f'{team.short_name} - Opposition'
     wyoplb = soup.find(text=search_string)
     opposition = wyoplb.parent.parent

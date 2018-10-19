@@ -331,44 +331,65 @@ def update_object_attributes(json_feed, game):
     game.away_team.shots = linescore_away["shotsOnGoal"]
     # game.away_team.goalie_pulled = linescore_away["goaliePulled"]
 
-    # Logic for tracking if a team kills a penalty
-    last_power_player_strength = game.power_play_strength
-    last_home_power_play = game.home_team.power_play
-    last_home_skaters = game.home_team.skaters
-    last_away_power_play = game.away_team.power_play
-    last_away_skaters = game.away_team.skaters
+    try:
+        all_plays = json_feed["liveData"]["plays"]["allPlays"]
+        last_event = all_plays[game.last_event_idx]
+        last_event_type = last_event["result"]["eventTypeId"]
+        event_filter_list = ["GOAL", "PENALTY"]
 
-    game.power_play_strength = json_feed["liveData"]["linescore"]["powerPlayStrength"]
-    game.home_team.power_play = linescore_home["powerPlay"]
-    game.home_team.skaters = linescore_home["numSkaters"]
-    game.away_team.power_play = linescore_away["powerPlay"]
-    game.away_team.skaters = linescore_away["numSkaters"]
+        # Logic for tracking if a team kills a penalty
+        last_power_player_strength = game.power_play_strength
+        last_home_power_play = game.home_team.power_play
+        last_home_skaters = game.home_team.skaters
+        last_away_power_play = game.away_team.power_play
+        last_away_skaters = game.away_team.skaters
 
+        game.power_play_strength = json_feed["liveData"]["linescore"]["powerPlayStrength"]
+        game.home_team.power_play = linescore_home["powerPlay"]
+        game.home_team.skaters = linescore_home["numSkaters"]
+        game.away_team.power_play = linescore_away["powerPlay"]
+        game.away_team.skaters = linescore_away["numSkaters"]
 
-    # One of the teams previously was on a power play
-    # if last_power_player_strength
-    penalty_killed_flag = False
-    if last_home_power_play and not game.home_team.power_play:
-        logging.info("Home team was on a power play, but now aren't anymore.")
-        penalty_killed_flag = True
-    elif last_away_power_play and not game.away_team.power_play:
-        logging.info("Away team was on a power play, but now aren't anymore.")
-        penalty_killed_flag = True
-    elif last_home_skaters == 3 and game.home_team.skaters != 3:
-        logging.info("Home team MIGHT be coming off a 5-on-3.")
-        penalty_killed_flag = True
-    elif last_away_skaters == 3 and game.away_team.skaters != 3:
-        logging.info("Away team MIGHT be coming off a 5-on-3.")
-        penalty_killed_flag = True
+        logging.info("Current Away Skaters: %s | Current Home Skaters: %s",
+                     game.away_team.skaters, game.home_team.skaters)
 
-    if penalty_killed_flag:
-        logging.info("Previous Home Skaters: %s | Current Home Skaters: %s",
-                     last_home_skaters, game.home_team.skaters)
-        logging.info("Previous Away Skaters: %s | Current Away Skaters: %s",
-                     last_away_skaters, game.away_team.skaters)
-        logging.info("Debug Linescore: %s", linescore)
+        # These conditions happen if one of the teams was
+        # previously on a power play, but aren't anymore
+        if last_home_power_play and not game.home_team.power_play:
+            logging.info("PP Strength Change - Home team was on a power play, but now aren't anymore.")
+            pk_team = game.home_team
+            pk_linescore = linescore_home
+            game.penalty_killed_flag = True
+        elif last_away_power_play and not game.away_team.power_play:
+            logging.info("PP Strength Change - Away team was on a power play, but now aren't anymore.")
+            pk_team = game.away_team
+            pk_linescore = linescore_away
+            game.penalty_killed_flag = True
+        elif last_home_skaters == 3 and game.home_team.skaters != 3:
+            logging.info("Num Skaters Change - Home team MIGHT be coming off a 5-on-3.")
+            pk_team = game.home_team
+            pk_linescore = linescore_home
+            game.penalty_killed_flag = True
+        elif last_away_skaters == 3 and game.away_team.skaters != 3:
+            logging.info("Num Skaters Change - Away team MIGHT be coming off a 5-on-3.")
+            pk_team = game.away_team
+            pk_linescore = linescore_away
+            game.penalty_killed_flag = True
 
-
+        if game.penalty_killed_flag and last_event_type not in event_filter_list:
+            logging.info("Last event was not a goal or penalty and skater number changed.")
+            logging.info("Previous Home Skaters: %s | Current Home Skaters: %s",
+                        last_home_skaters, game.home_team.skaters)
+            logging.info("Previous Away Skaters: %s | Current Away Skaters: %s",
+                        last_away_skaters, game.away_team.skaters)
+            logging.info('%s kill off a penalty with %s remaining in the %s period!',
+                          pk_team.short_name, pk_linescore['currentPeriodTimeRemaining'],
+                          pk_linescore['currentPeriodOrdinal'])
+            game.penalty_killed_flag = False
+    except Exception as e:
+        game.penalty_killed_flag = False
+        logging.warning("Issue checking if power play strength changed.")
+        logging.warning(e)
 
     # Logic for keeping goalie pulled with events in between
     try:
@@ -1521,7 +1542,9 @@ def parse_regular_goal(play, game):
             goal_scorer_total = player["seasonTotal"]
 
         elif player["playerType"] == "Assist":
-            assists.append(player["player"]["fullName"])
+            player_name = player["player"]["fullName"]
+            assist_total = player["seasonTotal"]
+            assists.append(f'{player_name} ({assist_total})')
 
         elif player["playerType"] == "Goalie":
             goalie_name = player["player"]["fullName"]
@@ -1742,7 +1765,9 @@ def check_scoring_changes(previous_goals, game):
                 goal_scorer_name = player["player"]["fullName"]
 
             elif player["playerType"] == "Assist":
-                assists.append(player["player"]["fullName"])
+                player_name = player["player"]["fullName"]
+                assist_total = player["seasonTotal"]
+                assists.append(f'{player_name} ({assist_total})')
 
         # Check for changes in existing goal array
         if goal_scorer_name != preferred_goals[idx].scorer:
