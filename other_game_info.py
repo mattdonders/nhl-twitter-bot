@@ -46,7 +46,7 @@ def scouting_the_refs(game, team):
         post_title = post.get('title').get('rendered')
         if (921 in categories and posted_today) or (posted_today and 'NHL' in post_title):
             content = post.get('content').get('rendered')
-            soup = BeautifulSoup(content, 'html.parser')
+            soup = BeautifulSoup(content, 'lxml')
 
     try:
         officials_games = soup.find_all("h1")

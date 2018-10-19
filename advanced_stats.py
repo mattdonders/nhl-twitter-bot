@@ -126,7 +126,7 @@ def nss_linetool(game, team):
         logging.info("NSS Line Tool URL (Line #%s) - %s", i, nss_url)
 
         stats = requests.get(nss_url)
-        soup = BeautifulSoup(stats.content, 'html.parser')
+        soup = BeautifulSoup(stats.content, 'lxml')
         games = soup.find("table", {"id": "players"}).find("tbody").find_all("tr")
         last_game = games[-1]
         game_info = last_game.find("td").text
@@ -177,7 +177,7 @@ def nss_linetool(game, team):
         logging.info("NSS Line Tool URL (Pairing #%s) - %s", i, nss_url)
 
         stats = requests.get(nss_url)
-        soup = BeautifulSoup(stats.content, 'html.parser')
+        soup = BeautifulSoup(stats.content, 'lxml')
         games = soup.find("table", {"id": "players"}).find("tbody").find_all("tr")
         last_game = games[-1]
 
@@ -235,7 +235,7 @@ def nss_opposition(game, team):
 
     # Parse the response via BeautifulSoup
     logging.info(f'Souping the NSS Opposition Content.')
-    soup = BeautifulSoup(stats.content, 'html.parser')
+    soup = BeautifulSoup(stats.content, 'lxml')
     logging.info('Storing the Game Log Soup in the Team Object (for possible later use).')
     team.nss_gamelog = soup
 
