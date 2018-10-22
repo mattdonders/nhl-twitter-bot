@@ -30,10 +30,18 @@ VPS_CLOUDHOST = config['VPS']['CLOUDHOST']
 VPS_HOSTNAME = config['VPS']['HOSTNAME']
 
 
+def fantasy_lab_alt_names(player_name):
+    fantasy_lab_alts = {
+        "Steve Santini": "Steven Santini"
+    }
+
+    return fantasy_lab_alts.get(player_name, player_name)
+
 # ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
-# Advanced Stats Functions
+# Other Game Information
 # ------------------------------------------------------------------------------
+
 
 def scouting_the_refs(game, team):
     # Initialize return dictionary
@@ -83,12 +91,12 @@ def scouting_the_refs(game, team):
                 for official, attrs in return_dict.items():
                     tweet_string += f'\n{official.title()}:\n'
                     for individual in attrs:
-                        tweet_string += f'* {individual.strip()}\n'
+                        tweet_string += f'- {individual.strip()}\n'
 
                 tweet_string += '\n(via @ScoutingTheRefs)'
                 return_dict['tweet'] = tweet_string
     except NameError:
-        print("Ref information is not posted for today - check again later!")
+        pass
 
     return_dict['confirmed'] = False if not bool(return_dict) else True
     logging.debug('Scouting the Refs - %s', return_dict)
@@ -139,7 +147,7 @@ def dailyfaceoff_goalies(pref_team, other_team, pref_homeaway):
                 away_goalie_stats_str = away_goalie_stats.text.strip()
                 away_goalie_stats_str = " ".join(away_goalie_stats_str.split())
                 away_goalie_stats_split = nhl_game_events.hockey_ref_goalie_against_team(away_goalie_name, home_team)
-                away_goalie_str = "{} ({})\nSeason Stats: {}\nCareer (vs {}): {}".format(away_goalie_name,
+                away_goalie_str = "{} ({})\nSeason Stats: {}\n\nCareer (vs {}): {}".format(away_goalie_name,
                                                     away_goalie_confirm, away_goalie_stats_str,
                                                     home_team_short, away_goalie_stats_split)
 
@@ -153,7 +161,7 @@ def dailyfaceoff_goalies(pref_team, other_team, pref_homeaway):
                 home_goalie_stats_str = home_goalie_stats.text.strip()
                 home_goalie_stats_str = " ".join(home_goalie_stats_str.split())
                 home_goalie_stats_split = nhl_game_events.hockey_ref_goalie_against_team(home_goalie_name, away_team)
-                home_goalie_str = "{} ({})\nSeason Stats: {}\nCareer (vs {}): {}".format(home_goalie_name,
+                home_goalie_str = "{} ({})\nSeason Stats: {}\n\nCareer (vs {}): {}".format(home_goalie_name,
                                                     home_goalie_confirm, home_goalie_stats_str,
                                                     away_team_short, home_goalie_stats_split)
 

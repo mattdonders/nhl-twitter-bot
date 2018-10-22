@@ -12,6 +12,9 @@ import dateutil.tz
 import requests
 from bs4 import BeautifulSoup
 
+# Custom Imports
+import other_game_info
+
 log = logging.getLogger('root')
 config = configparser.ConfigParser()
 conf_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'config.ini')
@@ -72,7 +75,7 @@ class Game(object):
 
         # Initialize Pregame Tweets dictionary
         self.pregame_lasttweet = None
-        self.pregametweets = {"lineups": False, "refs": False,
+        self.pregametweets = {"lines": False, "refs": False,
                               "goalies_pref": False, "goalies_other": False}
 
         # Initialize Final Tweets dictionary
@@ -226,6 +229,7 @@ class Team(object):
         self.goals = []
         self.lines = {}
         self.nss_gamelog = None
+        self.gameday_roster = {}
 
         # Break-up the record into wins, losses, ot
         self.wins = record["wins"]
@@ -390,6 +394,36 @@ class Team(object):
             roster_dict[number] = {}
             roster_dict[number]['id'] = id
             roster_dict[number]['name'] = name
+        return roster_dict
+
+    @property
+    def gameday_roster_by_name(self):
+        roster_dict = {}
+        for id, player in self.gameday_roster.items():
+            full_name = player.get('fullName')
+            first_name = player.get('firstName')
+            last_name = player.get('lastName')
+            number = player.get('primaryNumber')
+            roster_dict[full_name] = {}
+            roster_dict[full_name]['id'] = id.replace('ID', '')
+            roster_dict[full_name]['number'] = number
+            roster_dict[full_name]['first_name'] = first_name
+            roster_dict[full_name]['last_name'] = last_name
+        return roster_dict
+
+    @property
+    def gameday_roster_by_number(self):
+        roster_dict = {}
+        for id, player in self.gameday_roster.items():
+            full_name = player.get('fullName')
+            first_name = player.get('firstName')
+            last_name = player.get('lastName')
+            number = player.get('primaryNumber')
+            roster_dict[number] = {}
+            roster_dict[number]['id'] = id
+            roster_dict[number]['name'] = full_name
+            roster_dict[number]['first_name'] = first_name
+            roster_dict[number]['last_name'] = last_name
         return roster_dict
 
 
@@ -903,7 +937,7 @@ def fantasy_lab_lines(game, team):
     for player in players:
         properties = player['Properties']
         position = properties['Position']
-        full_name = properties['FullName']
+        full_name = other_game_info.fantasy_lab_alt_names(properties['FullName'])
         last_name = full_name.split()[1]
         lines_dict[position] = full_name
 

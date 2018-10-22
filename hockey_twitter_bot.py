@@ -350,8 +350,17 @@ def update_object_attributes(json_feed, game):
         game.away_team.power_play = linescore_away["powerPlay"]
         game.away_team.skaters = linescore_away["numSkaters"]
 
+        # TODO: Track onIce Players Array?
+        preferred_homeaway = game.preferred_team.home_away
+        other_homeaway = game.other_team.home_away
+        on_ice_pref = json_feed["liveData"]["boxscore"]["teams"][preferred_homeaway]["onIce"]
+        on_ice_other = json_feed["liveData"]["boxscore"]["teams"][other_homeaway]["onIce"]
+
         logging.info("Current Away Skaters: %s | Current Home Skaters: %s",
                      game.away_team.skaters, game.home_team.skaters)
+        logging.info("Current Power Play Strength: %s", game.power_play_strength)
+        logging.info("Preferred On Ice (%s): %s", len(on_ice_pref), on_ice_pref)
+        logging.info("Other On Ice (%s): %s\n", len(on_ice_other), on_ice_other)
 
         # These conditions happen if one of the teams was
         # previously on a power play, but aren't anymore
@@ -383,8 +392,8 @@ def update_object_attributes(json_feed, game):
             logging.info("Previous Away Skaters: %s | Current Away Skaters: %s",
                         last_away_skaters, game.away_team.skaters)
             logging.info('%s kill off a penalty with %s remaining in the %s period!',
-                          pk_team.short_name, pk_linescore['currentPeriodTimeRemaining'],
-                          pk_linescore['currentPeriodOrdinal'])
+                          pk_team.short_name, linescore['currentPeriodTimeRemaining'],
+                          linescore['currentPeriodOrdinal'])
             game.penalty_killed_flag = False
     except Exception as e:
         game.penalty_killed_flag = False
@@ -2199,7 +2208,7 @@ def parse_end_of_game(json_feed, game):
             img.save(img_filename)
             api = get_api()
             api.update_with_media(img_filename, final_score_tweet)
-            game.finaltweets["finalscore"] = True
+        game.finaltweets["finalscore"] = True
 
     # Once available, build the 3-stars tweet & send it.
     try:
@@ -2229,7 +2238,7 @@ def parse_end_of_game(json_feed, game):
                 logging.info("%s", stars_tweet)
             else:
                 send_tweet(stars_tweet)
-                game.finaltweets["stars"] = True
+            game.finaltweets["stars"] = True
     except KeyError:
         return False
 
@@ -2237,44 +2246,48 @@ def parse_end_of_game(json_feed, game):
     if game.finaltweets["opposition"] is False:
         try:
             nss_opposition, nss_opposition_byline = advanced_stats.nss_opposition(game, game.preferred_team)
-            opp_tweet_fwd1 = (f"{game.preferred_team.team_name} Opposition Faced\n\n"
-                              f"{nss_opposition_byline.get('F1').get('line')}\n"
-                              f"Forward: {', '.join(nss_opposition_byline.get('F1').get('FWD'))}\n"
-                              f"Defense: {', '.join(nss_opposition_byline.get('F1').get('DEF'))}\n\n"
-                              f"{nss_opposition_byline.get('F2').get('line')}\n"
-                              f"Forward: {', '.join(nss_opposition_byline.get('F2').get('FWD'))}\n"
-                              f"Defense: {', '.join(nss_opposition_byline.get('F2').get('DEF'))}")
-            opp_tweet_fwd2 = (f"{nss_opposition_byline.get('F3').get('line')}\n"
-                              f"Forward: {', '.join(nss_opposition_byline.get('F3').get('FWD'))}\n"
-                              f"Defense: {', '.join(nss_opposition_byline.get('F3').get('DEF'))}\n\n"
-                              f"{nss_opposition_byline.get('F4').get('line')}\n"
-                              f"Forward: {', '.join(nss_opposition_byline.get('F4').get('FWD'))}\n"
-                              f"Defense: {', '.join(nss_opposition_byline.get('F4').get('DEF'))}")
-            opp_tweet_def1 = (f"{nss_opposition_byline.get('D1').get('line')}\n"
-                              f"Forward: {', '.join(nss_opposition_byline.get('D1').get('FWD'))}\n"
-                              f"Defense: {', '.join(nss_opposition_byline.get('D1').get('DEF'))}\n\n"
-                              f"{nss_opposition_byline.get('D2').get('line')}\n"
-                              f"Forward: {', '.join(nss_opposition_byline.get('D2').get('FWD'))}\n"
-                              f"Defense: {', '.join(nss_opposition_byline.get('D2').get('DEF'))}")
-            opp_tweet_def2 = (f"{nss_opposition_byline.get('D3').get('line')}\n"
-                              f"Forward: {', '.join(nss_opposition_byline.get('D3').get('FWD'))}\n"
-                              f"Defense: {', '.join(nss_opposition_byline.get('D3').get('DEF'))}\n\n"
-                              f"(all stats via @NatStatTrick)")
+            # opp_tweet_fwd1 = (f"{game.preferred_team.team_name} Opposition Faced\n\n"
+            #                   f"{nss_opposition_byline.get('F1').get('line')}\n"
+            #                   f"Forward: {', '.join(nss_opposition_byline.get('F1').get('FWD'))}\n"
+            #                   f"Defense: {', '.join(nss_opposition_byline.get('F1').get('DEF'))}\n\n"
+            #                   f"{nss_opposition_byline.get('F2').get('line')}\n"
+            #                   f"Forward: {', '.join(nss_opposition_byline.get('F2').get('FWD'))}\n"
+            #                   f"Defense: {', '.join(nss_opposition_byline.get('F2').get('DEF'))}")
+            # opp_tweet_fwd2 = (f"{nss_opposition_byline.get('F3').get('line')}\n"
+            #                   f"Forward: {', '.join(nss_opposition_byline.get('F3').get('FWD'))}\n"
+            #                   f"Defense: {', '.join(nss_opposition_byline.get('F3').get('DEF'))}\n\n"
+            #                   f"{nss_opposition_byline.get('F4').get('line')}\n"
+            #                   f"Forward: {', '.join(nss_opposition_byline.get('F4').get('FWD'))}\n"
+            #                   f"Defense: {', '.join(nss_opposition_byline.get('F4').get('DEF'))}")
+            # opp_tweet_def1 = (f"{nss_opposition_byline.get('D1').get('line')}\n"
+            #                   f"Forward: {', '.join(nss_opposition_byline.get('D1').get('FWD'))}\n"
+            #                   f"Defense: {', '.join(nss_opposition_byline.get('D1').get('DEF'))}\n\n"
+            #                   f"{nss_opposition_byline.get('D2').get('line')}\n"
+            #                   f"Forward: {', '.join(nss_opposition_byline.get('D2').get('FWD'))}\n"
+            #                   f"Defense: {', '.join(nss_opposition_byline.get('D2').get('DEF'))}")
+            # opp_tweet_def2 = (f"{nss_opposition_byline.get('D3').get('line')}\n"
+            #                   f"Forward: {', '.join(nss_opposition_byline.get('D3').get('FWD'))}\n"
+            #                   f"Defense: {', '.join(nss_opposition_byline.get('D3').get('DEF'))}\n\n"
+            #                   f"(all stats via @NatStatTrick)")
+
+            opposition_tweet_text = (f'{game.preferred_team.team_name} Primary Opposition\n'
+                                    f'(via @NatStatTrick)')
+            img = hockey_bot_imaging.image_generator_nss_opposition(nss_opposition_byline)
+
             if args.notweets:
-                logging.info("%s", opp_tweet_fwd1)
-                logging.info("%s", opp_tweet_fwd2)
-                logging.info("%s", opp_tweet_def1)
-                logging.info("%s", opp_tweet_def2)
+                img.show()
+                logging.info("%s", opposition_tweet_text)
             else:
-                opp_tweetid_1 = send_tweet(opp_tweet_fwd1)
-                opp_tweetid_2 = send_tweet(opp_tweet_fwd2, reply=opp_tweetid_1)
-                opp_tweetid_3 = send_tweet(opp_tweet_def1, reply=opp_tweetid_2)
-                send_tweet(opp_tweet_def2, reply=opp_tweetid_3)
+                img_filename = os.path.join(PROJECT_ROOT,
+                                            'resources/images/GamedayAdvStats-{}.png'
+                                            .format(game.preferred_team.games + 1))
+                img.save(img_filename)
+                api = get_api()
+                api.update_with_media(img_filename, opposition_tweet_text)
             game.finaltweets["opposition"] = True
-            logging.debug("Opposition by Player - \n%s\n", nss_opposition)
-            logging.debug("Opposition by Line - %s\n", nss_opposition_byline)
         except Exception as e:
             logging.error(e)
+
 
     # Perform Line-By-Line Advanced Stats
     if game.finaltweets["advstats"] is False:
@@ -2438,7 +2451,7 @@ def game_preview(game):
 
 
         # Send Season Series tweet (only tweet not waiting on confirmation)
-        game.pregame_lasttweet = send_tweet(season_series_tweet, reply=game.prefgame_lasttweet)
+        game.pregame_lasttweet = send_tweet(season_series_tweet, reply=game.pregame_lasttweet)
 
         while True:
             if not game.pregametweets['goalies_pref'] or not game.pregametweets['goalies_other']:
@@ -2461,12 +2474,16 @@ def game_preview(game):
                                          f'for {pref_hashtag}:\n{pref_goalie_tweet_text}')
                     game.pregame_lasttweet = send_tweet(pref_goalie_tweet, reply=game.pregame_lasttweet)
                     game.pregametweets['goalies_pref'] = True
+                else:
+                    logging.info('Preferred team goalie not yet likely or confirmed.')
 
                 if other_goalie_confirm and not game.pregametweets['goalies_other']:
                     other_goalie_tweet = (f'Projected {game.game_hashtag} Goalie '
                                           f'for {other_hashtag}:\n{other_goalie_tweet_text}')
                     game.pregame_lasttweet = send_tweet(other_goalie_tweet, reply=game.pregame_lasttweet)
                     game.pregametweets['goalies_other'] = True
+                else:
+                    logging.info('Other team goalie not yet likely or confirmed.')
 
             # Get Fantasy Labs lineups (only if tweet not sent)
             if not game.pregametweets['lines']:
@@ -2480,6 +2497,8 @@ def game_preview(game):
                     game.pregame_lasttweet = send_tweet(fwd_def_lines_tweet, reply=game.pregame_lasttweet)
                     game.pregame_lasttweet = send_tweet(power_play_lines_tweet, reply=game.pregame_lasttweet)
                     game.pregametweets['lines'] = True
+                else:
+                    logging.info('Lineup information not yet confirmed.')
 
             # Get Officials via Scouting the Refs (if tweet not sent)
             if not game.pregametweets['refs']:
@@ -2491,17 +2510,20 @@ def game_preview(game):
                     officials_tweet = officials.get('tweet')
                     game.pregame_lasttweet = send_tweet(officials_tweet, reply=game.pregame_lasttweet)
                     game.pregametweets['refs'] = True
+                else:
+                    logging.info('Referee information not yet posted.')
 
 
             # Check if all tweets are sent
             all_pregametweets_sent = all(value is True for value in game.pregametweets.values())
-            logging.info("Pre-Game Tweets: %s", all_pregametweets_sent)
+            logging.info("Pre-Game Tweets: %s", game.pregametweets)
+            logging.info("Pre-Game Tweets Flag: %s", all_pregametweets_sent)
 
-            if all_pregametweets_sent and game.game_time_countdown > 3600:
+            if not all_pregametweets_sent and game.game_time_countdown > 3600:
                 logging.info("Game State is Preview & all pre-game tweets are not sent. "
                              "Sleep for 1 hour & check again.")
                 time.sleep(3600)
-            elif all_pregametweets_sent and game.game_time_countdown > 3600:
+            elif not all_pregametweets_sent and game.game_time_countdown < 3600:
                 logging.warn("Game State is Preview & all pre-game tweets are not sent. "
                              "Less than an hour until game time so we skip these today.")
                 time.sleep(game.game_time_countdown)
@@ -2579,6 +2601,10 @@ if __name__ == '__main__':
     else:
         if args.team is not None:
             TEAM_BOT = args.team
+
+    # ------------------------------------------------------------------------------
+    # SCRIPT STARTS PROCESSING BELOW
+    # ------------------------------------------------------------------------------
 
     # Log script start lines
     logging.info('#' * 80)
@@ -2695,6 +2721,26 @@ if __name__ == '__main__':
                                     gameobj_game_state, gameobj_venue, home_team_obj,
                                     away_team_obj, preferred_indicator, gameobj_live_feed,
                                     gameobj_game_season)
+
+    # Get the gameday rosters (from the Live Feed)
+    # This is needed because in some instances a player is not included
+    # on the /teams/{id}/roster page for some reason
+    preferred_homeaway = game_obj.preferred_team.home_away
+    preferred_team = game_obj.preferred_team
+    other_team = game_obj.other_team
+    try:
+        logging.info("Getting Gameday Roster via API - %s", game_obj.live_feed)
+        all_players = req_session.get(game_obj.live_feed).json()
+        all_players = all_players.get('gameData').get('players')
+        for id, player in all_players.items():
+            team = player.get('currentTeam').get('name')
+            if team == preferred_team.team_name:
+                preferred_team.gameday_roster[id] = player
+            else:
+                other_team.gameday_roster[id] = player
+    except requests.exceptions.RequestException as e:
+        logging.error("Unable to get all players.")
+        logging.error(e)
 
 
     # All objects are created, start the game loop

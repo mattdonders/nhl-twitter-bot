@@ -71,7 +71,7 @@ def nss_defense_url(game, team, LD, RD):
 
 def get_nss_stat(array, index):
     try:
-        return float(array[index].text)
+        return f'{float(array[index].text)}%'
     except ValueError:
         return 'N/A'
 
@@ -83,7 +83,8 @@ def nss_linetool(game, team):
     return_dict_attrs = {}
 
     # Get the team roster & lines dictionaries
-    roster_dict = team.roster_dict_by_name
+    # roster_dict = team.roster_dict_by_name
+    roster_dict = team.gameday_roster_by_name
 
     if bool(team.lines) is False:
         logging.info('Somehow the lines dictionary is empty - rebuild it.')
@@ -132,7 +133,7 @@ def nss_linetool(game, team):
         game_info = last_game.find("td").text
 
         if game.game_date_local not in game_info:
-            logging.warning("Line tool not yet updated - return Fals & check again shortly.")
+            logging.warning("Line tool not yet updated - return False & check again shortly.")
             return False
 
         last_game_stats = last_game.find_all("td")
@@ -245,7 +246,8 @@ def nss_opposition(game, team):
     opposition5v5 = opposition.find("div", class_="t5v5").find_all("div", class_="datadiv")
 
     # Get the team roster & lines dictionaries
-    roster_dict = team.roster_dict_by_number
+    # roster_dict = team.roster_dict_by_number
+    roster_dict = team.gameday_roster_by_number
     if bool(team.lines) is False:
         logging.info('Somehow the lines dictionary is empty - rebuild it.')
         nhl_game_events.fantasy_lab_lines(game, team)
@@ -254,9 +256,11 @@ def nss_opposition(game, team):
     # Loop through each preferred player & their opposition
     opposition_dict = {}
     for player in opposition5v5:
+        logging.debug('Creating opposition dictionary now.')
         teamnumber = player['class'][0]
         number = re.sub('[A-Za-z]', '', teamnumber)
         pref_player_name = roster_dict.get(number).get('name')
+        logging.debug("Number: %s | Player: %s", number, pref_player_name)
         opps = player.find("tbody").find_all("tr")
 
         highestopp_forward_toi = 0
@@ -272,16 +276,18 @@ def nss_opposition(game, team):
             if position in ('L', 'R', 'C'):
                 if TOI > highestopp_forward_toi:
                     highestopp_forward_toi = TOI
-                    highestopp_forward_name = name
+                    highestopp_forward_name = name.split()[1]
             elif position == 'D':
                 if TOI > highestopp_defense_toi:
                     highestopp_defense_toi = TOI
-                    highestopp_defense_name = name
+                    highestopp_defense_name = name.split()[1]
             opposition_dict[pref_player_name] = {}
             opposition_dict[pref_player_name]['FWDNAME'] = highestopp_forward_name
             opposition_dict[pref_player_name]['FWDTOI'] = highestopp_forward_toi
             opposition_dict[pref_player_name]['DEFNAME'] = highestopp_defense_name
             opposition_dict[pref_player_name]['DEFTOI'] = highestopp_defense_toi
+
+    logging.debug('Opposition Dictionary: %s', opposition_dict)
 
     opposition_dict_byline = {}
     # Loop through forward lines & get highest TOI opponent
@@ -289,10 +295,18 @@ def nss_opposition(game, team):
         CENTER = lines.get(str(i) + 'C', 'N/A')
         LW = lines.get(str(i) + 'LW', 'N/A')
         RW = lines.get(str(i) + 'RW', 'N/A')
+        logging.debug('Looping through forward line %s now: %s - %s - %s', i, LW, CENTER, RW)
 
         line_key = f'F{str(i)}'
+
+        # Get Last Names
+        lw_lastname = LW.split()[1]
+        center_lastname = CENTER.split()[1]
+        rw_lastname = RW.split()[1]
+        line_players_lastname = f'{lw_lastname} - {center_lastname} - {rw_lastname}'
+
         opposition_dict_byline[line_key] = {}
-        opposition_dict_byline[line_key]['line'] = f'{LW} - {CENTER} - {RW}'
+        opposition_dict_byline[line_key]['line'] = line_players_lastname
         opposition_dict_byline[line_key]['FWD'] = []
         opposition_dict_byline[line_key]['DEF'] = []
         opposition_dict_byline[line_key]['FWD'].append(opposition_dict.get(CENTER).get('FWDNAME'))
@@ -313,9 +327,13 @@ def nss_opposition(game, team):
         LD = lines.get(str(i) + 'LD', 'N/A')
         RD = lines.get(str(i) + 'RD', 'N/A')
         line_key = f'D{str(i)}'
+        logging.debug('Looping through defense pairing %s now: %s - %s', i, LD, RD)
 
+        ld_lastname = LD.split()[1]
+        rd_lastname = RD.split()[1]
+        line_players_lastname = f'{ld_lastname} - {rd_lastname}'
         opposition_dict_byline[line_key] = {}
-        opposition_dict_byline[line_key]['line'] = f'{LD} - {RD}'
+        opposition_dict_byline[line_key]['line'] = line_players_lastname
         opposition_dict_byline[line_key]['FWD'] = []
         opposition_dict_byline[line_key]['DEF'] = []
         opposition_dict_byline[line_key]['FWD'].append(opposition_dict.get(LD).get('FWDNAME'))
