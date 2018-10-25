@@ -25,21 +25,22 @@ import socket
 import sys
 import time
 from datetime import datetime, timedelta
-import dateutil.tz
 from subprocess import Popen
 
+import dateutil.tz
 # 3rd Party Imports
 import linode
 import pytz
 import requests
 import tweepy
+from bs4 import BeautifulSoup
 from PIL import Image, ImageDraw, ImageFont
 
+import advanced_stats
+import hockey_bot_imaging
 # My Local / Custom Imports
 import nhl_game_events
-import advanced_stats
 import other_game_info
-import hockey_bot_imaging
 
 # If running via Docker, there is no secret.py file
 # Config is done via ENV variables - just pass through this error
@@ -1164,7 +1165,7 @@ def stats_image_generator(game, bg_type, boxscore_preferred, boxscore_other):
     draw.pieslice(coords_faceoff_box, faceoff_angle, 360, fill=other_colors_bg)
 
     # Draw outlines & inner circles
-    draw.pieslice(coords_faceoff_box_inner_white, 0, 360, fill=(255, 255, 255))
+    # draw.pieslice(coords_faceoff_box_inner_white, 0, 360, fill=(255, 255, 255))
     draw.pieslice(coords_faceoff_box_inner_black, 0, 360, fill=(0, 0, 0))
 
     # Draw Goals & Score Text
@@ -1342,6 +1343,32 @@ def is_game_today(team_id):
         games_info = schedule["dates"][0]["games"][game_index]
         return True, games_info
     return False, None
+
+
+def calculate_shot_distance(play):
+    """Parses a play and returns the distance from the net.
+
+    Args:
+        play (dict): A dictionary of a penalty play attributes.
+
+    Note:
+        dist_string (String): distance with unit (foot / feet)
+    """
+
+    event_x = abs(play['coordinates']['x'])
+    event_y = play['coordinates']['y']
+    approx_goal_x = 89
+    approx_goal_y = 0
+    shot_dist = math.ceil(math.hypot(event_x - approx_goal_x, event_y - approx_goal_y))
+    # shot_dist = abs(math.ceil(approx_goal_x - shot_x))
+
+    if shot_dist == 1:
+        shot_dist_unit = 'foot'
+    else:
+        shot_dist_unit = 'feet'
+
+    dist_string = f'{shot_dist} {shot_dist_unit}'
+    return dist_string
 
 
 def get_lineup(game, period, on_ice, players):
@@ -1568,6 +1595,7 @@ def parse_regular_goal(play, game):
     goal_period_type = play["about"]["periodType"]
     goal_period_ord = play["about"]["ordinalNum"]
     goal_period_remain = play["about"]["periodTimeRemaining"]
+    goal_distance = calculate_shot_distance(play)
 
     goal_score_away = play["about"]["goals"]["away"]
     goal_score_home = play["about"]["goals"]["home"]
@@ -1602,10 +1630,10 @@ def parse_regular_goal(play, game):
                             .format(goal_scorer_name, ordinal(goal_scorer_total), goalie_name,
                                     goal_period_remain, goal_period_ord))
     else:
-        goal_scorer_text = ("{} scores ({}) on a {} "
+        goal_scorer_text = ("{} scores ({}) on a {} from {} away "
                             "with {} left in the {} period!"
-                            .format(goal_scorer_name, ordinal(goal_scorer_total),
-                                    goal_type, goal_period_remain, goal_period_ord))
+                            .format(goal_scorer_name, ordinal(goal_scorer_total), goal_type,
+                                    goal_distance, goal_period_remain, goal_period_ord))
 
     # In order to pickup assists we need to just wait a bit longer
     # Increasing or decreasing assist_break will change that wait time
@@ -1754,6 +1782,72 @@ def parse_shootout_event(play, game):
 
     # Increment Shootout Shots
     game.shootout.shots = game.shootout.shots + 1
+
+
+def parse_missed_shot(play, game):
+    """Parses attributes of a missed shot (post / crossbar) and tweets out the result.
+
+    Args:
+        play (dict): A dictionary of a penalty play attributes.
+        game (Game): The current game instance.
+    """
+
+    shot_team = play["team"]["name"]
+    if shot_team != game.preferred_team.team_name:
+        return False
+
+    shot_description = play["result"]["description"].lower()
+    if "crossbar" in shot_description:
+        shot_hit = "crossbar"
+    elif "goalpost" in shot_description:
+        shot_hit = "post"
+    else:
+        logging.info("The preferred team missed a shot, but didn't hit the post.")
+        return False
+
+    logging.info("The preferred team hit a post or crossbar - find distance & tweet it.")
+    shooter = play['players'][0]['player']['fullName']
+    shot_period_ord = play["about"]["ordinalNum"]
+    shot_period_remain = play["about"]["periodTimeRemaining"]
+    shot_x = abs(play['coordinates']['x'])
+    shot_y = play['coordinates']['y']
+    approx_goal_x = 89
+    approx_goal_y = 0
+    shot_dist = math.ceil(math.hypot(shot_x - approx_goal_x, shot_y - approx_goal_y))
+    # shot_dist = abs(math.ceil(approx_goal_x - shot_x))
+
+    if shot_dist == 1:
+        shot_dist_unit = 'foot'
+    else:
+        shot_dist_unit = 'feet'
+
+    game_hashtag = game.game_hashtag
+    preferred_hashtag = nhl_game_events.team_hashtag(game.preferred_team.team_name, game.game_type)
+    shot_tweet_text = (f'DING! 🛎\n{shooter} hits the {shot_hit} from {shot_dist} {shot_dist_unit} '
+                       f'away with {shot_period_remain} remaining in the {shot_period_ord} period.'
+                       f'\n\n{preferred_hashtag} {game_hashtag}')
+    send_tweet(shot_tweet_text)
+
+
+def check_tvtimeout(play, game):
+    logging.info("Recent stoppage detected - wait 10 seconds & check if this is a TV Timeout.")
+    time.sleep(10)
+    # Check if a Stoppage is a TV Timeout
+    html_plays = get_html_report(game)
+    last_play = html_plays[-1]
+
+    last_play_details = last_play.find_all('td', class_='bborder')
+    event_description = last_play_details[5].text
+    logging.info('Last HTML Event Description - %s', event_description)
+    if "tv timeout" in event_description.lower():
+        period_ordinal = play["about"]["ordinalNum"]
+        period_remaining = play["about"]["periodTimeRemaining"]
+        game_hashtag = game.game_hashtag
+
+        tv_timeout_tweet = (f'Heading to a TV Timeout with {period_remaining} '
+                            f'remaining in the {period_ordinal} period.'
+                            f'\n\n{game_hashtag}')
+        send_tweet(tv_timeout_tweet)
 
 
 def check_scoring_changes(previous_goals, game):
@@ -2045,12 +2139,20 @@ def loop_game_events(json_feed, game):
                 boxscore_preferred = boxscore_home if game.home_team.preferred else boxscore_away
                 boxscore_other = boxscore_away if game.home_team.preferred else boxscore_home
                 img = stats_image_generator(game, "intermission", boxscore_preferred, boxscore_other)
+
+                img_shotmap = hockey_bot_imaging.image_generator_shotmap(game, all_plays)
+                shotmap_tweet_text = f'Shot map after the {event_period_ordinal} period.'
                 if args.notweets:
                     img.show()
+                    img_shotmap.show()
                 else:
                     img_filename = (os.path.join(PROJECT_ROOT, 'resources/images/GamedayIntermission-{}-{}.png'
                                     .format(event_period, game.preferred_team.games + 1)))
                     img.save(img_filename)
+
+                    img_shotmap_filename = (os.path.join(PROJECT_ROOT, 'resources/images/RinkShotmap-{}-{}.png'
+                                            .format(event_period, game.preferred_team.games + 1)))
+                    img_shotmap.save(img_shotmap_filename)
 
 
                 if lead_trail_text is None:
@@ -2069,6 +2171,7 @@ def loop_game_events(json_feed, game):
                 if recent_event(play):
                     api = get_api()
                     api.update_with_media(img_filename, tweet_text)
+                    api.update_with_media(img_shotmap_filename, shotmap_tweet_text)
 
                 # 1st and 2nd intermission is 18 minutes - sleep for that long
                 linescore = json_feed["liveData"]["linescore"]
@@ -2115,11 +2218,32 @@ def loop_game_events(json_feed, game):
             game.assists_check = 0
         elif event_type in ("GOAL", "SHOT", "MISSED_SHOT") and period_type == "SHOOTOUT":
             parse_shootout_event(play, game)
+
+        elif event_type == "MISSED_SHOT" and period_type != "SHOOTOUT":
+            if recent_event(play):
+                parse_missed_shot(play, game)
+
+        elif event_type == "STOP":
+            if recent_event(play):
+                check_tvtimeout(play, game)
+
         else:
             logging.debug("Other event: %s - %s", event_type, event_description)
 
         # For each loop iteration, update the eventIdx in the game object
         game.last_event_idx = event_idx
+
+
+def get_html_report(game):
+    game_id = game.game_id_html
+    pbp_url = f'http://www.nhl.com/scores/htmlreports/20182019/PL{game_id}.HTM'
+    logging.info('Going to get HTML Report - %s', pbp_url)
+
+    pbp = requests.get(pbp_url)
+    pbp_soup = BeautifulSoup(pbp.content, 'lxml')
+
+    all_plays = pbp_soup.find_all('tr', class_='evenColor')
+    return all_plays
 
 
 def parse_end_of_game(json_feed, game):
@@ -2134,6 +2258,7 @@ def parse_end_of_game(json_feed, game):
     None
     """
 
+    all_plays = json_feed["liveData"]["plays"]["allPlays"]
     all_players = json_feed["gameData"]["players"]
 
     boxscore = json_feed["liveData"]["boxscore"]["teams"]
@@ -2242,34 +2367,28 @@ def parse_end_of_game(json_feed, game):
     except KeyError:
         return False
 
+    # Generate Shotmap & Send Tweet
+    if game.finaltweets["shotmap"] is False:
+        img_shotmap = hockey_bot_imaging.image_generator_shotmap(game, all_plays)
+        shotmap_tweet_text = f'Final shot map of the game.'
+
+        if args.notweets:
+            img_shotmap.show()
+            logging.info("%s", shotmap_tweet_text)
+        else:
+            img_shotmap_filename = (os.path.join(PROJECT_ROOT, 'resources/images/RinkShotmap-Final-{}.png'
+                                            .format(game.preferred_team.games + 1)))
+            img_shotmap.save(img_shotmap_filename)
+            api = get_api()
+            api.update_with_media(img_shotmap_filename, shotmap_tweet_text)
+
+        game.finaltweets["shotmap"] = True
+
+
     # Perform Opposition Stats
     if game.finaltweets["opposition"] is False:
         try:
             nss_opposition, nss_opposition_byline = advanced_stats.nss_opposition(game, game.preferred_team)
-            # opp_tweet_fwd1 = (f"{game.preferred_team.team_name} Opposition Faced\n\n"
-            #                   f"{nss_opposition_byline.get('F1').get('line')}\n"
-            #                   f"Forward: {', '.join(nss_opposition_byline.get('F1').get('FWD'))}\n"
-            #                   f"Defense: {', '.join(nss_opposition_byline.get('F1').get('DEF'))}\n\n"
-            #                   f"{nss_opposition_byline.get('F2').get('line')}\n"
-            #                   f"Forward: {', '.join(nss_opposition_byline.get('F2').get('FWD'))}\n"
-            #                   f"Defense: {', '.join(nss_opposition_byline.get('F2').get('DEF'))}")
-            # opp_tweet_fwd2 = (f"{nss_opposition_byline.get('F3').get('line')}\n"
-            #                   f"Forward: {', '.join(nss_opposition_byline.get('F3').get('FWD'))}\n"
-            #                   f"Defense: {', '.join(nss_opposition_byline.get('F3').get('DEF'))}\n\n"
-            #                   f"{nss_opposition_byline.get('F4').get('line')}\n"
-            #                   f"Forward: {', '.join(nss_opposition_byline.get('F4').get('FWD'))}\n"
-            #                   f"Defense: {', '.join(nss_opposition_byline.get('F4').get('DEF'))}")
-            # opp_tweet_def1 = (f"{nss_opposition_byline.get('D1').get('line')}\n"
-            #                   f"Forward: {', '.join(nss_opposition_byline.get('D1').get('FWD'))}\n"
-            #                   f"Defense: {', '.join(nss_opposition_byline.get('D1').get('DEF'))}\n\n"
-            #                   f"{nss_opposition_byline.get('D2').get('line')}\n"
-            #                   f"Forward: {', '.join(nss_opposition_byline.get('D2').get('FWD'))}\n"
-            #                   f"Defense: {', '.join(nss_opposition_byline.get('D2').get('DEF'))}")
-            # opp_tweet_def2 = (f"{nss_opposition_byline.get('D3').get('line')}\n"
-            #                   f"Forward: {', '.join(nss_opposition_byline.get('D3').get('FWD'))}\n"
-            #                   f"Defense: {', '.join(nss_opposition_byline.get('D3').get('DEF'))}\n\n"
-            #                   f"(all stats via @NatStatTrick)")
-
             opposition_tweet_text = (f'{game.preferred_team.team_name} Primary Opposition\n'
                                     f'(via @NatStatTrick)')
             img = hockey_bot_imaging.image_generator_nss_opposition(nss_opposition_byline)

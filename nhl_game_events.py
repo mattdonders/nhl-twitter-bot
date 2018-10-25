@@ -79,8 +79,8 @@ class Game(object):
                               "goalies_pref": False, "goalies_other": False}
 
         # Initialize Final Tweets dictionary
-        self.finaltweets = {"finalscore": False, "stars": False,
-                            "opposition": False, "advstats": False}
+        self.finaltweets = {"finalscore": False, "stars": False, "opposition": False,
+                            "advstats": False, "shotmap": False, "retry": 0}
 
         # Parse Game ID to get attributes
         game_id_string = str(self.game_id)
@@ -88,6 +88,7 @@ class Game(object):
         self.game_id_gametype_id = game_id_string[4:6]
         self.game_id_gametype_shortid = game_id_string[5:6]
         self.game_id_shortid = game_id_string[6:]
+        self.game_id_html = game_id_string[4:]
 
         if self.game_id_gametype_id == "01":
             self.game_id_gametype = "Preseason"
