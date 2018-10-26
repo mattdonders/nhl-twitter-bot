@@ -2365,7 +2365,7 @@ def parse_end_of_game(json_feed, game):
                 send_tweet(stars_tweet)
             game.finaltweets["stars"] = True
     except KeyError:
-        return False
+        logging.info("3-stars have not yet posted - try again in next iteration.")
 
     # Generate Shotmap & Send Tweet
     if game.finaltweets["shotmap"] is False:
@@ -2406,6 +2406,10 @@ def parse_end_of_game(json_feed, game):
             game.finaltweets["opposition"] = True
         except Exception as e:
             logging.error(e)
+            if game.finaltweets_retry == 5:
+                logging.warning('Maximum of 5 retries exceeded - setting opposition to True.')
+                game.finaltweets["opposition"] = True
+
 
 
     # Perform Line-By-Line Advanced Stats
@@ -2418,25 +2422,6 @@ def parse_end_of_game(json_feed, game):
             if nss_linetool is False or nss_linetool_dict is False:
                 raise IndexError('Line tool not yet available for this game - try again shortly.')
 
-            # advstats_tweet_fwd1 = (f"{game.preferred_team.team_name} Advanced Stats\n\n"
-            #                        f"Forward 1: {nss_linetool.get('F1')}\n\n"
-            #                        f"Forward 2:{nss_linetool.get('F2')}")
-            # advstats_tweet_fwd2 = (f"Forward 3: {nss_linetool.get('F3')}\n\n"
-            #                        f"Forward 4: {nss_linetool.get('F4')}")
-            # advstats_tweet_def1 = (f"Defense 1: {nss_linetool.get('D1')}\n\n"
-            #                        f"Defense 2: {nss_linetool.get('D2')}")
-            # advstats_tweet_def2 = (f"Defense 3: {nss_linetool.get('D3')}\n\n"
-            #                        f"(all stats via @NatStatTrick)")
-            # if args.notweets:
-            #     logging.info("%s", advstats_tweet_fwd1)
-            #     logging.info("%s", advstats_tweet_fwd2)
-            #     logging.info("%s", advstats_tweet_def1)
-            #     logging.info("%s", advstats_tweet_def2)
-            # else:
-            #     advstats_tweetid_1 = send_tweet(advstats_tweet_fwd1)
-            #     advstats_tweetid_2 = send_tweet(advstats_tweet_fwd2, reply=advstats_tweetid_1)
-            #     advstats_tweetid_3 = send_tweet(advstats_tweet_def1, reply=advstats_tweetid_2)
-            #     send_tweet(advstats_tweet_def2, reply=advstats_tweetid_3)
 
             adv_stats_tweet_text = (f'{game.preferred_team.team_name} Advanced Stats\n'
                                     f'(via @NatStatTrick)')
@@ -2455,9 +2440,15 @@ def parse_end_of_game(json_feed, game):
             game.finaltweets["advstats"] = True
         except Exception as e:
             logging.error(e)
+            if game.finaltweets_retry == 5:
+                logging.warning('Maximum of 5 retries exceeded - setting advstats to True.')
+                game.finaltweets["advstats"] = True
 
     all_tweets_sent = all(value is True for value in game.finaltweets.values())
     logging.info("All Tweets Info: %s", game.finaltweets)
+
+    # Increment Final Tweets Retry Counter
+    game.finaltweets_retry += 1
     return all_tweets_sent
 
 

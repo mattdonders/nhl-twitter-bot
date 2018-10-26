@@ -80,7 +80,8 @@ class Game(object):
 
         # Initialize Final Tweets dictionary
         self.finaltweets = {"finalscore": False, "stars": False, "opposition": False,
-                            "advstats": False, "shotmap": False, "retry": 0}
+                            "advstats": False, "shotmap": False}
+        self.finaltweets_retry = 0
 
         # Parse Game ID to get attributes
         game_id_string = str(self.game_id)

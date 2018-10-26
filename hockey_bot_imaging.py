@@ -228,7 +228,7 @@ def image_generator_shotmap(game, all_plays):
             continue
 
         coords_img_x = (IMG_HALF_WIDTH * (coords_x / 100)) + IMG_HALF_WIDTH
-        coords_img_y = (IMG_HALF_HEIGHT_RINK * (coords_y / 42.5)) + IMG_HALF_HEIGHT_ALL
+        coords_img_y = IMG_HALF_HEIGHT_ALL - (IMG_HALF_HEIGHT_RINK * (coords_y / 42.5))
 
         event = {}
         event['period'] = period
