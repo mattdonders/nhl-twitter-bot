@@ -10,12 +10,14 @@ import os
 import re
 
 import dateutil.tz
+import matplotlib.pyplot as plt
+import pandas as pd
 import requests
+import seaborn as sns
 from bs4 import BeautifulSoup
 from PIL import Image, ImageDraw, ImageFont
 
 import nhl_game_events
-
 
 PROJECT_ROOT = os.path.dirname(os.path.realpath(__file__))
 
@@ -170,7 +172,7 @@ def image_generator_nss_opposition(opposition_dictionary):
     return bg
 
 
-def image_generator_shotmap(game, all_plays):
+def image_generator_shotmap_old(game, all_plays):
     """
     Takes a game & JSON object of game events and generates a shot map.
 
@@ -318,3 +320,171 @@ def image_generator_shotmap(game, all_plays):
             draw.text(coords, marker, away_color, SHOT_FONT)
 
     return bg
+
+def image_generator_shotmap(game, all_plays):
+    """
+    Takes a game & JSON object of game events and generates a shot map.
+
+    Input:
+    game - current game as a Game object
+    all_plays - JSON object of allPlays from the liveFeed API
+
+    Ouput:
+    bg (Image): Image object of shot map.
+    """
+
+    logging.info('Generating shotmap for both teams.')
+
+    MAPPED_EVENTS = ('SHOT', 'MISSED_SHOT', 'GOAL')
+    IMG_HALF_WIDTH = 512
+    IMG_WIDTH = 1024
+    IMG_HEIGHT = 512
+    IMG_HALF_HEIGHT_RINK = 218
+    IMG_HALF_HEIGHT_ALL = 256
+
+    pref_team_name = game.preferred_team.team_name
+    pref_team_short = game.preferred_team.short_name
+    other_team_name = game.other_team.team_name
+    other_team_short = game.other_team.short_name
+
+    home_team = game.home_team.team_name
+    home_team_short = game.home_team.short_name
+    away_team = game.away_team.team_name
+    away_team_short = game.away_team.short_name
+
+    logging.info('Preferred Team: %s', pref_team_name)
+    logging.info('Other Team: %s', other_team_name)
+    logging.info('Home Team: %s', home_team)
+    logging.info('Away Team: %s', away_team)
+
+    pref_events = list()
+    other_events = list()
+
+    # Loop through all plays and build a list of mapped events
+    for play in all_plays:
+        event_type = play['result']['eventTypeId']
+
+        # If play is not mapped, continue (skips loop iteration)
+        if event_type not in MAPPED_EVENTS:
+            continue
+
+        team = play['team']['name']
+        period = play['about']['period']
+        coords_x = play['coordinates']['x']
+        coords_y = play['coordinates']['y']
+
+        # Flip coordinates if 2nd period (or overtime)
+        if period % 2 == 0:
+            coords_x = coords_x * -1
+            coords_y = coords_y * -1
+
+        # If play is outside of the grid, skip it (unless its a Goal)
+        if event_type != "GOAL" and (abs(coords_x) > 100 or abs(coords_y) > 42.5):
+            continue
+
+        event = {}
+        event['id'] = id
+        event['period'] = period
+        event['event_type'] = event_type
+        event['coords_x'] = coords_x
+        event['coords_y'] = coords_y
+
+        if team == pref_team_name:
+            if event['coords_x'] < 0:
+                event['coords_x'] = abs(event['coords_x'])
+            pref_events.append(event)
+        else:
+            if event['coords_x'] > 0:
+                event['coords_x'] = event['coords_x'] * -1
+            other_events.append(event)
+
+    # Create lists for goals & shots (to scatter)
+    pref_goals = list()
+    pref_shots = list()
+    other_goals = list()
+    other_shots = list()
+
+    for event in pref_events:
+        if event['event_type'] == "GOAL":
+            pref_goals.append(event)
+        elif event['event_type'] == "SHOT":
+            pref_shots.append(event)
+
+    for event in other_events:
+        if event['event_type'] == "GOAL":
+            other_goals.append(event)
+        elif event['event_type'] == "SHOT":
+            other_shots.append(event)
+
+    # Convert lists to DataFrames (to scatter)
+    pref_df = pd.DataFrame(pref_events)
+    other_df = pd.DataFrame(other_events)
+
+    pref_goals_df = pd.DataFrame(pref_goals)
+    pref_shots_df = pd.DataFrame(pref_shots)
+
+    other_goals_df = pd.DataFrame(other_goals)
+    other_shots_df = pd.DataFrame(other_shots)
+
+    # Build Plot (via Matplotlib)
+    MY_DPI = 96
+    fig = plt.figure(figsize=(IMG_WIDTH / MY_DPI, IMG_HEIGHT / MY_DPI), dpi=MY_DPI)
+    ax = fig.add_subplot(111)
+    img = Image.open(os.path.join(PROJECT_ROOT, 'resources/images/Rink-Shotmap-Blank.png'))
+    ax.imshow(img, extent=[-100, 100, -50, 50])
+
+    # Draw the heatmap portion of the graph
+    sns.set_style("white")
+    sns.kdeplot(pref_df.coords_x, pref_df.coords_y, cmap='Reds', shade=True, shade_lowest=False, alpha=0.6)
+    sns.kdeplot(other_df.coords_x, other_df.coords_y, cmap="Blues", shade=True, shade_lowest=False, alpha=0.6)
+
+    # Draw the goal markers
+    ax.scatter(pref_goals_df.coords_x, pref_goals_df.coords_y, marker='*', s=30, c='#333333')
+    ax.scatter(other_goals_df.coords_x, other_goals_df.coords_y, marker='*', s=30, c='#333333')
+
+    # Draw the shot markers (40% opacity)
+    ax.scatter(pref_shots_df.coords_x, pref_shots_df.coords_y, marker='o', s=10, c='#333333', alpha=0.4)
+    ax.scatter(other_shots_df.coords_x, other_shots_df.coords_y, marker='o', s=10, c='#333333', alpha=0.4)
+
+    # Hide all axes & bounding boxes
+    ax.axes.get_xaxis().set_visible(False)
+    ax.axes.get_yaxis().set_visible(False)
+    ax.set_frame_on(False)
+    ax.axis('off')
+
+    fig_filename = os.path.join(PROJECT_ROOT, 'resources/images/Rink-Shotmap-Generated.png')
+    fig.savefig(fig_filename, dpi=400, bbox_inches='tight', pad_inches=0)
+
+    # Add text to our Image (title, subtitles, etc)
+    # Setup Fonts, Constants & Sizing
+    FONT_COLOR_BLACK = (0, 0, 0)
+    FONT_OPENSANS_BOLD = os.path.join(PROJECT_ROOT, 'resources/fonts/OpenSans-Bold.ttf')
+    TITLE_FONT = custom_font_size(FONT_OPENSANS_BOLD, 28)
+    SUBTITLE_FONT = custom_font_size(FONT_OPENSANS_BOLD, 15)
+    LEGEND_FONT = custom_font_size(FONT_OPENSANS_BOLD, 11)
+
+    # Re-Load our Saved Image, Crop & Resize
+    output_img = Image.open(fig_filename)
+    w,h = output_img.size
+
+    cropped_img = output_img.crop((81, 0, w, h))
+    w,h = cropped_img.size
+
+    resize_ratio = 1024 / w
+    resize_wh = (int(w * resize_ratio), int(h * resize_ratio))
+    resized = cropped_img.resize(resize_wh, resample=Image.BILINEAR)
+
+    # Create the Draw Object & Place Text
+    draw = ImageDraw.Draw(resized)
+
+    graph_title = f'{pref_team_name} vs. {other_team_name}'
+    legend_text = 'o - Shot on Goal | * - Goal'
+    draw_centered_text(draw, (0,15), 1024, graph_title, (0, 0, 0), TITLE_FONT)
+    draw_centered_text(draw, (380, 513), 260, legend_text, (0,0,0), LEGEND_FONT)
+
+    pref_subtitle = f'{pref_team_short} Shot Distribution'
+    other_subtitle = f'{other_team_short} Shot Distribution'
+    draw_centered_text(draw, (0, 510), 512, other_subtitle, (0,0,0), SUBTITLE_FONT)
+    draw_centered_text(draw, (512, 510), 512, pref_subtitle, (0,0,0), SUBTITLE_FONT)
+
+    return resized
