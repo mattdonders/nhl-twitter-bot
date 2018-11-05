@@ -2656,7 +2656,7 @@ def game_preview(game):
                 time.sleep(1800)
             elif not all_pregametweets_sent and game.game_time_countdown < 1800:
                 logging.warning("Game State is Preview & all pre-game tweets are not sent. "
-                                "Less than 30 minutes until game time so we skip these today.
+                                "Less than 30 minutes until game time so we skip these today."
                                 "If needed, we try to get lines at the end of the game for advanced stats.")
                 time.sleep(game.game_time_countdown)
                 break
