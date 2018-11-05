@@ -2223,9 +2223,10 @@ def loop_game_events(json_feed, game):
             if recent_event(play):
                 parse_missed_shot(play, game)
 
-        elif event_type == "STOP":
-            if recent_event(play):
-                check_tvtimeout(play, game)
+        # This code is not reliable enough - commenting out for now
+        # elif event_type == "STOP":
+        #     if recent_event(play):
+        #         check_tvtimeout(play, game)
 
         else:
             logging.debug("Other event: %s - %s", event_type, event_description)
@@ -2288,33 +2289,37 @@ def parse_end_of_game(json_feed, game):
 
 
     # Get next game on the schedule (bottom of the final tweet)
-    pref_team_id = game.preferred_team.team_id
-    next_game_url = f'{NHLAPI_BASEURL}/api/v1/teams/{pref_team_id}?expand=team.schedule.next'
-    logging.info(f"Going to get next game information via URL - {next_game_url}")
-    next_game_json = req_session.get(next_game_url).json()
-    next_game_sched = next_game_json.get('teams')[0].get('nextGameSchedule')
-    next_game = next_game_sched.get('dates')[0].get('games')[0]
+    try:
+        pref_team_id = game.preferred_team.team_id
+        next_game_url = f'{NHLAPI_BASEURL}/api/v1/teams/{pref_team_id}?expand=team.schedule.next'
+        logging.info(f"Going to get next game information via URL - {next_game_url}")
+        next_game_json = req_session.get(next_game_url).json()
+        next_game_sched = next_game_json.get('teams')[0].get('nextGameSchedule')
+        next_game = next_game_sched.get('dates')[0].get('games')[0]
 
-    # Commands used to calculate time related attributes
-    localtz = dateutil.tz.tzlocal()
-    localoffset = localtz.utcoffset(datetime.now(localtz))
-    next_game_date = next_game.get('gameDate')
-    next_game_datetime = datetime.strptime(next_game_date, '%Y-%m-%dT%H:%M:%SZ')
-    next_game_datetime_local = next_game_datetime + localoffset
-    next_game_date_string = datetime.strftime(next_game_datetime_local, '%A %B %d @ %I:%M%p')
+        # Commands used to calculate time related attributes
+        localtz = dateutil.tz.tzlocal()
+        localoffset = localtz.utcoffset(datetime.now(localtz))
+        next_game_date = next_game.get('gameDate')
+        next_game_datetime = datetime.strptime(next_game_date, '%Y-%m-%dT%H:%M:%SZ')
+        next_game_datetime_local = next_game_datetime + localoffset
+        next_game_date_string = datetime.strftime(next_game_datetime_local, '%A %B %d @ %I:%M%p')
 
-    # Get the Opponent for Next Game
-    next_game_teams = next_game.get('teams')
-    next_game_home = next_game_teams.get('home')
-    next_game_away = next_game_teams.get('away')
-    if next_game_home.get('team').get('id') == pref_team_id:
-        next_game_opponent = next_game_away.get('team').get('name')
-    else:
-        next_game_opponent = next_game_home.get('team').get('name')
+        # Get the Opponent for Next Game
+        next_game_teams = next_game.get('teams')
+        next_game_home = next_game_teams.get('home')
+        next_game_away = next_game_teams.get('away')
+        if next_game_home.get('team').get('id') == pref_team_id:
+            next_game_opponent = next_game_away.get('team').get('name')
+        else:
+            next_game_opponent = next_game_home.get('team').get('name')
 
-    next_game_venue = next_game.get('venue').get('name')
-    next_game_text = (f'Next Game: {next_game_date_string} vs. {next_game_opponent}'
-                      f' (at {next_game_venue})!')
+        next_game_venue = next_game.get('venue').get('name')
+        next_game_text = (f'Next Game: {next_game_date_string} vs. {next_game_opponent}'
+                        f' (at {next_game_venue})!')
+    except:
+        logging.warning('NHL API returned an incorrect response.')
+        next_game_text = ''
 
     # Generate Final Image
     # img = final_image(game, boxscore_preferred, boxscore_other)
@@ -2389,6 +2394,22 @@ def parse_end_of_game(json_feed, game):
     if game.finaltweets["opposition"] is False:
         try:
             nss_opposition, nss_opposition_byline = advanced_stats.nss_opposition(game, game.preferred_team)
+
+            # If both return values are False, it means the lines aren't confirmed
+            if nss_opposition is False and nss_opposition_byline is False:
+                tweet_text = (f'The bot could not programatically find the confirmed lines for tonight.'
+                              f'Due to this no advanced stats will be posted.'
+                              f'\n\n{preferred_hashtag} {game.game_hashtag}')
+                send_tweet(tweet_text)
+
+                # Skip the remainder of the functions by setting retries & tweet array values
+                # Then raise an Exception to skip the rest of the below
+                game.finaltweets["advstats"] = True
+                game.finaltweets["opposition"] = True
+                game.finaltweets_retry == 3
+                raise ValueError('Advanced stats cannot be performed with no lines!')
+
+            # If the above criteria is not met, the bot can do the rest of the advanced stats
             opposition_tweet_text = (f'{game.preferred_team.team_name} Primary Opposition\n'
                                     f'(via @NatStatTrick)')
             img = hockey_bot_imaging.image_generator_nss_opposition(nss_opposition_byline)
@@ -2406,8 +2427,8 @@ def parse_end_of_game(json_feed, game):
             game.finaltweets["opposition"] = True
         except Exception as e:
             logging.error(e)
-            if game.finaltweets_retry == 5:
-                logging.warning('Maximum of 5 retries exceeded - setting opposition to True.')
+            if game.finaltweets_retry == 3:
+                logging.warning('Maximum of 3 retries exceeded - setting opposition to True.')
                 game.finaltweets["opposition"] = True
 
 
@@ -2440,7 +2461,7 @@ def parse_end_of_game(json_feed, game):
             game.finaltweets["advstats"] = True
         except Exception as e:
             logging.error(e)
-            if game.finaltweets_retry == 5:
+            if game.finaltweets_retry == 3:
                 logging.warning('Maximum of 5 retries exceeded - setting advstats to True.')
                 game.finaltweets["advstats"] = True
 
@@ -2877,8 +2898,9 @@ if __name__ == '__main__':
                 logging.info("Sleeping for 5 seconds...")
                 time.sleep(5)
             except Exception as e:
-                logging.error("Uncaught exception in live game loop.")
+                logging.error("Uncaught exception in live game loop - still sleep for 5 seconds.")
                 logging.error(e)
+                time.sleep(5)
 
         elif game_obj.game_state == "Final":
             logging.info("Game is 'Final' - increase sleep time to 10 seconds.")

@@ -251,6 +251,9 @@ def nss_opposition(game, team):
     if bool(team.lines) is False:
         logging.info('Somehow the lines dictionary is empty - rebuild it.')
         nhl_game_events.fantasy_lab_lines(game, team)
+    if team.lines is None:
+        logging.warning('Fantasy Labs lines are not confirmed - cannot perform advanced stats.')
+        return False, False
     lines = team.lines
 
     # Loop through each preferred player & their opposition
