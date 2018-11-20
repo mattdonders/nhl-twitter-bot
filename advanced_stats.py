@@ -5,6 +5,7 @@
 
 import configparser
 import datetime
+import json
 import logging
 import os
 import re
@@ -20,6 +21,7 @@ config = configparser.ConfigParser()
 conf_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'config.ini')
 config.read(conf_path)
 
+PROJECT_ROOT = os.path.dirname(os.path.realpath(__file__))
 TEAM_BOT = config['DEFAULT']['TEAM_NAME']
 NHLAPI_BASEURL = config['ENDPOINTS']['NHL_BASE']
 NHLRPT_BASEURL = config['ENDPOINTS']['NHL_RPT_BASE']
@@ -218,6 +220,27 @@ def nss_linetool(game, team):
 
 
 def nss_opposition(game, team):
+
+    # Before we get the Opposition Gamelog
+    # Check if the Lines are even set (or overridden)
+    # Get the team roster & lines dictionaries
+    # roster_dict = team.roster_dict_by_number
+    roster_dict = team.gameday_roster_by_number
+    if bool(team.lines) is False:
+        logging.info('Somehow the lines dictionary is empty - rebuild it.')
+        nhl_game_events.fantasy_lab_lines(game, team)
+
+    # Check if the lines are still not confirmed (after running again)
+    if bool(team.lines) is False and team.overridelines:
+        logging.info('Fantasy Labs lines are not confirmed, but we can override with a local file!')
+        OVERRIDELINES = os.path.join(PROJECT_ROOT, 'localdata', 'lines-override.json')
+        with open(OVERRIDELINES) as f:
+            team.lines = json.load(f)
+    elif bool(team.lines) is False and not team.overridelines:
+        logging.warning('Fantasy Labs lines are not confirmed - cannot perform advanced stats.')
+        return False, False
+    lines = team.lines
+
     stats_url = (f'https://www.naturalstattrick.com/game.php?season={game.season}'
                  f'&game={game.game_id_gametype_shortid}{game.game_id_shortid}')
     logging.info(f'Running NSS Opposition Tool via URL - {stats_url}')
@@ -244,17 +267,6 @@ def nss_opposition(game, team):
     wyoplb = soup.find(text=search_string)
     opposition = wyoplb.parent.parent
     opposition5v5 = opposition.find("div", class_="t5v5").find_all("div", class_="datadiv")
-
-    # Get the team roster & lines dictionaries
-    # roster_dict = team.roster_dict_by_number
-    roster_dict = team.gameday_roster_by_number
-    if bool(team.lines) is False:
-        logging.info('Somehow the lines dictionary is empty - rebuild it.')
-        nhl_game_events.fantasy_lab_lines(game, team)
-    if team.lines is None:
-        logging.warning('Fantasy Labs lines are not confirmed - cannot perform advanced stats.')
-        return False, False
-    lines = team.lines
 
     # Loop through each preferred player & their opposition
     opposition_dict = {}

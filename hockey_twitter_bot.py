@@ -36,9 +36,9 @@ import tweepy
 from bs4 import BeautifulSoup
 from PIL import Image, ImageDraw, ImageFont
 
+# My Local / Custom Imports
 import advanced_stats
 import hockey_bot_imaging
-# My Local / Custom Imports
 import nhl_game_events
 import other_game_info
 
@@ -118,6 +118,8 @@ def parse_arguments():
     parser.add_argument("--debugtweets", help="send tweets from debug account",
                         action="store_true")
     parser.add_argument("--localdata", help="use local data instead of API",
+                        action="store_true")
+    parser.add_argument("--overridelines", help="override lines if None are returned",
                         action="store_true")
     parser.add_argument("--yesterday", help="get yesterday game on the schedule",
                         action="store_true")
@@ -1127,16 +1129,25 @@ def stats_image_generator(game, bg_type, boxscore_preferred, boxscore_other):
                               other_stats["blocked"], pref_colors_all, other_colors_all)
     stats_image_bar_generator(draw, "hits", preferred_stats["hits"],
                               other_stats["hits"], pref_colors_all, other_colors_all)
-    stats_image_bar_generator(draw, "penalty minutes", preferred_stats["pim"],
-                              other_stats["pim"], pref_colors_all, other_colors_all)
 
-    # Power Play requires a Tuple to be passed in (instead of a integer)
-    pref_powerplay = (preferred_stats["powerPlayOpportunities"], preferred_stats["powerPlayGoals"])
-    other_powerplay = (other_stats["powerPlayOpportunities"], other_stats["powerPlayGoals"])
-    logging.debug("Calling Stats Bar: pref_pp - %s, other_pp - %s, pref_colors - %s, other_colors - %s",
-                   pref_powerplay, other_powerplay, pref_colors_all, other_colors_all)
-    stats_image_bar_generator(draw, "power play", pref_powerplay, other_powerplay,
-                              pref_colors_all, other_colors_all)
+    # Some games go through multiple periods without a single penalty being called.
+    # Checking here removes the `Divide by Zero` errors.
+    if (
+            preferred_stats["pim"] != 0 and
+            other_stats["pim"] != 0 and
+            preferred_stats["powerPlayOpportunities"] != 0 and
+            other_stats["powerPlayOpportunities"] !=0
+       ):
+        stats_image_bar_generator(draw, "penalty minutes", preferred_stats["pim"],
+                                other_stats["pim"], pref_colors_all, other_colors_all)
+
+        # Power Play requires a Tuple to be passed in (instead of a integer)
+        pref_powerplay = (preferred_stats["powerPlayOpportunities"], preferred_stats["powerPlayGoals"])
+        other_powerplay = (other_stats["powerPlayOpportunities"], other_stats["powerPlayGoals"])
+        logging.debug("Calling Stats Bar: pref_pp - %s, other_pp - %s, pref_colors - %s, other_colors - %s",
+                    pref_powerplay, other_powerplay, pref_colors_all, other_colors_all)
+        stats_image_bar_generator(draw, "power play", pref_powerplay, other_powerplay,
+                                pref_colors_all, other_colors_all)
 
     # Setup & Draw Faceoff Graph (including inner / outer circles)
     logging.debug("Generating Faceoff Stats for Image.")
@@ -2552,7 +2563,7 @@ def game_preview(game):
         logging.info("%s", preview_tweet_text)
         if lineups_confirmed:
             fwd_def_lines_tweet = lineups.get('fwd_def_lines_tweet')
-            power_play_lines_tweet = lineups.get('power_play_lines_tweet')
+            power_play_lines_tweet = lineups.get('power_play_lines_tweet', 'N/A')
             logging.info("%s", fwd_def_lines_tweet)
             logging.info("%s", power_play_lines_tweet)
         if officials_confirmed:
@@ -2746,8 +2757,8 @@ if __name__ == '__main__':
     logging.info('TIME: %s', datetime.now())
     logging.info('ARGS - notweets: %s, console: %s, teamoverride: %s',
                  args.notweets, args.console, args.team)
-    logging.info('ARGS - debug: %s, debugtweets: %s, yesterday: %s',
-                 args.debug, args.debugtweets, args.yesterday)
+    logging.info('ARGS - debug: %s, debugtweets: %s, overridelines: %s',
+                 args.debug, args.debugtweets, args.overridelines)
     logging.info('ARGS - date: %s, split: %s, localdata: %s',
                  args.date, args.split, args.localdata)
     logging.info("%s\n", "#" * 80)
@@ -2822,6 +2833,7 @@ if __name__ == '__main__':
         awayteamobj_tv = gameobj_broadcasts["away"]
     except KeyError:
         awayteamobj_tv = "N/A"
+
     away_team_obj = nhl_game_events.Team(awayteamobj_id, awayteamobj_name, awayteamobj_shortname,
                                          awayteamobj_tri, "away", awayteamobj_tv, awayteamobj_games,
                                          awayteam_record, team_objs_season)
@@ -2840,9 +2852,15 @@ if __name__ == '__main__':
         hometeamobj_tv = gameobj_broadcasts["home"]
     except KeyError:
         hometeamobj_tv = "N/A"
+
     home_team_obj = nhl_game_events.Team(hometeamobj_id, hometeamobj_name, hometeamobj_shortname,
                                          hometeamobj_tri, "home", hometeamobj_tv, hometeamobj_games,
                                          hometeam_record, team_objs_season)
+
+    # Check for Line Overrides
+    if args.overridelines:
+        home_team_obj.overridelines = True
+        away_team_obj.overridelines = True
 
     # Set Preferred Team
     home_team_obj.preferred = bool(home_team_obj.team_name == TEAM_BOT)

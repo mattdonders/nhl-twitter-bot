@@ -13,6 +13,7 @@ import dateutil.tz
 import requests
 from bs4 import BeautifulSoup
 from dateutil.parser import parse
+from fake_useragent import UserAgent
 
 import nhl_game_events
 
@@ -44,9 +45,13 @@ def fantasy_lab_alt_names(player_name):
 
 
 def scouting_the_refs(game, team):
+    # Setup a Fake User Agent (simulates a real visit)
+    ua = UserAgent()
+    ua_header = {'User-Agent':str(ua.chrome)}
+
     # Initialize return dictionary
     return_dict = {}
-    refposts = requests.get('http://scoutingtherefs.com/wp-json/wp/v2/posts').json()
+    refposts = requests.get('http://scoutingtherefs.com/wp-json/wp/v2/posts', header=ua_header).json()
     for post in refposts:
         categories = post.get('categories')
         post_date = parse(post.get('date'))
@@ -205,3 +210,72 @@ def dailyfaceoff_goalies(pref_team, other_team, pref_homeaway):
         return_dict['other_goalie_confirm'] = "Not Found"
 
         return return_dict
+
+
+def dailyfaceoff_parse_lines(lines, soup):
+    for player in soup:
+        try:
+            soup_position = player['id']
+            line = soup_position[-1]
+            position = soup_position[0:-1]
+            player_pos = f'{line}{position}'
+            name = player.find('a').text
+
+            # Add player & position to lines dictionary
+            lines[player_pos] = name
+        except KeyError:
+            pass    # Not a player, skip this row
+
+    return lines
+
+
+def dailyfaceoff_lines(game, team):
+    """Parse Daily Faceoff lines page to get lines dictionary.
+       Used for pre-game tweets & advanced stats.
+
+    Args:
+        game (game): An NHL Game Event game object.
+        team (Team): A NHL Game Event team object.
+
+    Returns:
+        Dictionary: confirmed, forwards, defense, powerplay
+    """
+
+    # Instantiate blank dictionaries
+    return_dict = dict()
+    lines = dict()
+
+    # Setup a Fake User Agent (simulates a real visit)
+    ua = UserAgent()
+    ua_header = {'User-Agent':str(ua.chrome)}
+
+    df_team_format = team.team_name.lower().replace(' ', '-')
+    df_url = f'https://www.dailyfaceoff.com/teams/{df_team_format}/line-combinations/'
+
+    logging.info('Requesting & Souping the Daily Faceoff lines page.')
+    r = requests.get(df_url, headers=ua_header)
+    soup = BeautifulSoup(r.text, 'lxml')
+
+    # Grab the last update line from Daily Faceoff
+    # If Update Time != Game Date, return not confirmed
+    soup_update = soup.find('div', class_="team-lineup-last-updated")
+    last_update = soup_update.text.replace('\n','').strip().split(': ')[1]
+    last_update_date = parse(last_update)
+    game_day = parse(game.game_date_local)
+    confirmed = bool(last_update_date.date() == game_day.date())
+    return_dict['confirmed'] = confirmed
+    if not confirmed:
+        return return_dict
+
+    # If the lines are confirmed (updated today) then parse & return
+    combos = soup.find("div", class_="team-line-combination-wrap")
+    soup_forwards = combos.find('table', {"id":"forwards"}).find('tbody').find_all('td')
+    soup_defense = combos.find('table', {"id":"defense"}).find('tbody').find_all('td')
+
+    lines = dailyfaceoff_parse_lines(lines, soup_forwards)
+    lines = dailyfaceoff_parse_lines(lines, soup_defense)
+
+    # Put the lines in the return dictionary
+    # And set the property on the team object
+    return_dict['lines'] = lines
+    team.lines = lines

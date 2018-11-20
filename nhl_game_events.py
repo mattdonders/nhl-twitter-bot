@@ -230,6 +230,7 @@ class Team(object):
         self.preferred = False
         self.goals = []
         self.lines = {}
+        self.overridelines = False
         self.nss_gamelog = None
         self.gameday_roster = {}
 
