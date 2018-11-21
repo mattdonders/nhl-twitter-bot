@@ -13,3 +13,6 @@ debug_access_secret = ''
 # Linode Keys
 linode_apikey = ''
 linode_id_devils = ''
+
+# Discord token
+DISCORD_TOKEN = ''

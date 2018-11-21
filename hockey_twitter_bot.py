@@ -36,6 +36,14 @@ import tweepy
 from bs4 import BeautifulSoup
 from PIL import Image, ImageDraw, ImageFont
 
+# Discord imports
+
+import asyncio
+import discord
+import time
+import threading
+import readline
+
 # My Local / Custom Imports
 import advanced_stats
 import hockey_bot_imaging
@@ -66,6 +74,10 @@ TWITTER_URL = config['ENDPOINTS']['TWITTER_URL']
 TWITTER_ID = config['ENDPOINTS']['TWITTER_HANDLE']
 VPS_CLOUDHOST = config['VPS']['CLOUDHOST']
 VPS_HOSTNAME = config['VPS']['HOSTNAME']
+
+# Discord 
+CHANNEL_ID = config['DISCORD']['CHANNEL_ID']
+message_queue = asyncio.Queue()
 
 
 def setup_logging():
@@ -129,7 +141,8 @@ def parse_arguments():
                         action="store_true")
     parser.add_argument("--docker", help="running in a docker container",
                         action="store_true")
-
+    parser.add_argument("--discord", help="Send messages to discord instead of twitter",
+                        action="store_true")
     arguments = parser.parse_args()
     return arguments
 
@@ -198,6 +211,45 @@ def linode_shutdown():
     # Request the Linode to shutdown
     l.shutdown()
 
+# ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# Discord Methods
+# ------------------------------------------------------------------------------
+def bot_thread(loop, bot, bot_token, message_queue, channel_id):
+    asyncio.set_event_loop(loop)
+
+    @bot.event
+    async def on_ready():
+        while True:
+            data = await message_queue.get()
+            event = data[0]
+            message = data[1]
+            channel_id = data[2]
+
+            try:
+                await bot.send_message(bot.get_channel(channel_id), message)
+            except:
+                pass
+
+            event.set()
+
+    bot.run(DISCORD_TOKEN, bot = bot_token)
+
+
+def send_discord(channel_id, message):
+    event = threading.Event()
+
+    message_queue.put_nowait([event, message, channel_id])
+
+    event.wait()
+
+def start_discord_bot():
+    loop = asyncio.new_event_loop()
+    bot = discord.Client()
+    bot_token = True
+    
+    thread = threading.Thread(target = bot_thread, args = (loop, bot, bot_token, message_queue, CHANNEL_ID), daemon = True)
+    thread.start()
 
 # ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
@@ -238,6 +290,9 @@ def send_tweet(tweet_text, reply=None):
                  If duplicate cannot be found, returns base URL (also raises error)
     """
     # pylint: disable=bare-except
+    if args.discord:
+        logging.info("SENDING TO DISCORD: %s", tweet_text)
+        send_discord(CHANNEL_ID, tweet_text)
 
     # If the --notweets flag is passed, log tweets instead of Twitter
     if args.notweets:
@@ -2343,12 +2398,18 @@ def parse_end_of_game(json_feed, game):
         if args.notweets:
             img.show()
             logging.info("%s", final_score_tweet)
+            if args.discord:
+                logging.info("Sending final game tweet to Discord")
+                send_discord(CHANNEL_ID, final_score_tweet)
         else:
             img_filename = (os.path.join(PROJECT_ROOT, 'resources/images/GamedayFinal-{}.png'
                             .format(game.preferred_team.games + 1)))
             img.save(img_filename)
             api = get_api()
             api.update_with_media(img_filename, final_score_tweet)
+            if args.discord:
+                logging.info("Sending to Discord: %s", final_score_tweet)
+                send_discord(CHANNEL_ID, final_score_tweet)
         game.finaltweets["finalscore"] = True
 
     # Once available, build the 3-stars tweet & send it.
@@ -2766,6 +2827,12 @@ if __name__ == '__main__':
     # Create a requests object to maintain session
     req_session = requests.Session()
 
+    # Starting Discord thread
+    logging.info('Starting Discord Thread')
+    start_discord_bot()
+    # send_discord(CHANNEL_ID, 'TEST')
+    logging.info('Discord Thread started')
+
     # Check if there is a game scheduled for today
     # If there is no game, exit the program
     game_today, game_info = is_game_today(get_team(TEAM_BOT))
@@ -2777,7 +2844,8 @@ if __name__ == '__main__':
         else:
             logging.info("No game scheduled for today - exiting script.")
         sys.exit()
-
+    
+ 
     # For debugging purposes, print all game_info
     logging.debug("Game Information: %s", game_info)
 
