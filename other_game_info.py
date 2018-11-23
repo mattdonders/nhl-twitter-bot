@@ -51,7 +51,8 @@ def scouting_the_refs(game, team):
 
     # Initialize return dictionary
     return_dict = {}
-    refposts = requests.get('http://scoutingtherefs.com/wp-json/wp/v2/posts', header=ua_header).json()
+    # refposts = requests.get('http://scoutingtherefs.com/wp-json/wp/v2/posts', header=ua_header).json()
+    refposts = requests.get('http://scoutingtherefs.com/wp-json/wp/v2/posts').json()
     for post in refposts:
         categories = post.get('categories')
         post_date = parse(post.get('date'))

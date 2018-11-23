@@ -290,10 +290,6 @@ def send_tweet(tweet_text, reply=None):
                  If duplicate cannot be found, returns base URL (also raises error)
     """
     # pylint: disable=bare-except
-    if args.discord:
-        logging.info("SENDING TO DISCORD: %s", tweet_text)
-        send_discord(CHANNEL_ID, tweet_text)
-
     # If the --notweets flag is passed, log tweets instead of Twitter
     if args.notweets:
         logging.info("%s", tweet_text)
@@ -1476,6 +1472,8 @@ def get_lineup(game, period, on_ice, players):
                       .format(game.game_hashtag, game.preferred_team.team_name,
                               tweet_forwards, tweet_defense, tweet_goalie))
         send_tweet(tweet_text)
+        if args.discord:
+            send_discord(CHANNEL_ID, tweet_text)
 
     elif period == 4 and game.game_type in ("PR", "R"):
         all_players = forwards + defense
@@ -1490,6 +1488,8 @@ def get_lineup(game, period, on_ice, players):
             tweet_text = ("On the ice to start overtime for your {} are:\n\n{}\n\n{}"
                         .format(game.preferred_team.team_name, tweet_players, game.game_hashtag))
         send_tweet(tweet_text)
+        if args.discord:
+            send_discord(CHANNEL_ID, tweet_text)
 
     elif period > 3 and game.game_type == "P":
         ot_number = period - 3
@@ -1501,6 +1501,8 @@ def get_lineup(game, period, on_ice, players):
                       .format(ot_number, game.preferred_team.team_name,
                               tweet_forwards, tweet_defense, tweet_goalie))
         send_tweet(tweet_text)
+        if args.discord:             
+            send_discord(CHANNEL_ID, tweet_text)
 
 
 def goalie_pull_tweet(game, team):
@@ -1516,6 +1518,8 @@ def goalie_pull_tweet(game, team):
                                 game.period.current_ordinal, game.game_hashtag))
 
     send_tweet(goalie_pull_text)
+    if args.discord:
+        send_discord(CHANNEL_ID, goalie_pull_text)
 
 
 def parse_penalty(play, game):
@@ -1619,7 +1623,8 @@ def parse_penalty(play, game):
         penalty_tweet = ("{} {}\n\n{}"
                          .format(penalty_text_players, penalty_text_skaters, game.game_hashtag))
     penalty_tweet_id = send_tweet(penalty_tweet)
-
+    if args.discord:
+        send_discord(CHANNEL_ID, penalty_tweet)
 
 def parse_regular_goal(play, game):
     """Parses attributes of a goal and tweets out the result.
@@ -1763,7 +1768,8 @@ def parse_regular_goal(play, game):
                           .format(goal_announce, goal_lights_text, goal_text_player,
                                   goal_text_score, team_hashtag, game.game_hashtag))
         goal_tweet = send_tweet(goal_text_full) if recent_event(play) else None
-
+        if args.discord:
+            send_discord(CHANNEL_ID, goal_text_full)
         # Create Goal Object & append to Team goals array
         goal = nhl_game_events.Goal(goal_description, goal_eventidx, goal_period, goal_period_type,
                                     goal_period_ord, goal_period_remain, goal_score_home,
@@ -1788,7 +1794,8 @@ def parse_regular_goal(play, game):
                             .format(goal_announce, goal_text_player,
                                     goal_text_score, game.game_hashtag))
         goal_tweet = send_tweet(goal_other_tweet) if recent_event(play) else None
-
+        if args.discord:
+            send_discord(CHANNEL_ID, goal_other_tweet)
     return True
 
 
@@ -1845,7 +1852,8 @@ def parse_shootout_event(play, game):
     shootout_tweet_text = ("{}\n\n{}\n\n{}"
                            .format(shootout_event_text, shootout_score_text, game.game_hashtag))
     send_tweet(shootout_tweet_text)
-
+    if args.discord:
+        send_discord(CHANNEL_ID, shootout_tweet_text)
     # Increment Shootout Shots
     game.shootout.shots = game.shootout.shots + 1
 
@@ -1893,7 +1901,8 @@ def parse_missed_shot(play, game):
                        f'away with {shot_period_remain} remaining in the {shot_period_ord} period.'
                        f'\n\n{preferred_hashtag} {game_hashtag}')
     send_tweet(shot_tweet_text)
-
+    if args.discord:
+        send_discord(CHANNEL_ID, shot_tweet_text)
 
 def check_tvtimeout(play, game):
     logging.info("Recent stoppage detected - wait 10 seconds & check if this is a TV Timeout.")
@@ -1914,7 +1923,8 @@ def check_tvtimeout(play, game):
                             f'remaining in the {period_ordinal} period.'
                             f'\n\n{game_hashtag}')
         send_tweet(tv_timeout_tweet)
-
+        if args.discord:
+            send_discord(CHANNEL_ID, tv_timeout_tweet)
 
 def check_scoring_changes(previous_goals, game):
     """
@@ -1959,7 +1969,8 @@ def check_scoring_changes(previous_goals, game):
                                       .format(goal_scorechange_announce, goal_scorechange_text,
                                               game.game_hashtag, goal_tweet))
             goal_scorechange_tweeturl = send_tweet(goal_scorechange_tweet)
-
+            if args.discord:
+                send_discord(CHANNEL_ID, goal_scorechange_tweet)
             # Adjust the values of the array with the changed ones
             preferred_goals[idx].scorer = goal_scorer_name
             preferred_goals[idx].assists = assists
@@ -1987,6 +1998,8 @@ def check_scoring_changes(previous_goals, game):
                                            .format(goal_assistchange_text,
                                                    game.game_hashtag, goal_tweet))
                 goal_assistchange_url = send_tweet(goal_assistchange_tweet)
+                if args.discord:
+                    send_discord(CHANNEL_ID, goal_assistchange_tweet)
 
             # Assists on the original goal have changed, quote tweet that with different wording.
             else:
@@ -2006,7 +2019,8 @@ def check_scoring_changes(previous_goals, game):
                                                    goal_assistchange_text, game.game_hashtag,
                                                    goal_tweet))
                 goal_assistchange_url = send_tweet(goal_assistchange_tweet)
-
+                if args.discord:
+                    send_discord(CHANNEL_ID, tweet_text)
             # Then, adjust the values of the array with the changed ones
             preferred_goals[idx].scorer = goal_scorer_name
             preferred_goals[idx].assists = assists
@@ -2170,6 +2184,8 @@ def loop_game_events(json_feed, game):
 
             if recent_event(play):
                 send_tweet(tweet_text)
+                if args.discord:
+                    send_discord(CHANNEL_ID, tweet_text)
 
         elif event_type == "PERIOD_END":
             if event_period in (1, 2):
@@ -2255,6 +2271,8 @@ def loop_game_events(json_feed, game):
                                       game.preferred_team.score, game.game_hashtag))
                 if recent_event(play):
                     send_tweet(tweet_text)
+                    if args.discord:
+                        send_discord(CHANNEL_ID, tweet_text)
 
             elif event_period > 3 and (game.preferred_team.score == game.other_team.score) and game.game_type == "P":
                 ot_period = event_period - 3
@@ -2266,6 +2284,8 @@ def loop_game_events(json_feed, game):
                                       next_ot, game.preferred_team.score, game.game_hashtag))
                 if recent_event(play):
                     send_tweet(tweet_text)
+                    if args.discord:
+                        send_discord(CHANNEL_ID, tweet_text)
 
         elif event_type == "PENALTY":
             if recent_event(play):
@@ -2440,6 +2460,8 @@ def parse_end_of_game(json_feed, game):
                 logging.info("%s", stars_tweet)
             else:
                 send_tweet(stars_tweet)
+                if args.discord:
+                    send_discord(CHANNEL_ID, stars_tweet)
             game.finaltweets["stars"] = True
     except KeyError:
         logging.info("3-stars have not yet posted - try again in next iteration.")
@@ -2473,6 +2495,8 @@ def parse_end_of_game(json_feed, game):
                               f'Due to this no advanced stats will be posted.'
                               f'\n\n{preferred_hashtag} {game.game_hashtag}')
                 send_tweet(tweet_text)
+                if args.discord:
+                    send_discord(CHANNEL_ID, tweet_text)
 
                 # Skip the remainder of the functions by setting retries & tweet array values
                 # Then raise an Exception to skip the rest of the below
@@ -2622,13 +2646,20 @@ def game_preview(game):
 
         img.show()
         logging.info("%s", preview_tweet_text)
+        if args.discord:
+            send_discord(CHANNEL_ID, preview_tweet_text)
         if lineups_confirmed:
             fwd_def_lines_tweet = lineups.get('fwd_def_lines_tweet')
             power_play_lines_tweet = lineups.get('power_play_lines_tweet', 'N/A')
             logging.info("%s", fwd_def_lines_tweet)
             logging.info("%s", power_play_lines_tweet)
+            if args.discord:
+                send_discord(CHANNEL_ID, fwd_def_lines_tweet)
+                send_discord(CHANNEL_ID, power_play_lines_tweet)
         if officials_confirmed:
             logging.info("%s", officials.get('tweet'))
+            if args.discord:
+                send_discord(CHANNEL_ID, officials.get('tweet'))
         pref_goalie_tweet_text = goalies.get('pref_goalie')
         other_goalie_tweet_text = goalies.get('other_goalie')
         pref_goalie_tweet = (f'Projected {game.game_hashtag} Goalie '
@@ -2638,6 +2669,10 @@ def game_preview(game):
         logging.info("%s", pref_goalie_tweet)
         logging.info("%s", other_goalie_tweet)
         logging.info("%s", season_series_tweet)
+        if args.discord:
+            send_discord(CHANNEL_ID, pref_goalie_tweet)
+            send_discord(CHANNEL_ID, other_goalie_tweet)
+            send_discord(CHANNEL_ID, season_series_tweet)
 
         logging.info("Since we are not sending tweets, just sleep until game time.")
         time.sleep(game.game_time_countdown)
@@ -2651,6 +2686,8 @@ def game_preview(game):
             game.pregame_lasttweet = image_tweet_id
         else:
             image_tweet_id = send_tweet(preview_tweet_text)
+            if args.discord:
+                send_discord(CHANNEL_ID, preview_tweet_text)
 
 
         # Send Season Series tweet (only tweet not waiting on confirmation)
@@ -2676,6 +2713,8 @@ def game_preview(game):
                     pref_goalie_tweet = (f'Projected {game.game_hashtag} Goalie '
                                          f'for {pref_hashtag}:\n{pref_goalie_tweet_text}')
                     game.pregame_lasttweet = send_tweet(pref_goalie_tweet, reply=game.pregame_lasttweet)
+                    if args.discord:
+                        send_discord(CHANNEL_ID, pref_goalie_tweet)
                     game.pregametweets['goalies_pref'] = True
                 else:
                     logging.info('Preferred team goalie not yet likely or confirmed.')
@@ -2684,6 +2723,8 @@ def game_preview(game):
                     other_goalie_tweet = (f'Projected {game.game_hashtag} Goalie '
                                           f'for {other_hashtag}:\n{other_goalie_tweet_text}')
                     game.pregame_lasttweet = send_tweet(other_goalie_tweet, reply=game.pregame_lasttweet)
+                    if args.discord:
+                        send_discord(CHANNEL_ID, other_goalie_tweet)
                     game.pregametweets['goalies_other'] = True
                 else:
                     logging.info('Other team goalie not yet likely or confirmed.')
@@ -2698,7 +2739,11 @@ def game_preview(game):
                     fwd_def_lines_tweet = lineups.get('fwd_def_lines_tweet')
                     power_play_lines_tweet = lineups.get('power_play_lines_tweet')
                     game.pregame_lasttweet = send_tweet(fwd_def_lines_tweet, reply=game.pregame_lasttweet)
+                    if args.discord:
+                        send_discord(CHANNEL_ID, fwd_def_lines_tweet)
                     game.pregame_lasttweet = send_tweet(power_play_lines_tweet, reply=game.pregame_lasttweet)
+                    if args.discord:
+                        send_discord(CHANNEL_ID, power_play_lines_tweet)
                     game.pregametweets['lines'] = True
                 else:
                     logging.info('Lineup information not yet confirmed.')
@@ -2712,6 +2757,8 @@ def game_preview(game):
                 if officials_confirmed:
                     officials_tweet = officials.get('tweet')
                     game.pregame_lasttweet = send_tweet(officials_tweet, reply=game.pregame_lasttweet)
+                    if args.discord:
+                        send_discord(CHANNEL_ID, officials_tweet)
                     game.pregametweets['refs'] = True
                 else:
                     logging.info('Referee information not yet posted.')
