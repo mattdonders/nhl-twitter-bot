@@ -1149,6 +1149,19 @@ def stats_image_generator(game, bg_type, boxscore_preferred, boxscore_other):
         stats_image_bar_generator(draw, "power play", pref_powerplay, other_powerplay,
                                 pref_colors_all, other_colors_all)
 
+    else:
+        # If PIM & PP == 0, draw only the labels
+        penalty_total_text = "PENALTY MINUTES: 0"
+        penalty_total_text_font = custom_font_size(font_opensans_bolditalic, 20)
+        penalty_total_text_coords = (50, 603)
+        draw.text(penalty_total_text_coords, penalty_total_text, FONT_WHITE, penalty_total_text_font)
+
+        pp_total_text = "POWER PLAYS: 0"
+        pp_total_text_font = custom_font_size(font_opensans_bolditalic, 23)
+        pp_total_text_coords = (50, 423)
+        draw.text(pp_total_text_coords, pp_total_text, FONT_WHITE, pp_total_text_font)
+
+
     # Setup & Draw Faceoff Graph (including inner / outer circles)
     logging.debug("Generating Faceoff Stats for Image.")
     text_title_faceoff = "FACEOFF %"
