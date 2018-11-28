@@ -28,6 +28,7 @@ pip install -r requirements.txt
 ```
 
 * Create a new [Twitter application](https://apps.twitter.com/app/new) and request an Access Token once completed.
+* If you want to send messages to Discord create a new [Discord application](https://discordapp.com/developers/applications/) and copy its token.
 * Rename `secret-sample.py` to `secret.py` and fill in the proper credentials.
   * There are two sets of Twitter credentials as the second set can be used to setup a debug / test account.
   * Linode is my cloud VPS host of choice. If you are running this locally, this can be left blank as the script will just exit on completion.
@@ -47,6 +48,9 @@ debug_access_secret = ''
 # Linode Keys
 linode_apikey = ''
 linode_id_devils = ''
+
+# Discord token
+DISCORD_TOKEN = ''
 ```
 
 * Modify the following values within `config.ini` to fit our team and Twitter handles.
@@ -62,6 +66,9 @@ DEBUG_TWITTER_HANDLE = DevilsBotDebug
 [VPS]
 CLOUDHOST = linode
 HOSTNAME = donders-devils-twitter
+
+[DISCORD]
+CHANNEL_ID = 12345678910
 ```
 
 ### Execution
@@ -94,6 +101,7 @@ optional arguments:
   --debugtweets  send tweets from debug account
   --localdata    use local data instead of API
   --yesterday    get yesterday game on the schedule
+  --discord      Send messages to discord channel
 ```
 
 
@@ -104,6 +112,7 @@ We use [SemVer](http://semver.org/) for versioning. For the versions available, 
 ## Authors
 
 * **Matt Donders** - https://mattdonders.com
+* **Dave McPherson** - http://www.wochstudios.com/
 
 ## Acknowledgments
 
