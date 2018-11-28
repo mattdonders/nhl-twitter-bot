@@ -141,7 +141,7 @@ def parse_arguments():
                         action="store_true")
     parser.add_argument("--docker", help="running in a docker container",
                         action="store_true")
-    parser.add_argument("--discord", help="Send messages to discord instead of twitter",
+    parser.add_argument("--discord", help="Send messages to discord channel",
                         action="store_true")
     arguments = parser.parse_args()
     return arguments
