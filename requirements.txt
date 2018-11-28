@@ -22,7 +22,7 @@ pkg-resources==0.0.0
 pyparsing==2.3.0
 python-dateutil==2.7.5
 pytz==2018.3
-requests==2.18.4
+requests==2.20.1
 requests-oauthlib==1.0.0
 scipy==1.1.0
 seaborn==0.9.0
