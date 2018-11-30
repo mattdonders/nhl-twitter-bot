@@ -237,11 +237,12 @@ def bot_thread(loop, bot, bot_token, message_queue, channel_id):
 
 
 def send_discord(channel_id, message):
+    logging.info('Sending Discord Message (Channel %s) - %s', channel_id, message)
+    
     event = threading.Event()
-
     message_queue.put_nowait([event, message, channel_id])
-
     event.wait()
+
 
 def start_discord_bot():
     loop = asyncio.new_event_loop()
@@ -2697,6 +2698,8 @@ def game_preview(game):
             image_tweet = api.update_with_media(img_filename, preview_tweet_text)
             image_tweet_id = image_tweet.id_str
             game.pregame_lasttweet = image_tweet_id
+            if args.discord:
+                send_discord(CHANNEL_ID, preview_tweet_text)
         else:
             image_tweet_id = send_tweet(preview_tweet_text)
             if args.discord:
@@ -2705,6 +2708,8 @@ def game_preview(game):
 
         # Send Season Series tweet (only tweet not waiting on confirmation)
         game.pregame_lasttweet = send_tweet(season_series_tweet, reply=game.pregame_lasttweet)
+        if args.discord:
+            send_discord(CHANNEL_ID, season_series_tweet)
 
         while True:
             if not game.pregametweets['goalies_pref'] or not game.pregametweets['goalies_other']:
@@ -2880,8 +2885,8 @@ if __name__ == '__main__':
                  args.notweets, args.console, args.team)
     logging.info('ARGS - debug: %s, debugtweets: %s, overridelines: %s',
                  args.debug, args.debugtweets, args.overridelines)
-    logging.info('ARGS - date: %s, split: %s, localdata: %s',
-                 args.date, args.split, args.localdata)
+    logging.info('ARGS - date: %s, split: %s, localdata: %s, discord: %s',
+                 args.date, args.split, args.localdata, args.discord)
     logging.info("%s\n", "#" * 80)
 
     # Create a requests object to maintain session
