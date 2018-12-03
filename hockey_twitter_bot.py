@@ -1699,7 +1699,10 @@ def parse_regular_goal(play, game):
     goal_period_type = play["about"]["periodType"]
     goal_period_ord = play["about"]["ordinalNum"]
     goal_period_remain = play["about"]["periodTimeRemaining"]
-    goal_distance = calculate_shot_distance(play)
+    try:
+        goal_distance = calculate_shot_distance(play)
+    except:
+        goal_distance = None
 
     goal_score_away = play["about"]["goals"]["away"]
     goal_score_home = play["about"]["goals"]["home"]
@@ -1734,10 +1737,16 @@ def parse_regular_goal(play, game):
                             .format(goal_scorer_name, ordinal(goal_scorer_total), goalie_name,
                                     goal_period_remain, goal_period_ord))
     else:
-        goal_scorer_text = ("{} scores ({}) on a {} from {} away "
-                            "with {} left in the {} period!"
-                            .format(goal_scorer_name, ordinal(goal_scorer_total), goal_type,
-                                    goal_distance, goal_period_remain, goal_period_ord))
+        if goal_distance is not None:
+            goal_scorer_text = ("{} scores ({}) on a {} from {} away "
+                                "with {} left in the {} period!"
+                                .format(goal_scorer_name, ordinal(goal_scorer_total), goal_type,
+                                        goal_distance, goal_period_remain, goal_period_ord))
+        else:
+            goal_scorer_text = ("{} scores ({}) on a {} "
+                                "with {} left in the {} period!"
+                                .format(goal_scorer_name, ordinal(goal_scorer_total), goal_type,
+                                        goal_period_remain, goal_period_ord))
 
     # In order to pickup assists we need to just wait a bit longer
     # Increasing or decreasing assist_break will change that wait time
