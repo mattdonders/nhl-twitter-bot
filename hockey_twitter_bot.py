@@ -75,8 +75,9 @@ TWITTER_ID = config['ENDPOINTS']['TWITTER_HANDLE']
 VPS_CLOUDHOST = config['VPS']['CLOUDHOST']
 VPS_HOSTNAME = config['VPS']['HOSTNAME']
 
-# Discord 
-CHANNEL_ID = config['DISCORD']['CHANNEL_ID']
+# Discord Imports (Uncomment Top Line to Enable Debug Mode)
+CHANNEL_ID = config['DISCORD']['DEBUG_CHANNEL_ID']
+# CHANNEL_ID = config['DISCORD']['DEBUG_CHANNEL_ID']
 message_queue = asyncio.Queue()
 
 
@@ -222,25 +223,43 @@ def bot_thread(loop, bot, bot_token, message_queue, channel_id):
     async def on_ready():
         while True:
             data = await message_queue.get()
-            event = data[0]
-            message = data[1]
-            channel_id = data[2]
+            if len(data) == 3:  # No Image
+                event = data[0]
+                message = data[1]
+                channel_id = data[2]
+                message = f'▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n{message}'
+                try:
+                    await bot.send_message(bot.get_channel(channel_id), message)
+                except Exception as e:
+                    logging.warning('Error sending Discord message - %s', e)
 
-            try:
-                await bot.send_message(bot.get_channel(channel_id), message)
-            except:
-                pass
+                event.set()
 
-            event.set()
+            elif len(data) == 4:    # Image to Send
+                logging.info('Discord Image Detected - %s', data)
+                event = data[0]
+                message = data[1]
+                image = data[2]
+                channel_id = data[3]
+                message = f'▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n{message}'
+                try:
+                    await bot.send_file(bot.get_channel(channel_id), image, content=message)
+                except Exception as e:
+                    logging.warning('Error sending Discord image & message - %s', e)
+
+                event.set()
 
     bot.run(DISCORD_TOKEN, bot = bot_token)
 
 
-def send_discord(channel_id, message):
-    logging.info('Sending Discord Message (Channel %s) - %s', channel_id, message)
-    
+def send_discord(channel_id, message, image=None):
     event = threading.Event()
-    message_queue.put_nowait([event, message, channel_id])
+    if image is None:
+        logging.info('Sending Discord Message (Channel %s) - %s', channel_id, message)
+        message_queue.put_nowait([event, message, channel_id])
+    else:
+        logging.info('Sending Discord Message w/ Image (Channel %s) - %s - %s', channel_id, message, image)
+        message_queue.put_nowait([event, message, image, channel_id])
     event.wait()
 
 
@@ -248,7 +267,7 @@ def start_discord_bot():
     loop = asyncio.new_event_loop()
     bot = discord.Client()
     bot_token = True
-    
+
     thread = threading.Thread(target = bot_thread, args = (loop, bot, bot_token, message_queue, CHANNEL_ID), daemon = True)
     thread.start()
 
@@ -1515,7 +1534,7 @@ def get_lineup(game, period, on_ice, players):
                       .format(ot_number, game.preferred_team.team_name,
                               tweet_forwards, tweet_defense, tweet_goalie))
         send_tweet(tweet_text)
-        if args.discord:             
+        if args.discord:
             send_discord(CHANNEL_ID, tweet_text)
 
 
@@ -1911,7 +1930,7 @@ def parse_missed_shot(play, game):
 
     game_hashtag = game.game_hashtag
     preferred_hashtag = nhl_game_events.team_hashtag(game.preferred_team.team_name, game.game_type)
-    shot_tweet_text = (f'DING! 🛎\n{shooter} hits the {shot_hit} from {shot_dist} {shot_dist_unit} '
+    shot_tweet_text = (f'DING! 🛎\n\n{shooter} hits the {shot_hit} from {shot_dist} {shot_dist_unit} '
                        f'away with {shot_period_remain} remaining in the {shot_period_ord} period.'
                        f'\n\n{preferred_hashtag} {game_hashtag}')
     send_tweet(shot_tweet_text)
@@ -2034,7 +2053,7 @@ def check_scoring_changes(previous_goals, game):
                                                    goal_tweet))
                 goal_assistchange_url = send_tweet(goal_assistchange_tweet)
                 if args.discord:
-                    send_discord(CHANNEL_ID, tweet_text)
+                    send_discord(CHANNEL_ID, goal_assistchange_tweet)
             # Then, adjust the values of the array with the changed ones
             preferred_goals[idx].scorer = goal_scorer_name
             preferred_goals[idx].assists = assists
@@ -2429,21 +2448,21 @@ def parse_end_of_game(json_feed, game):
                                  next_game_text))
 
     if game.finaltweets["finalscore"] is False:
+        # Set the Image Filename & Save it
+        img_filename = (os.path.join(PROJECT_ROOT, 'resources/images/GamedayFinal-{}.png'
+                            .format(game.preferred_team.games + 1)))
+        img.save(img_filename)
+
         if args.notweets:
             img.show()
             logging.info("%s", final_score_tweet)
-            if args.discord:
-                logging.info("Sending final game tweet to Discord")
-                send_discord(CHANNEL_ID, final_score_tweet)
         else:
-            img_filename = (os.path.join(PROJECT_ROOT, 'resources/images/GamedayFinal-{}.png'
-                            .format(game.preferred_team.games + 1)))
-            img.save(img_filename)
             api = get_api()
             api.update_with_media(img_filename, final_score_tweet)
-            if args.discord:
-                logging.info("Sending to Discord: %s", final_score_tweet)
-                send_discord(CHANNEL_ID, final_score_tweet)
+
+        if args.discord:
+            logging.info("Sending Image & Message to Discord: %s", final_score_tweet)
+            send_discord(CHANNEL_ID, final_score_tweet, img_filename)
         game.finaltweets["finalscore"] = True
 
     # Once available, build the 3-stars tweet & send it.
@@ -2474,7 +2493,8 @@ def parse_end_of_game(json_feed, game):
                 logging.info("%s", stars_tweet)
             else:
                 send_tweet(stars_tweet)
-                if args.discord:
+
+            if args.discord:
                     send_discord(CHANNEL_ID, stars_tweet)
             game.finaltweets["stars"] = True
     except KeyError:
@@ -2485,15 +2505,19 @@ def parse_end_of_game(json_feed, game):
         img_shotmap = hockey_bot_imaging.image_generator_shotmap(game, all_plays)
         shotmap_tweet_text = f'Final shot map of the game.'
 
+        img_shotmap_filename = (os.path.join(PROJECT_ROOT, 'resources/images/RinkShotmap-Final-{}.png'
+                                            .format(game.preferred_team.games + 1)))
+        img_shotmap.save(img_shotmap_filename)
+
         if args.notweets:
             img_shotmap.show()
             logging.info("%s", shotmap_tweet_text)
         else:
-            img_shotmap_filename = (os.path.join(PROJECT_ROOT, 'resources/images/RinkShotmap-Final-{}.png'
-                                            .format(game.preferred_team.games + 1)))
-            img_shotmap.save(img_shotmap_filename)
             api = get_api()
             api.update_with_media(img_shotmap_filename, shotmap_tweet_text)
+
+        if args.discord:
+            send_discord(CHANNEL_ID, shotmap_tweet_text, img_shotmap_filename)
 
         game.finaltweets["shotmap"] = True
 
@@ -2523,17 +2547,20 @@ def parse_end_of_game(json_feed, game):
             opposition_tweet_text = (f'{game.preferred_team.team_name} Primary Opposition\n'
                                     f'(via @NatStatTrick)')
             img = hockey_bot_imaging.image_generator_nss_opposition(nss_opposition_byline)
+            img_filename = os.path.join(PROJECT_ROOT,
+                            'resources/images/GamedayAdvStats-{}.png'
+                            .format(game.preferred_team.games + 1))
+            img.save(img_filename)
 
             if args.notweets:
                 img.show()
                 logging.info("%s", opposition_tweet_text)
             else:
-                img_filename = os.path.join(PROJECT_ROOT,
-                                            'resources/images/GamedayAdvStats-{}.png'
-                                            .format(game.preferred_team.games + 1))
-                img.save(img_filename)
                 api = get_api()
                 api.update_with_media(img_filename, opposition_tweet_text)
+
+            if args.discord:
+                send_discord(CHANNEL_ID, opposition_tweet_text, img_filename)
             game.finaltweets["opposition"] = True
         except Exception as e:
             logging.error(e)
@@ -2557,17 +2584,20 @@ def parse_end_of_game(json_feed, game):
             adv_stats_tweet_text = (f'{game.preferred_team.team_name} Advanced Stats\n'
                                     f'(via @NatStatTrick)')
             img = hockey_bot_imaging.image_generator_nss_linetool(nss_linetool_dict)
+            img_filename = os.path.join(PROJECT_ROOT,
+                                        'resources/images/GamedayAdvStats-{}.png'
+                                        .format(game.preferred_team.games + 1))
+            img.save(img_filename)
 
             if args.notweets:
                 img.show()
                 logging.info("%s", adv_stats_tweet_text)
             else:
-                img_filename = os.path.join(PROJECT_ROOT,
-                                            'resources/images/GamedayAdvStats-{}.png'
-                                            .format(game.preferred_team.games + 1))
-                img.save(img_filename)
                 api = get_api()
                 api.update_with_media(img_filename, adv_stats_tweet_text)
+
+            if args.discord:
+                send_discord(CHANNEL_ID, adv_stats_tweet_text, img_filename)
             game.finaltweets["advstats"] = True
         except Exception as e:
             logging.error(e)
@@ -2650,6 +2680,15 @@ def game_preview(game):
 
     # img = preview_image(game)
     img = pregame_image(game)
+
+    if args.discord:
+        if img is not None:
+            img_filename = os.path.join(PROJECT_ROOT, 'resources/images/Gameday-{}.png'.format(game.preferred_team.games + 1))
+            img.save(img_filename)
+            send_discord(CHANNEL_ID, preview_tweet_text, img_filename)
+        else:
+            send_discord(CHANNEL_ID, preview_tweet_text)
+
     if args.notweets:
         lineups = nhl_game_events.fantasy_lab_lines(game, game.preferred_team)
         lineups_confirmed = lineups.get('confirmed')
@@ -2660,8 +2699,6 @@ def game_preview(game):
 
         img.show()
         logging.info("%s", preview_tweet_text)
-        if args.discord:
-            send_discord(CHANNEL_ID, preview_tweet_text)
         if lineups_confirmed:
             fwd_def_lines_tweet = lineups.get('fwd_def_lines_tweet')
             power_play_lines_tweet = lineups.get('power_play_lines_tweet', 'N/A')
@@ -2698,13 +2735,11 @@ def game_preview(game):
             image_tweet = api.update_with_media(img_filename, preview_tweet_text)
             image_tweet_id = image_tweet.id_str
             game.pregame_lasttweet = image_tweet_id
-            if args.discord:
-                send_discord(CHANNEL_ID, preview_tweet_text)
+
         else:
             image_tweet_id = send_tweet(preview_tweet_text)
             if args.discord:
                 send_discord(CHANNEL_ID, preview_tweet_text)
-
 
         # Send Season Series tweet (only tweet not waiting on confirmation)
         game.pregame_lasttweet = send_tweet(season_series_tweet, reply=game.pregame_lasttweet)
@@ -2909,8 +2944,8 @@ if __name__ == '__main__':
         else:
             logging.info("No game scheduled for today - exiting script.")
         sys.exit()
-    
- 
+
+
     # For debugging purposes, print all game_info
     logging.debug("Game Information: %s", game_info)
 
