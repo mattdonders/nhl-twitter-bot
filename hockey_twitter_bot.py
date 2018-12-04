@@ -1,4 +1,3 @@
-#!/usr/local/bin/python3
 # -*- coding: utf-8 -*-
 
 """
@@ -76,8 +75,8 @@ VPS_CLOUDHOST = config['VPS']['CLOUDHOST']
 VPS_HOSTNAME = config['VPS']['HOSTNAME']
 
 # Discord Imports (Uncomment Top Line to Enable Debug Mode)
-CHANNEL_ID = config['DISCORD']['DEBUG_CHANNEL_ID']
 # CHANNEL_ID = config['DISCORD']['DEBUG_CHANNEL_ID']
+CHANNEL_ID = config['DISCORD']['CHANNEL_ID']
 message_queue = asyncio.Queue()
 
 
@@ -2296,6 +2295,11 @@ def loop_game_events(json_feed, game):
                     api = get_api()
                     api.update_with_media(img_filename, tweet_text)
                     api.update_with_media(img_shotmap_filename, shotmap_tweet_text)
+
+                    if args.discord:
+                        send_discord(CHANNEL_ID, tweet_text, img_filename)
+                        send_discord(CHANNEL_ID, shotmap_tweet_text, img_shotmap_filename)
+
 
                 # 1st and 2nd intermission is 18 minutes - sleep for that long
                 linescore = json_feed["liveData"]["linescore"]
