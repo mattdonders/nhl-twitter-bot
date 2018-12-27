@@ -863,7 +863,7 @@ def hockey_ref_goalie_against_team(goalie, opponent):
             hr_position_goalie = bool("Position: G" in attr.text.rstrip())
             break
 
-    if hr_name != goalie_name_camel or not hr_position_goalie:
+    if hr_name.lower() != goalie_name_camel.lower() or not hr_position_goalie:
         logging.warning("Wrong player retrieved from HR, trying 02.")
         goalie_hockey_ref_name = "{}{}02".format(goalie_last_name[0:5], goalie_first_name[0:2])
         hockey_ref_url = ("{}/{}/{}/splits"

@@ -223,6 +223,7 @@ def bot_thread(loop, bot, bot_token, message_queue, channel_id):
         while True:
             data = await message_queue.get()
             if len(data) == 3:  # No Image
+                logging.info('Discord Message w/o Image Detected - %s', data)
                 event = data[0]
                 message = data[1]
                 channel_id = data[2]
@@ -235,7 +236,7 @@ def bot_thread(loop, bot, bot_token, message_queue, channel_id):
                 event.set()
 
             elif len(data) == 4:    # Image to Send
-                logging.info('Discord Image Detected - %s', data)
+                logging.info('Discord Message w/ Image Detected - %s', data)
                 event = data[0]
                 message = data[1]
                 image = data[2]
@@ -1834,9 +1835,11 @@ def parse_regular_goal(play, game):
         goal_other_tweet = ("{}\n\n{}\n\n{}\n\n{}"
                             .format(goal_announce, goal_text_player,
                                     goal_text_score, game.game_hashtag))
-        goal_tweet = send_tweet(goal_other_tweet) if recent_event(play) else None
-        if args.discord:
-            send_discord(CHANNEL_ID, goal_other_tweet)
+
+        if recent_event(play):
+            goal_tweet = send_tweet(goal_other_tweet)
+            if args.discord:
+                send_discord(CHANNEL_ID, goal_other_tweet)
     return True
 
 
