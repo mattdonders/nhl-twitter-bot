@@ -80,8 +80,8 @@ def scouting_the_refs(game, team):
                         ref_string = f'{ref_name} ({ref_gms} games)'
                         referees.append(ref_string)
 
-                soup_linesmen = game_details.find_all("tr")[23].find_all("td")
-                soup_linesman_gms = game_details.find_all("tr")[26].find_all("td")
+                soup_linesmen = game_details.find_all("tr")[22].find_all("td")
+                soup_linesman_gms = game_details.find_all("tr")[25].find_all("td")
                 for i, linesman in enumerate(soup_linesmen):
                     linesman_name = linesman.text
                     linesman_gms = soup_linesman_gms[i].text
