@@ -2202,10 +2202,9 @@ def loop_game_events(json_feed, game):
             if recent_event(play):
                 get_lineup(game, event_period, on_ice, players)
 
-        elif event_type == "PERIOD_READY" and event_period == 5 and game.game_type in ("PR", "R"):
-            if recent_event(play):
-                tweet_text = ("The shootout is ready to begin at {}!\n\n{}"
-                              .format(game.venue, game.game_hashtag))
+        # elif event_type == "PERIOD_READY" and event_period == 5 and game.game_type in ("PR", "R"):
+        #     tweet_text = ("The shootout is ready to begin at {}!\n\n{}"
+        #                     .format(game.venue, game.game_hashtag))
 
         elif event_type == "PERIOD_START":
             if event_period == 1:
@@ -2225,6 +2224,10 @@ def loop_game_events(json_feed, game):
                 ot_period = event_period - 3
                 tweet_text = ("Who will be the hero this time? OT{} starts now at {}!\n\n{}"
                               .format(ot_period, game.venue, game.game_hashtag))
+
+            elif event_period == 5 and game.game_type in ("PR", "R"):
+                tweet_text = ("The shootout is underway at {}!\n\n{}"
+                                .format(game.venue, game.game_hashtag))
 
             if recent_event(play):
                 send_tweet(tweet_text)
