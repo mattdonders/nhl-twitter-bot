@@ -26,6 +26,10 @@ if [ -d "$SCRIPTPATH/env" ]; then
   source env/bin/activate
 fi
 
-nohup python3 $SCRIPTPATH/hockey_twitter_bot.py &
+# Perform a `git pull` to make sure our code is up to date
+git pull
+
+# $* passes all arguments from the bash script into the python script
+nohup python3 $SCRIPTPATH/hockey_twitter_bot.py $* &
 
 exit 0
