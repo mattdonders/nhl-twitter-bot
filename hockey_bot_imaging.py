@@ -458,8 +458,8 @@ def image_generator_shotmap(game, all_plays):
 
     # Draw the heatmap portion of the graph
     sns.set_style("white")
-    sns.kdeplot(pref_df.coords_x, pref_df.coords_y, cmap='Reds', shade=True, shade_lowest=False, alpha=0.6, ax=ax)
-    sns.kdeplot(other_df.coords_x, other_df.coords_y, cmap="Blues", shade=True, shade_lowest=False, alpha=0.6, ax=ax)
+    sns.kdeplot(pref_df.coords_x, pref_df.coords_y, cmap='Reds', shade=True, bw=0.2, cut=100, shade_lowest=False, alpha=0.9, ax=ax)
+    sns.kdeplot(other_df.coords_x, other_df.coords_y, cmap="Blues", shade=True, bw=0.2, cut=100, shade_lowest=False, alpha=0.9, ax=ax)
 
     # Draw the goal markers
     if not pref_goals_df.empty:
@@ -526,7 +526,7 @@ def image_generator_shotmap(game, all_plays):
 
     graph_title = (f'{pref_team_name} vs. {other_team_name}'
                    f'\nShotmap for All Situations')
-    legend_text = 'o - Shot on Goal | * - Goal'
+    legend_text = 'o - Shot Attempt | * - Goal | ▲ - PPG'
     draw_centered_text(draw, (0, 10), resized_w, graph_title, FONT_COLOR_BLACK, TITLE_FONT)
     draw_centered_text(draw, (0, resized_h - 57), resized_w, legend_text, FONT_COLOR_BLACK, LEGEND_FONT)
 

@@ -2270,7 +2270,7 @@ def loop_game_events(json_feed, game):
                 img = stats_image_generator(game, "intermission", boxscore_preferred, boxscore_other)
 
                 img_shotmap = hockey_bot_imaging.image_generator_shotmap(game, all_plays)
-                shotmap_tweet_text = f'Shot map after the {event_period_ordinal} period.'
+                shotmap_tweet_text = f'A look at the "all situations" shotmap after the {event_period_ordinal} period.\n\n{game.game_hashtag}'
                 if args.notweets:
                     img.show()
                     img_shotmap.show()
