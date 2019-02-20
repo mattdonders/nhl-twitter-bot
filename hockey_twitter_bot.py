@@ -1288,7 +1288,7 @@ def stats_image_generator(game, bg_type, boxscore_preferred, boxscore_other):
                 player_name = player["person"]["fullName"]
                 player_first_name = player_name.split()[0]
                 player_first_letter = player_first_name[0]
-                player_last_name = player_name.split()[1]
+                player_last_name = ' '.join(player_name.split()[1:])
                 player_abbrev_name = f"{player_first_letter}. {player_last_name}"
                 pref_goals_array.append(player_abbrev_name)
             elif player["stats"]["skaterStats"]["goals"] > 1:
@@ -1296,7 +1296,7 @@ def stats_image_generator(game, bg_type, boxscore_preferred, boxscore_other):
                 player_name = player["person"]["fullName"]
                 player_first_name = player_name.split()[0]
                 player_first_letter = player_first_name[0]
-                player_last_name = player_name.split()[1]
+                player_last_name = ' '.join(player_name.split()[1:])
                 player_abbrev_name = f"{player_first_letter}. {player_last_name} [{player_goals}]"
                 pref_goals_array.append(player_abbrev_name)
         except KeyError:
@@ -1310,7 +1310,7 @@ def stats_image_generator(game, bg_type, boxscore_preferred, boxscore_other):
                 player_name = player["person"]["fullName"]
                 player_first_name = player_name.split()[0]
                 player_first_letter = player_first_name[0]
-                player_last_name = player_name.split()[1]
+                player_last_name = ' '.join(player_name.split()[1:])
                 player_abbrev_name = f"{player_first_letter}. {player_last_name}"
                 other_goals_array.append(player_abbrev_name)
             elif player["stats"]["skaterStats"]["goals"] > 1:
@@ -1318,7 +1318,7 @@ def stats_image_generator(game, bg_type, boxscore_preferred, boxscore_other):
                 player_name = player["person"]["fullName"]
                 player_first_name = player_name.split()[0]
                 player_first_letter = player_first_name[0]
-                player_last_name = player_name.split()[1]
+                player_last_name = ' '.join(player_name.split()[1:])
                 player_abbrev_name = f"{player_first_letter}. {player_last_name} [{player_goals}]"
                 other_goals_array.append(player_abbrev_name)
         except KeyError:
