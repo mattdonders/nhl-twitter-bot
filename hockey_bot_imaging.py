@@ -370,8 +370,12 @@ def image_generator_shotmap(game, all_plays):
 
         team = play['team']['name']
         period = play['about']['period']
-        coords_x = play['coordinates']['x']
-        coords_y = play['coordinates']['y']
+        try:
+            coords_x = play['coordinates']['x']
+            coords_y = play['coordinates']['y']
+        except KeyError:
+            logging.warning('Event without coordinate detected - skip this play.')
+            continue
 
         # Flip coordinates if 2nd period (or overtime)
         if period % 2 == 0:
