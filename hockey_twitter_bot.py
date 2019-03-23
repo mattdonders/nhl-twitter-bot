@@ -69,8 +69,9 @@ config.read(conf_path)
 
 TEAM_BOT = config['DEFAULT']['TEAM_NAME']
 NHLAPI_BASEURL = config['ENDPOINTS']['NHL_BASE']
-TWITTER_URL = config['ENDPOINTS']['TWITTER_URL']
+# TWITTER_URL = config['ENDPOINTS']['TWITTER_URL']
 TWITTER_ID = config['ENDPOINTS']['TWITTER_HANDLE']
+TWITTER_URL = f'https://twitter.com/{TWITTER_ID}/status/'
 VPS_CLOUDHOST = config['VPS']['CLOUDHOST']
 VPS_HOSTNAME = config['VPS']['HOSTNAME']
 
@@ -2907,12 +2908,14 @@ if __name__ == '__main__':
     if args.docker and not args.notweets:
         try:
             TWITTER_ID = os.environ["TWTR_HANDLE"]
+            TWITTER_URL = f'https://twitter.com/{TWITTER_ID}/status/'
         except KeyError:
             print("[ERROR] Twitter handle is not set, please add to `docker run` command.")
             sys.exit()
     else:
         if args.debugtweets:
             TWITTER_ID = config['ENDPOINTS']['DEBUG_TWITTER_HANDLE']
+            TWITTER_URL = f'https://twitter.com/{TWITTER_ID}/status/'
 
     # If --team is specified, override TEAM_BOT constant
     if args.docker:
