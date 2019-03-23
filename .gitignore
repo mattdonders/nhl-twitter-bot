@@ -22,6 +22,12 @@ secret.py
 # Customized Images
 resources/images/Gameday-*.jpg
 resources/images/GamedayFinal-*.jpg
+resources/images/Gameday-*.png
+resources/images/GamedayFinal-*.png
+resources/images/RinkShotmap-*.png
+resources/images/GamedayAdvStats-*.png
+resources/images/Rink-Shotmap-Blank-Backup.png
+resources/images/Rink-Shotmap-Generated.png
 
 # VirtualEnv Files
 bin/
