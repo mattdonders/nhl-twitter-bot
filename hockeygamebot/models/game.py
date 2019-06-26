@@ -1,0 +1,179 @@
+from datetime import datetime
+
+from hockeygamebot.models import period
+from hockeygamebot.models import shootout
+
+
+class Game(object):
+    """Holds all game related attributes - usually one instance created per game."""
+
+    # pylint: disable=too-many-instance-attributes
+    # pyline: disable-msg=too-many-locals
+    # A Game has a lot of attributes that cannot be subclassed.
+
+    def __init__(
+        self,
+        game_id,
+        game_type,
+        date_time,
+        game_state,
+        venue,
+        home,
+        away,
+        preferred,
+        live_feed,
+        season,
+    ):
+
+        # pylint: disable-msg=too-many-arguments
+        # pylint: disable-msg=too-many-locals
+
+        self.game_id = game_id
+        self.game_type = game_type
+        self.date_time = date_time
+        self.game_state = game_state
+        self.venue = venue
+        self._live_feed = live_feed
+        self.home_team = home
+        self.away_team = away
+        self.season = season
+
+        # Not passed in at object creation time
+        if preferred == "home":
+            self.preferred_team = home
+            self.other_team = away
+        else:
+            self.preferred_team = away
+            self.other_team = home
+
+        self.past_start_time = False
+        self.last_event_idx = 0
+        self.power_play_strength = "Even"
+        self.penalty_killed_flag = False
+        self.req_session = None
+        self.assists_check = 0
+        self.shootout = Shootout()
+        self.period = Period()
+
+        # Initialize Pregame Tweets dictionary
+        self.pregame_lasttweet = None
+        self.pregametweets = {
+            "lines": False,
+            "refs": False,
+            "goalies_pref": False,
+            "goalies_other": False,
+        }
+
+        # Initialize Final Tweets dictionary
+        self.finaltweets = {
+            "finalscore": False,
+            "stars": False,
+            "opposition": False,
+            "advstats": False,
+            "shotmap": False,
+        }
+        self.finaltweets_retry = 0
+
+        # Parse Game ID to get attributes
+        game_id_string = str(self.game_id)
+        self.game_id_season = game_id_string[0:4]
+        self.game_id_gametype_id = game_id_string[4:6]
+        self.game_id_gametype_shortid = game_id_string[5:6]
+        self.game_id_shortid = game_id_string[6:]
+        self.game_id_html = game_id_string[4:]
+
+        if self.game_id_gametype_id == "01":
+            self.game_id_gametype = "Preseason"
+        elif self.game_id_gametype_id == "02":
+            self.game_id_gametype = "Regular"
+        elif self.game_id_gametype_id == "03":
+            self.game_id_gametype = "Playoff"
+            self.game_id_playoff_round = self.game_id_shortid[1]
+            self.game_id_playoff_matchup = self.game_id_shortid[2]
+            self.game_id_playoff_game = self.game_id_shortid[3]
+        elif self.game_id_gametype_id == "04":
+            self.game_id_gametype = "All-Star"
+        else:
+            self.game_id_gametype = "Unknown"
+
+    # Commands used to calculate time related attributes
+    localtz = dateutil.tz.tzlocal()
+    localoffset = localtz.utcoffset(datetime.datetime.now(localtz))
+
+    @property
+    def day_of_game_local(self):
+        """Returns the day of date_time in local server time."""
+        game_date = datetime.datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
+        game_date_local = game_date + self.localoffset
+        game_day_local = game_date_local.strftime("%A")
+        return game_day_local
+
+    @property
+    def month_day_local(self):
+        """Returns the month & date of date_time in local server time."""
+        game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
+        game_date_local = game_date + self.localoffset
+        game_abbr_month = game_date_local.strftime("%b %d").lstrip("0")
+        return game_abbr_month
+
+    @property
+    def game_time_local(self):
+        """Returns the game date_time in local server time in AM / PM format."""
+        game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
+        game_date_local = game_date + self.localoffset
+        game_date_local_ampm = game_date_local.strftime("%I:%M %p")
+        return game_date_local_ampm
+
+    @property
+    def game_date_local(self):
+        game_date = datetime.datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
+        game_date_local = game_date + self.localoffset
+        game_date_local_api = game_date_local.strftime("%Y-%m-%d")
+        return game_date_local_api
+
+    @property
+    def game_date_short(self):
+        """Returns the game date_time in local server time in AM / PM format."""
+        game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
+        game_date_local = game_date + self.localoffset
+        game_date_local_short = (
+            game_date_local.strftime("%b %d").replace(" 0", " ").upper()
+        )
+        return game_date_local_short
+
+    @property
+    def game_time_of_day(self):
+        """Returns the time of the day of the game (later today or tonight)."""
+        game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
+        game_date_local = game_date + self.localoffset
+        game_date_hour = game_date_local.strftime("%H")
+        return "tonight" if int(game_date_hour) > 17 else "later today"
+
+    @property
+    def game_time_countdown(self):
+        """Returns a countdown (in seconds) to the game start time."""
+        game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
+        game_date_local = game_date + self.localoffset
+        countdown = (game_date_local - datetime.datetime.now()).total_seconds()
+        # value_when_true if condition else value_when_false
+        return 0 if countdown < 0 else countdown
+
+    @property
+    def live_feed(self):
+        """Returns a full URL to the livefeed API endpoint."""
+        base_url = "http://statsapi.web.nhl.com"
+        full_url = "{}{}".format(base_url, self._live_feed)
+        return full_url
+
+    @property
+    def game_hashtag(self):
+        """Returns the game specific hashtag (usually #AWAYvsHOME tri-codes)."""
+        hashtag = "#{}vs{}".format(self.away_team.tri_code, self.home_team.tri_code)
+        return hashtag
+
+    def get_preferred_team(self):
+        """Returns a Tuple of team objects of the preferred & other teams."""
+        if self.home_team.preferred is True:
+            return (self.home_team, self.away_team)
+
+        return (self.away_team, self.home_team)
