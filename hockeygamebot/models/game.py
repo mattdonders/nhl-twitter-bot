@@ -1,7 +1,9 @@
 from datetime import datetime
 
-from hockeygamebot.models import period
-from hockeygamebot.models import shootout
+import dateutil.tz
+
+from hockeygamebot.models.period import Period
+from hockeygamebot.models.shootout import Shootout
 
 
 class Game(object):
@@ -96,14 +98,35 @@ class Game(object):
         else:
             self.game_id_gametype = "Unknown"
 
+    @classmethod
+    def from_json(cls, resp):
+        # The venue is not always a 'cherry-pick' from the dictionary
+        try:
+            venue = resp["venue"]["name"]
+        except KeyError:
+            venue = resp["teams"]["home"]["team"]["venue"]["name"]
+
+        return Game(
+            game_id=resp["gamePk"],
+            season=resp["season"],
+            game_type=resp["gameType"],
+            date_time=resp["gameDate"],
+            game_state=resp["status"]["abstractGameState"],
+            live_feed=resp["link"],
+            venue=venue,
+            home="home",
+            away="away",
+            preferred="preferred",
+        )
+
     # Commands used to calculate time related attributes
     localtz = dateutil.tz.tzlocal()
-    localoffset = localtz.utcoffset(datetime.datetime.now(localtz))
+    localoffset = localtz.utcoffset(datetime.now(localtz))
 
     @property
     def day_of_game_local(self):
         """Returns the day of date_time in local server time."""
-        game_date = datetime.datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
+        game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
         game_date_local = game_date + self.localoffset
         game_day_local = game_date_local.strftime("%A")
         return game_day_local
@@ -136,9 +159,7 @@ class Game(object):
         """Returns the game date_time in local server time in AM / PM format."""
         game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
         game_date_local = game_date + self.localoffset
-        game_date_local_short = (
-            game_date_local.strftime("%b %d").replace(" 0", " ").upper()
-        )
+        game_date_local_short = game_date_local.strftime("%b %d").replace(" 0", " ").upper()
         return game_date_local_short
 
     @property

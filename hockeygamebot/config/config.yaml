@@ -6,9 +6,9 @@ default:
     team_name: New Jersey Devils
 
 endpoints:
-    nhl_base: http://statsapi.web.nhl.com
-    nhl_endpoint: http://statsapi.web.nhl.com/api/v1
-    nhl_rpt_base: http://www.nhl.com/stats/rest/team
+    nhl_base: https://statsapi.web.nhl.com
+    nhl_endpoint: https://statsapi.web.nhl.com/api/v1
+    nhl_rpt_base: https://api.nhle.com/stats/rest/team
     twitter_url: https://twitter.com/NJDevilsGameBot/status/
     twitter_handle: NJDevilsGameBot
     debug_twitter_handle: DevilsBotDebug

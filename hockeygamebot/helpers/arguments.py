@@ -10,6 +10,16 @@ import sys
 import pytz
 
 
+class ArgumentFactory:
+    def __init__(self):
+        self.args = None
+
+    def get(self):
+        if self.args == None:
+            self.args = parse_arguments()
+        return self.args
+
+
 def parse_arguments():
     """Executes local argument parsing and then checks for Docker arguments.
 
@@ -19,6 +29,7 @@ def parse_arguments():
     Returns:
         args: Arguments Namespace
     """
+    # print("!!! Parsing arguments !!!")
     args = parse_local_arguments()
 
     # If running in Docker, parse environment variables (instead of arguments)
@@ -57,37 +68,24 @@ def parse_local_arguments():
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--notweets",
-        help="log tweets to console instead of Twitter",
-        action="store_true",
+        "--notweets", help="log tweets to console instead of Twitter", action="store_true"
     )
-    parser.add_argument(
-        "--console", help="log to console instead of file", action="store_true"
-    )
+    parser.add_argument("--console", help="log to console instead of file", action="store_true")
     parser.add_argument("--debug", help="print debug log items", action="store_true")
     parser.add_argument("--team", help="override team in configuration", action="store")
+    parser.add_argument("--debugtweets", help="send tweets from debug account", action="store_true")
+    parser.add_argument("--localdata", help="use local data instead of API", action="store_true")
     parser.add_argument(
-        "--debugtweets", help="send tweets from debug account", action="store_true"
-    )
-    parser.add_argument(
-        "--localdata", help="use local data instead of API", action="store_true"
-    )
-    parser.add_argument(
-        "--overridelines",
-        help="override lines if None are returned",
-        action="store_true",
+        "--overridelines", help="override lines if None are returned", action="store_true"
     )
     parser.add_argument(
         "--yesterday", help="get yesterday game on the schedule", action="store_true"
     )
     parser.add_argument("--date", help="override game date", action="store")
     parser.add_argument("--split", help="split squad game index", action="store_true")
-    parser.add_argument(
-        "--docker", help="running in a docker container", action="store_true"
-    )
-    parser.add_argument(
-        "--discord", help="Send messages to discord channel", action="store_true"
-    )
+    parser.add_argument("--docker", help="running in a docker container", action="store_true")
+    parser.add_argument("--discord", help="Send messages to discord channel", action="store_true")
+    parser.add_argument("-v", help="Increased verbosity.", action="store_true")
     arguments = parser.parse_args()
     return arguments
 

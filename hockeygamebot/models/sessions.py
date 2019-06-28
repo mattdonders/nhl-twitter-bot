@@ -8,4 +8,4 @@ class SessionFactory:
     def get(self):
         if self.session is None:
             self.session = requests.session()
-            return self.session
+        return self.session

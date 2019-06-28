@@ -62,6 +62,16 @@ def setup_logging():
         )
 
 
+def date_parser(date):
+    try:
+        date_dt = datetime.strptime(date, "%Y-%m-%d")
+        return date_dt
+    except ValueError as e:
+        logging.error("Invalid override date - exiting.")
+        logging.error(e)
+        raise
+
+
 def clock_emoji(time):
     """
     Accepts an hour (in 12 or 24 hour format) and returns the correct clock emoji.
