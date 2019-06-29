@@ -2,9 +2,10 @@ import logging
 
 import requests
 
+from hockeygamebot import nhlapi
+from hockeygamebot.helpers import utils
 from hockeygamebot.models.gametype import GameType
 from hockeygamebot.nhlapi import schedule
-from hockeygamebot.helpers import utils
 
 
 class Team(object):
@@ -56,12 +57,8 @@ class Team(object):
                 "&reportType=basic&isGame=false&reportName=leadingtrailing"
                 "&cayenneExp=seasonId={}%20and%20teamId={}".format(api, self.season, self.team_id)
             )
-            logging.info(
-                "Getting leading / trailing stats for %s via URL - %s",
-                self.short_name,
-                lead_trail_stats_url,
-            )
-            lead_trail_stats = requests.get(lead_trail_stats_url).json()
+            logging.info("Getting leading / trailing stats for %s via NHL API.", self.short_name)
+            lead_trail_stats = nhlapi.api.nhl_api(lead_trail_stats_url).json()
             lead_trail_stats = lead_trail_stats["data"][0]
             self.lead_trail_lead1P = "{}-{}-{}".format(
                 lead_trail_stats["winsAfterLead1p"],
@@ -93,9 +90,10 @@ class Team(object):
 
         # Send request to get stats
         try:
-            stats_url = "https://statsapi.web.nhl.com/api/v1/teams/{}/stats".format(self.team_id)
-            logging.info("Getting team stats for %s via URL - %s", self.short_name, stats_url)
-            stats = requests.get(stats_url).json()
+            api = utils.load_config()["endpoints"]["nhl_endpoint"]
+            stats_url = "{api}/teams/{team}/stats".format(api=api, team=self.team_id)
+            logging.info("Getting team stats for %s via NHL API.", self.short_name)
+            stats = nhlapi.api.nhl_api(stats_url).json()
             stats = stats["stats"]
             self.team_stats = stats[0]["splits"][0]["stat"]
             self.rank_stats = stats[1]["splits"][0]["stat"]
@@ -106,9 +104,10 @@ class Team(object):
 
         # Send request to get current roster
         try:
-            roster_url = "https://statsapi.web.nhl.com/api/v1/teams/{}/roster".format(self.team_id)
-            logging.info("Getting roster for %s via URL - %s", self.short_name, roster_url)
-            roster = requests.get(roster_url).json()
+            api = utils.load_config()["endpoints"]["nhl_endpoint"]
+            roster_url = "{api}/teams/{team}/roster".format(api=api, team=self.team_id)
+            logging.info("Getting roster for %s via NHL API.", self.short_name)
+            roster = nhlapi.api.nhl_api(roster_url).json()
             self.roster = roster["roster"]
         except (IndexError, KeyError) as e:
             logging.warning("Error getting team roster - %s", e)
@@ -123,7 +122,7 @@ class Team(object):
 
     @classmethod
     def from_json(cls, resp, homeaway):
-        broadcasts = schedule.get_broadcasts(resp)
+        broadcasts = nhlapi.schedule.get_broadcasts(resp)
 
         # Easier parsing of team related attributes
         team = resp["teams"][homeaway]["team"]

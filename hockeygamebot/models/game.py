@@ -2,6 +2,7 @@ from datetime import datetime
 
 import dateutil.tz
 
+from hockeygamebot.helpers import utils
 from hockeygamebot.models.period import Period
 from hockeygamebot.models.shootout import Shootout
 
@@ -99,12 +100,15 @@ class Game(object):
             self.game_id_gametype = "Unknown"
 
     @classmethod
-    def from_json(cls, resp):
+    def from_json_and_teams(cls, resp, home_team, away_team):
         # The venue is not always a 'cherry-pick' from the dictionary
         try:
             venue = resp["venue"]["name"]
         except KeyError:
             venue = resp["teams"]["home"]["team"]["venue"]["name"]
+
+        # Get the preferred team flag from the Team objects attribute
+        preferred = "home" if home_team.preferred else "away"
 
         return Game(
             game_id=resp["gamePk"],
@@ -114,9 +118,9 @@ class Game(object):
             game_state=resp["status"]["abstractGameState"],
             live_feed=resp["link"],
             venue=venue,
-            home="home",
-            away="away",
-            preferred="preferred",
+            home=home_team,
+            away=away_team,
+            preferred=preferred,
         )
 
     # Commands used to calculate time related attributes
@@ -182,7 +186,7 @@ class Game(object):
     @property
     def live_feed(self):
         """Returns a full URL to the livefeed API endpoint."""
-        base_url = "http://statsapi.web.nhl.com"
+        base_url = utils.load_config()["endpoints"]["nhl_base"]
         full_url = "{}{}".format(base_url, self._live_feed)
         return full_url
 

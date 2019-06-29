@@ -1,6 +1,10 @@
 script:
     log_file_name: NHLTwitterBot
     event_timeout: 300
+    preview_sleep_time: 1800
+    pregame_sleep_time: 10
+    live_sleep_time: 5
+    final_sleep_time: 10
 
 default:
     team_name: New Jersey Devils
