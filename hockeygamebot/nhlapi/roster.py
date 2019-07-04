@@ -4,8 +4,7 @@ Functions pertaining to the NHL Roster (via API).
 import logging
 
 from hockeygamebot import nhlapi
-from hockeygamebot.helpers import utils
-from hockeygamebot.helpers.arguments import ArgumentFactory
+from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.models.sessions import SessionFactory
 
 
@@ -20,6 +19,8 @@ def gameday_roster_update(game):
     Returns:
         None
     """
+
+    args = arguments.get_arguments()
 
     home_team = game.home_team
     away_team = game.away_team
@@ -38,3 +39,38 @@ def gameday_roster_update(game):
     except Exception as e:
         logging.error("Unable to get all players.")
         logging.error(e)
+
+
+def player_attr_by_id(roster, player_id, attribute):
+    """Returns the attribute of a player given a roaster and a player_id.
+
+    Args:
+        roster (dict): Team roster (returned from API)
+        player_id (str): Player unique identifier (IDXXXXXXX)
+        attribute (str): Attribute from roster dictionary.
+
+    Returns:
+        string: Attribute of the person requested.
+    """
+    new_player_id = player_id.replace("ID", "")
+    for roster_item in roster:
+        person_id = str(roster_item["person"]["id"])
+        person_attr = roster_item["person"][attribute]
+        if person_id == new_player_id:
+            return person_attr
+
+
+def nonroster_player_attr_by_id(player_id, attribute):
+    """Returns the attribute of a non-roster player via the NHL People API.
+
+    Args:
+        player_id (str): Player unique identifier (IDXXXXXXX)
+        attribute (str): Attribute from roster dictionary.
+
+    Returns:
+        string: Attribute of the person requested.
+    """
+    api_player_url = f"/people/{[player_id]}"
+    api_player = nhlapi.nhl_api(api_player_url).json()
+    player_attr = api_player["people"][0][attribute]
+    return player_attr

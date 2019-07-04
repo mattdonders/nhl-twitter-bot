@@ -55,8 +55,11 @@ class Game(object):
         self.penalty_killed_flag = False
         self.req_session = None
         self.assists_check = 0
+
+        # Attributes holding other models / objects
         self.shootout = Shootout()
         self.period = Period()
+        self.events = []
 
         # Initialize Pregame Tweets dictionary
         self.pregame_lasttweet = None
@@ -153,7 +156,7 @@ class Game(object):
 
     @property
     def game_date_local(self):
-        game_date = datetime.datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
+        game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
         game_date_local = game_date + self.localoffset
         game_date_local_api = game_date_local.strftime("%Y-%m-%d")
         return game_date_local_api
@@ -179,7 +182,7 @@ class Game(object):
         """Returns a countdown (in seconds) to the game start time."""
         game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
         game_date_local = game_date + self.localoffset
-        countdown = (game_date_local - datetime.datetime.now()).total_seconds()
+        countdown = (game_date_local - datetime.now()).total_seconds()
         # value_when_true if condition else value_when_false
         return 0 if countdown < 0 else countdown
 

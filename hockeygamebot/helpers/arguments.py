@@ -3,59 +3,20 @@ This module deals with parsing of command line arguments
 or environment variables (if using Docker containers).
 """
 
+# Disable global statement warnings as we use it for "singletone" Arguments
+# pylint: disable=global-statement
+
 import argparse
 import os
 import sys
 
 import pytz
 
-
-class ArgumentFactory:
-    def __init__(self):
-        self.args = None
-
-    def get(self):
-        if self.args == None:
-            self.args = parse_arguments()
-        return self.args
+# Set global ARGS to None until parsed
+CONSOLE_ARGS = None
 
 
-def parse_arguments():
-    """Executes local argument parsing and then checks for Docker arguments.
-
-    Args:
-        None
-
-    Returns:
-        args: Arguments Namespace
-    """
-    # print("!!! Parsing arguments !!!")
-    args = parse_local_arguments()
-
-    # If running in Docker, parse environment variables (instead of arguments)
-    # And set args.console to True to make `docker logs` easier to use
-    if args.docker:
-        # Check to see if Time Zone is set
-        if "TZ" not in os.environ:
-            print(
-                "[ERROR] Timezone environment variable not set, please add to `docker run` commmand."
-            )
-            sys.exit()
-
-        if os.environ["TZ"] not in pytz.all_timezones:
-            print(
-                f"[ERROR] {os.environ['TZ']} is not a valid time zone, please fix in `docker run` commmand."
-            )
-            sys.exit()
-
-        # Force console argument & parse the remainder of the environment variables
-        args.console = True
-        parse_env_variables(args)
-
-    return args
-
-
-def parse_local_arguments():
+def _parse_local_arguments(sysargs):
     """
     Parses arguments passed into the python script on the command line.command
 
@@ -65,7 +26,6 @@ def parse_local_arguments():
     Output:
     args - argument Namespace
     """
-
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--notweets", help="log tweets to console instead of Twitter", action="store_true"
@@ -86,11 +46,11 @@ def parse_local_arguments():
     parser.add_argument("--docker", help="running in a docker container", action="store_true")
     parser.add_argument("--discord", help="Send messages to discord channel", action="store_true")
     parser.add_argument("-v", help="Increased verbosity.", action="store_true")
-    arguments = parser.parse_args()
+    arguments = parser.parse_args() if sysargs is None else parser.parse_args(sysargs)
     return arguments
 
 
-def parse_env_variables(args):
+def _parse_env_variables(args):
     """
     For when running via Docker, parse Environment variables.
     Environment variables replace command line arguments.
@@ -117,3 +77,50 @@ def parse_env_variables(args):
     if "ARGS_DATE" in os.environ:
         args.date = os.environ["ARGS_DATE"]
 
+
+def parse_arguments(sysargs=None):
+    """Executes local argument parsing and then checks for Docker arguments.
+
+    Args:
+        None
+
+    Returns:
+        args: Arguments Namespace
+    """
+    args = _parse_local_arguments(sysargs)
+
+    # If running in Docker, parse environment variables (instead of arguments)
+    # And set args.console to True to make `docker logs` easier to use
+    if args.docker:
+        # Check to see if Time Zone is set
+        if "TZ" not in os.environ:
+            print(
+                "[ERROR] Timezone environment variable not set, please add to `docker run` commmand."
+            )
+            sys.exit()
+
+        if os.environ["TZ"] not in pytz.all_timezones:
+            print(
+                f"[ERROR] {os.environ['TZ']} is not a valid time zone, please fix in `docker run` commmand."
+            )
+            sys.exit()
+
+        # Force console argument & parse the remainder of the environment variables
+        args.console = True
+        _parse_env_variables(args)
+
+    global CONSOLE_ARGS
+    CONSOLE_ARGS = args
+    # return args
+    return CONSOLE_ARGS
+
+
+def get_arguments():
+    global CONSOLE_ARGS
+    if CONSOLE_ARGS is None:
+        parse_arguments()
+    return CONSOLE_ARGS
+
+
+# optional: delete function after use to prevent calling from other place
+# del _parse_arguments

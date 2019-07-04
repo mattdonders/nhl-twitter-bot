@@ -41,10 +41,10 @@ def start_game_loop(game):
     # ------------------------------------------------------------------------------
 
     while True:
-        if game.game_state == GameState.PREVIEW:
+        if GameState(game.game_state) == GameState.PREVIEW:
             if game.game_time_countdown > 0:
                 logging.info("Game is in Preview state - send out all pregame information.")
-                preview.send_game_preview(game)
+                preview.generate_game_preview(game)
                 time.sleep(config["script"]["preview_sleep_time"])
             else:
                 logging.info(
@@ -52,7 +52,7 @@ def start_game_loop(game):
                 )
                 # get_game_events()
                 time.sleep(config["script"]["pregame_sleep_time"])
-        elif game.game_state == GameState.LIVE:
+        elif GameState(game.game_state) == GameState.LIVE:
             try:
                 logging.info(
                     "Game is currently live - checking events after event Idx %s.",
@@ -68,7 +68,7 @@ def start_game_loop(game):
                 logging.error(error)
 
             time.sleep(config["script"]["live_sleep_time"])
-        elif game.game_state == GameState.FINAL:
+        elif GameState(game.game_state) == GameState.FINAL:
             pass
         else:
             logging.warning(
@@ -79,8 +79,8 @@ def start_game_loop(game):
 
 def run():
     """ The main script runner - everything starts here! """
-    args = arguments.parse_arguments()
     config = utils.load_config()
+    args = arguments.get_arguments()
 
     # Setup the logging for this script run (console, file, etc)
     utils.setup_logging()
@@ -123,7 +123,7 @@ def run():
     if not game_today:
         sys.exit()
 
-    logging.info("%s", game_info)
+    # logging.info("%s", game_info)
 
     # Create the Home & Away Team objects
     away_team = Team.from_json(game_info, "away")
@@ -146,9 +146,12 @@ def run():
     # Update the Team Objects with the gameday rosters
     roster.gameday_roster_update(game)
 
-    print(vars(game))
-    print(vars(away_team))
-    print(vars(home_team))
+    # print(vars(game))
+    # print(vars(away_team))
+    # print(vars(home_team))
+
+    # All necessary Objects are created, start the game loop!
+    start_game_loop(game)
 
 
 if __name__ == "__main__":

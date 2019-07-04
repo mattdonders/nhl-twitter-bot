@@ -17,6 +17,24 @@ endpoints:
     twitter_handle: NJDevilsGameBot
     debug_twitter_handle: DevilsBotDebug
 
+events:
+    gamecenterGameScheduled: GenericEvent
+    gamecenterPeriodReady: Period
+    gamecenterPeriodStart: Period
+    gamecenterFaceoff: Faceoff
+    gamecenterHit: Hit
+    gamecenterStop: Stop
+    gamecenterGoal: Goal
+    gamecenterMissedShot: Shot
+    gamecenterBlockedShot: Shot
+    gamecenterGiveaway: GenericEvent
+    gamecenterPenalty: Penalty
+    gamecenterShot: Shot
+    gamecenterTakeaway: GenericEvent
+    gamecenterPeriodEnd: Period
+    gamecenterPeriodOfficial: GenericEvent
+    gamecenterGameEnd: GameEnd
+
 discord:
     debug_channel_id: 513415230026547202
     channel_id: 493573741167771649

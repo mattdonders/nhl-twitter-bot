@@ -1,8 +1,11 @@
+"""
+This module contains all functions pertaining spawning a second process of the Game bot.
+This is mainly used for split squad games.
+"""
+
 import logging
 import os
 import sys
-import time
-from datetime import datetime, timedelta
 from subprocess import Popen
 
 from hockeygamebot.definitions import PROJECT_ROOT
@@ -11,7 +14,7 @@ from hockeygamebot.helpers import arguments
 
 def spawn_another_process():
     """Spawns a second process of the hockeygamebot (for split squad games)."""
-    args = arguments.parse_arguments()
+    args = arguments.get_arguments()
 
     if args.date is not None:
         python_exec = sys.executable

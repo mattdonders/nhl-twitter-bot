@@ -51,14 +51,13 @@ class Team(object):
 
         # Send request for leading / trailing stats (via other API)
         try:
-            api = utils.load_config()["endpoints"]["nhl_rpt_base"]
             lead_trail_stats_url = (
-                "{}?isAggregate=false"
+                "?isAggregate=false"
                 "&reportType=basic&isGame=false&reportName=leadingtrailing"
-                "&cayenneExp=seasonId={}%20and%20teamId={}".format(api, self.season, self.team_id)
+                "&cayenneExp=seasonId={}%20and%20teamId={}".format(self.season, self.team_id)
             )
             logging.info("Getting leading / trailing stats for %s via NHL API.", self.short_name)
-            lead_trail_stats = nhlapi.api.nhl_api(lead_trail_stats_url).json()
+            lead_trail_stats = nhlapi.api.nhl_rpt(lead_trail_stats_url).json()
             lead_trail_stats = lead_trail_stats["data"][0]
             self.lead_trail_lead1P = "{}-{}-{}".format(
                 lead_trail_stats["winsAfterLead1p"],
@@ -91,7 +90,7 @@ class Team(object):
         # Send request to get stats
         try:
             api = utils.load_config()["endpoints"]["nhl_endpoint"]
-            stats_url = "{api}/teams/{team}/stats".format(api=api, team=self.team_id)
+            stats_url = "/teams/{team}/stats".format(team=self.team_id)
             logging.info("Getting team stats for %s via NHL API.", self.short_name)
             stats = nhlapi.api.nhl_api(stats_url).json()
             stats = stats["stats"]
@@ -105,7 +104,7 @@ class Team(object):
         # Send request to get current roster
         try:
             api = utils.load_config()["endpoints"]["nhl_endpoint"]
-            roster_url = "{api}/teams/{team}/roster".format(api=api, team=self.team_id)
+            roster_url = "/teams/{team}/roster".format(team=self.team_id)
             logging.info("Getting roster for %s via NHL API.", self.short_name)
             roster = nhlapi.api.nhl_api(roster_url).json()
             self.roster = roster["roster"]

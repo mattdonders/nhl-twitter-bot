@@ -6,8 +6,7 @@ import logging
 
 import tweepy
 
-from hockeygamebot.helpers import utils
-from hockeygamebot.helpers import arguments
+from hockeygamebot.helpers import arguments, utils
 
 
 def get_api():
@@ -20,7 +19,8 @@ def get_api():
     Output:
         tweepy_session - authorized twitter session that can send a tweet.
     """
-    args = arguments.parse_arguments()
+    args = arguments.get_arguments()
+
     twitterenv = "twitter-debug" if args.debugtweets else "twitter"
     twitter_config = utils.load_config()[twitterenv]
 
@@ -48,11 +48,10 @@ def send_tweet(tweet_text, media=None, reply=None):
         last_tweet - A link to the last tweet sent (or search result if duplicate)
                      If duplicate cannot be found, returns base URL (also raises error)
     """
-    args = arguments.parse_arguments()
+    args = arguments.get_arguments()
     twitterenv = "twitter-debug" if args.debugtweets else "twitter"
     twitter_config = utils.load_config()[twitterenv]
     twitter_handle = twitter_config["handle"]
     if args.notweets:
         logging.info("%s", tweet_text)
         return "https://twitter.com/{handle}/status".format(handle=twitter_handle)
-
