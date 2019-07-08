@@ -28,7 +28,8 @@ def nhl_api(endpoint):
     session.mount("https://", retries)
     session.mount("http://", retries)
 
-    url = f"{api_base}{endpoint}"
+    # Fix issues with leading slash on an endpoint call
+    url = f"{api_base}{endpoint}" if endpoint[0] == "/" else f"{api_base}/{endpoint}"
 
     try:
         logging.info("Sending Stats API Request - %s", url)

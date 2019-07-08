@@ -1,8 +1,13 @@
 """
 This module contains object creation for all Game Events.
 """
+import weakref
 
 import dateutil.parser
+
+from hockeygamebot.helpers import utils
+
+allobjects = list()
 
 
 def event_factory(response: dict):
@@ -17,9 +22,9 @@ def event_factory(response: dict):
     """
 
     # The NHL can't spell Period correctly, so we will have duplicates  -
-    # gamecenterPeriodReady     /       gameCenterPeroidReady
-    # gamecenterPeriodEnd       /       gamecenterPeroidEnd
-    # gamecenterPeriodOfficial  /       gamecenterPeiodOfficial
+    # gamecenterPeriodReady     /   gameCenterPeroidReady
+    # gamecenterPeriodEnd       /   gamecenterPeroidEnd
+    # gamecenterPeriodOfficial  /   gamecenterPeiodOfficial
 
     event_map = {
         "gamecenterGameScheduled": GenericEvent,
@@ -46,14 +51,47 @@ def event_factory(response: dict):
 
     event_type = response.get("result").get("eventTypeId")
     object_type = event_map.get(event_type, GenericEvent)
+    event_idx = response.get("about").get("eventIdx")
 
-    return object_type(response)
+    # Check whether this event is in our Cache
+    obj = object_type.cache.get(event_idx)
+
+    # Update attributes only for existing Goal objects
+    if object_type == Goal and obj is not None:
+        obj.check_for_scoring_changes()
+
+    # If object doesn't exist, create it & add to Cache
+    if obj is None:
+        obj = object_type(response)
+        object_type.cache.add(obj)
+
+    return obj
+
+
+class Cache:
+    """ A cache that holds GameEvents by type. """
+
+    def __init__(self, object_type, duration=60):
+        self.contains = object_type
+        self.duration = duration
+        self.entries = {}
+
+    def add(self, entry):
+        """ Adds an object to this Cache. """
+        self.entries[entry.event_idx] = entry
+
+    def get(self, idx):
+        """ Gets an entry from the cache / checks if exists via None return. """
+        entry = self.entries.get(idx)
+        return entry
 
 
 class GenericEvent:
     """ A Generic Game event where we just store the attributes and don't
         do anything with the object except store it.
     """
+
+    cache = Cache(__name__)
 
     def __init__(self, data: dict):
         self.data = data
@@ -78,6 +116,12 @@ class GenericEvent:
         self.away_goals = about.get("goals").get("away")
         self.home_goals = about.get("goals").get("home")
 
+    # @classmethod
+    # def idx_exists(cls, idx):
+    #     for obj in cls.allobjects:
+    #         if obj.event_idx == idx:
+    #             return obj
+
 
 class Period(GenericEvent):
     """ A Period object contains all period-related attributes and extra methods.
@@ -88,9 +132,10 @@ class Period(GenericEvent):
         super().__init__(data)
         self.call_socials()
 
+    @utils.check_social_timeout
     def call_socials(self):
-        # print("This a PERIOD object!")
-        # print(self.data)
+        print("This a PERIOD object!")
+        print(self.data)
         pass
 
 
@@ -123,7 +168,8 @@ class Goal(GenericEvent):
         It is a subclass of the GenericEvent class with the most basic attributes.
     """
 
-    pass
+    def check_for_scoring_changes(self):
+        print("Checking for scoring changes!")
 
 
 class Shot(GenericEvent):

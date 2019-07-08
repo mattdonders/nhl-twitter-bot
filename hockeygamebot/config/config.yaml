@@ -2,7 +2,7 @@ script:
     log_file_name: NHLTwitterBot
     event_timeout: 300
     preview_sleep_time: 1800
-    pregame_sleep_time: 10
+    pregame_sleep_time: 15
     live_sleep_time: 5
     final_sleep_time: 10
 
@@ -16,24 +16,11 @@ endpoints:
     twitter_url: https://twitter.com/NJDevilsGameBot/status/
     twitter_handle: NJDevilsGameBot
     debug_twitter_handle: DevilsBotDebug
-
-events:
-    gamecenterGameScheduled: GenericEvent
-    gamecenterPeriodReady: Period
-    gamecenterPeriodStart: Period
-    gamecenterFaceoff: Faceoff
-    gamecenterHit: Hit
-    gamecenterStop: Stop
-    gamecenterGoal: Goal
-    gamecenterMissedShot: Shot
-    gamecenterBlockedShot: Shot
-    gamecenterGiveaway: GenericEvent
-    gamecenterPenalty: Penalty
-    gamecenterShot: Shot
-    gamecenterTakeaway: GenericEvent
-    gamecenterPeriodEnd: Period
-    gamecenterPeriodOfficial: GenericEvent
-    gamecenterGameEnd: GameEnd
+    # df_starting_goalies: https://www.dailyfaceoff.com/starting-goalies/
+    df_starting_goalies: https://www.dailyfaceoff.com/starting-goalies/04-04-2019/
+    df_line_combos: https://www.dailyfaceoff.com/teams/TEAMNAME/line-combinations/
+    hockeyref_base: https://www.hockey-reference.com/players
+    scouting_refs: http://scoutingtherefs.com/wp-json/wp/v2/posts
 
 discord:
     debug_channel_id: 513415230026547202

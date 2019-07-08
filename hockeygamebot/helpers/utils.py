@@ -3,16 +3,51 @@ This module contains all utility functions such as
 configuration, log management & other miscellaneous.
 """
 
+import functools
 import logging
 import os
-import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 
 import yaml
 
 from hockeygamebot.definitions import CONFIG_PATH, LOGS_PATH
 from hockeygamebot.helpers import arguments
 from hockeygamebot.models.gametype import GameType
+
+
+# Social Media Decorator
+def check_social_timeout(func):
+    """ A function decorate used within the GameEvent module to determine
+        if we should send this event to social media. This can only wrap
+        functions that have an attribute of a GameEvent.
+    """
+
+    @functools.wraps(func)
+    def wrapper_social_timeout(*args, **kwargs):
+        parsed_args = arguments.get_arguments()
+        config = load_config()
+
+        # If notweets is specified, always run the social methods
+        if parsed_args.notweets:
+            return func(*args, **kwargs)
+
+        event = args[0]
+        event_time = event.date_time
+        timeout = config["script"]["event_timeout"]
+        utcnow = datetime.now(timezone.utc)
+        time_since_event = (utcnow - event_time).total_seconds()
+        if time_since_event < timeout:
+            return func(*args, **kwargs)
+        else:
+            logging.info(
+                "Event #%s (%s) occurred %s second(s) in the past - older than our social timeout.",
+                event.event_idx,
+                event.event_type,
+                time_since_event,
+            )
+            return False
+
+    return wrapper_social_timeout
 
 
 def load_config():

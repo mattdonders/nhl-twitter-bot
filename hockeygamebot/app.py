@@ -16,13 +16,14 @@ try:
 except ImportError:
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir))
 
+
 from hockeygamebot.core import preview
-from hockeygamebot.models.team import Team
-from hockeygamebot.models.game import Game
-from hockeygamebot.models.gamestate import GameState
 from hockeygamebot.definitions import VERSION
 from hockeygamebot.helpers import arguments, utils
-from hockeygamebot.nhlapi import schedule, roster
+from hockeygamebot.models.game import Game
+from hockeygamebot.models.gamestate import GameState
+from hockeygamebot.models.team import Team
+from hockeygamebot.nhlapi import livefeed, roster, schedule
 
 
 def start_game_loop(game):
@@ -44,20 +45,31 @@ def start_game_loop(game):
         if GameState(game.game_state) == GameState.PREVIEW:
             if game.game_time_countdown > 0:
                 logging.info("Game is in Preview state - send out all pregame information.")
-                preview.generate_game_preview(game)
-                time.sleep(config["script"]["preview_sleep_time"])
+                # The core game preview function should run only once
+                if not game.pregametweets['core']:
+                    preview.generate_game_preview(game)
+
+                # The other game preview function should run every xxx minutes
+                # until all pregame tweets are sent or its too close to game time
+                sleep_time = preview.game_preview_others(game)
+                time.sleep(sleep_time)
             else:
                 logging.info(
-                    "Game is in Preview state, but past game start time - sleep for a bit."
+                    "Game is in Preview state, but past game start time - sleep for a bit "
+                    "& update game attributes so we detect when game goes live."
                 )
-                # get_game_events()
+                livefeed_resp = livefeed.get_livefeed(game.game_id)
+                game.update_game(livefeed_resp)
                 time.sleep(config["script"]["pregame_sleep_time"])
+
         elif GameState(game.game_state) == GameState.LIVE:
             try:
                 logging.info(
                     "Game is currently live - checking events after event Idx %s.",
                     game.last_event_idx,
                 )
+                livefeed_resp = livefeed.get_livefeed(game.game_id)
+                game.update_game(livefeed_resp)
                 # game_events = get_game_events(game_obj)
                 # loop_game_events(game_events, game_obj)
                 logging.info("Sleeping for configured live game time.")
@@ -69,6 +81,7 @@ def start_game_loop(game):
 
             time.sleep(config["script"]["live_sleep_time"])
         elif GameState(game.game_state) == GameState.FINAL:
+            # TODO: Implement refactored Final / Postgame Functions
             pass
         else:
             logging.warning(

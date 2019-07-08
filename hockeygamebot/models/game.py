@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 import dateutil.tz
@@ -11,7 +12,10 @@ class Game(object):
     """Holds all game related attributes - usually one instance created per game."""
 
     # pylint: disable=too-many-instance-attributes
-    # pyline: disable-msg=too-many-locals
+    # pylint: disable-msg=too-many-locals
+    # pylint: disable-msg=too-many-arguments
+    # pylint: disable-msg=too-many-locals
+
     # A Game has a lot of attributes that cannot be subclassed.
 
     def __init__(
@@ -28,15 +32,12 @@ class Game(object):
         season,
     ):
 
-        # pylint: disable-msg=too-many-arguments
-        # pylint: disable-msg=too-many-locals
-
         self.game_id = game_id
         self.game_type = game_type
         self.date_time = date_time
         self.game_state = game_state
         self.venue = venue
-        self._live_feed = live_feed
+        self.live_feed_endpoint = live_feed
         self.home_team = home
         self.away_team = away
         self.season = season
@@ -126,6 +127,22 @@ class Game(object):
             preferred=preferred,
         )
 
+    # Instance Functions
+    def update_game(self, response):
+        logging.info("Updating all Game object attributes.")
+        self.game_state = response.get("gameData").get("status").get("abstractGameState")
+
+        # if self.game_state != "Preview":
+        #     self.period.current =
+        linescore = response.get("liveData").get("linescore")
+        linescore_home = linescore.get("teams").get("home")
+        self.home_team.score = linescore_home.get("goals")
+        self.home_team.shots = linescore_home.get("shots")
+
+        linescore_away = linescore.get("teams").get("away")
+        self.away_team.score = linescore_away.get("goals")
+        self.away_team.shots = linescore_away.get("shots")
+
     # Commands used to calculate time related attributes
     localtz = dateutil.tz.tzlocal()
     localoffset = localtz.utcoffset(datetime.now(localtz))
@@ -190,7 +207,7 @@ class Game(object):
     def live_feed(self):
         """Returns a full URL to the livefeed API endpoint."""
         base_url = utils.load_config()["endpoints"]["nhl_base"]
-        full_url = "{}{}".format(base_url, self._live_feed)
+        full_url = "{}{}".format(base_url, self.live_feed_endpoint)
         return full_url
 
     @property
