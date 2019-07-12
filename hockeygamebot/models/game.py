@@ -65,6 +65,7 @@ class Game(object):
         # Initialize Pregame Tweets dictionary
         self.pregame_lasttweet = None
         self.pregametweets = {
+            "core": False,
             "lines": False,
             "refs": False,
             "goalies_pref": False,

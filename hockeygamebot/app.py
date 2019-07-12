@@ -46,7 +46,7 @@ def start_game_loop(game):
             if game.game_time_countdown > 0:
                 logging.info("Game is in Preview state - send out all pregame information.")
                 # The core game preview function should run only once
-                if not game.pregametweets['core']:
+                if not game.pregametweets["core"]:
                     preview.generate_game_preview(game)
 
                 # The other game preview function should run every xxx minutes
@@ -64,9 +64,9 @@ def start_game_loop(game):
 
         elif GameState(game.game_state) == GameState.LIVE:
             try:
+                logging.info("-" * 80)
                 logging.info(
-                    "Game is currently live - checking events after event Idx %s.",
-                    game.last_event_idx,
+                    "Game is LIVE - checking events after event Idx %s.", game.last_event_idx
                 )
                 livefeed_resp = livefeed.get_livefeed(game.game_id)
                 game.update_game(livefeed_resp)
@@ -163,9 +163,14 @@ def run():
     # print(vars(away_team))
     # print(vars(home_team))
 
-    # All necessary Objects are created, start the game loop!
-    start_game_loop(game)
+    # Return the game object to use in the game loop function
+    return game
 
 
 if __name__ == "__main__":
-    run()
+    # Run the application (creates main objects)
+    game = run()
+
+    # All necessary Objects are created, start the game loop!
+    start_game_loop(game)
+

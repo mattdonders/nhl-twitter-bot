@@ -11,4 +11,4 @@
 disable=invalid-name, broad-except
 
 [TYPECHECK]
-ignored-classes= responses
+ignored-classes=responses,_Config

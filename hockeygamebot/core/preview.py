@@ -78,7 +78,7 @@ def generate_game_preview(game):
 
     logging.info(preview_tweet_text)
     logging.info(season_series_tweet_text)
-    game.pregametweets['core'] = True
+    game.pregametweets["core"] = True
 
 
 def game_preview_others(game):
@@ -97,6 +97,15 @@ def game_preview_others(game):
     # All of the below functions containg information from non-NHL API sites
     # Each one is wrapped in a try / except just in case.
 
+    # Load our Config
+    config = utils.load_config()
+    preview_sleep_time = config["script"]["preview_sleep_time"]
+    preview_sleep_mins = preview_sleep_time / 60
+
+    # Get the preferred team, other teams & homeaway from the Game object
+    pref_team, other_team = game.get_preferred_team()
+    pref_team_homeaway = game.preferred_team.home_away
+
     if not game.pregametweets["goalies_pref"] or not game.pregametweets["goalies_other"]:
         # goalies_confirmed_values = ("Confirmed", "Likely")
         try:
@@ -109,9 +118,13 @@ def game_preview_others(game):
         try:
             goalie_away = goalies_df.get("away").get("name")
             goalie_home = goalies_df.get("home").get("name")
-            goalie_hr_home = thirdparty.hockeyref_goalie_against_team(goalie_home, game.away_team.team_name)
+            goalie_hr_home = thirdparty.hockeyref_goalie_against_team(
+                goalie_home, game.away_team.team_name
+            )
             logging.info(goalie_hr_home)
-            goalie_hr_away = thirdparty.hockeyref_goalie_against_team(goalie_away, game.home_team.team_name)
+            goalie_hr_away = thirdparty.hockeyref_goalie_against_team(
+                goalie_away, game.home_team.team_name
+            )
             logging.info(goalie_hr_away)
         except Exception as e:
             logging.error("Exception getting Hockey Reference splits - try again next loop.")

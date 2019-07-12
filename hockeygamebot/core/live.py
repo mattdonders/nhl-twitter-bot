@@ -8,12 +8,14 @@ import logging
 import time
 
 from hockeygamebot.helpers import utils
+from hockeygamebot.models import gameevent
 
 
-def live_loop(game):
+def live_loop(livefeed, game):
     """ The master live-game loop. All logic spawns from here.
 
     Args:
+        livefeed: Live Feed API response
         game: Game Object
 
     Returns:
@@ -21,15 +23,11 @@ def live_loop(game):
     """
     config = utils.load_config()
 
-    try:
-        logging.info("-" * 80)
-        logging.info("Game is LIVE - checking events after event Idx %s.", game.last_event_idx)
-        # game_events = get_game_events(game)
-        # loop_game_events(game_events, game)
-        logging.info("Sleeping for 5 seconds...")
-        time.sleep(config["script"]["live_sleep_time"])
-    except Exception as e:  # pylint: disable=broad-except
-        logging.error("Uncaught exception in live game loop - still sleep for 5 seconds.")
-        logging.error(e)
-        time.sleep(config["script"]["live_sleep_time"])
+    # Load all plays, the next event ID & new plays into lists
+    all_plays = livefeed.get("liveData").get("plays").get("allPlays")
+    # next_event = game.last_event_idx + 1
+    # new_plays = all_plays[next_event:]
 
+    all_plays_objs = [gameevent.event_factory(game, play) for play in all_plays]
+    return all_plays_objs
+    # print(all_plays_objs)

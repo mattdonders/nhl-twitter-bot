@@ -1,13 +1,15 @@
 """
 This module contains all utility functions such as
-configuration, log management & other miscellaneous.
+log management & other miscellaneous.
 """
 
 import functools
 import logging
 import os
+import sys
 from datetime import datetime, timezone
 
+import dateutil.parser
 import yaml
 
 from hockeygamebot.definitions import CONFIG_PATH, LOGS_PATH
@@ -32,7 +34,7 @@ def check_social_timeout(func):
             return func(*args, **kwargs)
 
         event = args[0]
-        event_time = event.date_time
+        event_time = dateutil.parser.parse(event.date_time)
         timeout = config["script"]["event_timeout"]
         utcnow = datetime.now(timezone.utc)
         time_since_event = (utcnow - event_time).total_seconds()
@@ -108,6 +110,19 @@ def setup_logging():
     logger = logging.getLogger()
     logger_level = logging.DEBUG if args.debug else logging.INFO
     logger.setLevel(logger_level)
+
+
+def ordinal(n):
+    """ Converts an integer into its ordinal equivalent.
+
+    Args:
+        n: number to convert
+
+    Returns:
+        nth: ordinal respresentation of passed integer
+    """
+    nth = "%d%s" % (n, "tsnrhtdd"[(n / 10 % 10 != 1) * (n % 10 < 4) * n % 10 :: 4])
+    return nth
 
 
 def date_parser(date):
