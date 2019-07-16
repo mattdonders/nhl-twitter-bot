@@ -5,6 +5,7 @@ log management & other miscellaneous.
 
 import functools
 import logging
+import math
 import os
 import sys
 from datetime import datetime, timezone
@@ -257,3 +258,20 @@ def team_hashtag(team, game_type):
         return team_hashtags_playoffs[team]
     else:
         return team_hashtags[team]
+
+
+def calculate_shot_distance(x: int, y: int) -> str:
+    """ Takes a (x,y) shot coordinate and calculates the distance to the net.
+
+    Args:
+        x: x-coordinate of the shot
+        y: y-coordiante of the shot
+
+    Returns:
+        shot_text: shot distance with unit
+    """
+
+    shot_dist = math.ceil(math.hypot(x - 89, y))
+    shot_unit = "foot" if shot_dist == 1 else "feet"
+    shot_text = f"{shot_dist} {shot_unit}"
+    return shot_text

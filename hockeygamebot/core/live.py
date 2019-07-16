@@ -28,6 +28,6 @@ def live_loop(livefeed, game):
     # next_event = game.last_event_idx + 1
     # new_plays = all_plays[next_event:]
 
-    all_plays_objs = [gameevent.event_factory(game, play) for play in all_plays]
+    all_plays_objs = [gameevent.event_factory(game, play, livefeed) for play in all_plays]
     return all_plays_objs
     # print(all_plays_objs)

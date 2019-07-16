@@ -10,7 +10,7 @@ from hockeygamebot.helpers import utils
 from hockeygamebot.social import socialhandler
 
 
-def event_factory(game: Game, response: dict):
+def event_factory(game: Game, response: dict, livefeed: dict):
     """ Factory method for creating a game event. Converts the JSON
             response into a Type-Specific Event we can parse and track.
 
@@ -28,9 +28,9 @@ def event_factory(game: Game, response: dict):
 
     event_map = {
         "gamecenterGameScheduled": GenericEvent,
-        "gamecenterPeriodReady": PeriodEvent,
-        "gamecenterPeroidReady": PeriodEvent,
-        "gamecenterPeriodStart": PeriodEvent,
+        "gamecenterPeriodReady": PeriodStartEvent,
+        "gamecenterPeroidReady": PeriodStartEvent,
+        "gamecenterPeriodStart": PeriodStartEvent,
         "gamecenterFaceoff": FaceoffEvent,
         "gamecenterHit": HitEvent,
         "gamecenterStop": StopEvent,
@@ -42,10 +42,10 @@ def event_factory(game: Game, response: dict):
         "gamecenterShot": ShotEvent,
         "gamecenterOfficialChallenge": ChallengeEvent,
         "gamecenterTakeaway": GenericEvent,
-        "gamecenterPeriodEnd": PeriodEvent,
-        "gamecenterPeroidEnd": PeriodEvent,
-        "gamecenterPeriodOfficial": PeriodEvent,
-        "gamecenterPeiodOfficial": PeriodEvent,
+        "gamecenterPeriodEnd": PeriodEndEvent,
+        "gamecenterPeroidEnd": PeriodEndEvent,
+        "gamecenterPeriodOfficial": PeriodEndEvent,
+        "gamecenterPeiodOfficial": PeriodEndEvent,
         "gamecenterGameEnd": GameEndEvent,
     }
 
@@ -56,8 +56,9 @@ def event_factory(game: Game, response: dict):
     # Check whether this event is in our Cache
     obj = object_type.cache.get(event_idx)
 
-    # Add the game object to our response
+    # Add the game object & livefeed to our response
     response["game"] = game
+    response["livefeed"] = livefeed
 
     # These methods are called when we want to act on existing objects
     # Check for scoring changes on GoalEvents
@@ -68,7 +69,7 @@ def event_factory(game: Game, response: dict):
     # If object doesn't exist, create it & add to Cache
     if obj is None:
         try:
-            obj = object_type(response)
+            obj = object_type(data=response, game=game)
             object_type.cache.add(obj)
         except Exception as error:
             logging.error("Error creating %s event for Idx %s.", object_type, event_idx)
@@ -92,7 +93,8 @@ def game_event_total(object_type, player, attribute):
         event_count: number of events
     """
 
-    events = [getattr(v, attribute) for k,v in object_type.cache.entries.items() if getattr(v, attribute) == player]
+    items = object_type.cache.entries.items()
+    events = [getattr(v, attribute) for k, v in items if getattr(v, attribute) == player]
     return len(events)
 
 
@@ -121,9 +123,11 @@ class GenericEvent:
 
     cache = Cache(__name__)
 
-    def __init__(self, data: dict):
+    def __init__(self, data: dict, game: Game):
         self.data = data
-        self.game = data.get("game")
+        self.game = game
+        self.livefeed = data.get('livefeed')
+        self.social_msg = None
 
         # Get the Result Section
         results = data.get("result")
@@ -166,23 +170,144 @@ class GenericEvent:
         return dict_obj if withsource else dict_obj_nosource
 
 
-class PeriodEvent(GenericEvent):
-    """ A Period object contains all period-related attributes and extra methods.
+class PeriodStartEvent(GenericEvent):
+    """ A Period Start object contains all start of period-related attributes and extra methods.
         It is a subclass of the GenericEvent class with the most basic attributes.
     """
 
     cache = Cache(__name__)
 
-    def __init__(self, data: dict):
-        super().__init__(data)
+    def __init__(self, data: dict, game: Game):
+        super().__init__(data, game)
+
+        # Now call any functions that should be called when creating a new object
+        self.generate_social_msg()
+        self.send_socials()
+
+
+    def generate_social_msg(self):
+        """ Used for generating the message that will be logged or sent to social media. """
+
+        # Logic for Period Ready Events (used for lineups)
+        if "ready" in self.event_type.lower():
+            preferred_homeaway = self.game.preferred_team.home_away
+            on_ice = self.livefeed.get('liveData').get('boxscore').get('teams').get(preferred_homeaway).get('onIce')
+            players = self.livefeed.get('gameData').get('players')
+            self.social_msg = self.get_lineup(on_ice, players)
+
+        # Logic for Period Start Events
+        elif "start" in self.event_type.lower():
+            # First period start event
+            if self.period == 1:
+                self.social_msg = (f"The puck has dropped between the "
+                                   f"{self.game.preferred_team.short_name} & "
+                                   f"{self.game.other_team.short_name} at {self.game.venue}!")
+            # Second & Third period start events are same for all game types
+            elif self.period in (2, 3):
+                self.social_msg = (f"It's time for the {self.period_ordinal} period at "
+                                   f"{self.game.venue}.")
+            # Non-Playoff Game Period Start (3-on-3 OT)
+            elif self.period == 4 and self.game.game_type in ("PR", "R"):
+                self.social_msg = (f"Who will be the hero this time? "
+                                   f"3-on-3 OT starts now at {self.game.venue}.")
+            # Playoff Game Period Start (5-on-5 OT)
+            elif self.period > 3 and self.game.game_type == "P":
+                ot_period = self.period - 3
+                self.social_msg = (f"Who will be the hero this time? "
+                                   f"OT{ot_period} starts now at {self.game.venue}.")
+            # Start of the Shootout (Period 5 of Non-Playoff Game)
+            elif self.period == 5 and self.game.game_type in ("PR", "R"):
+                self.social_msg = f"The shootout is underway at {self.game.venue}!"
+
+
+
+    def get_lineup(self, on_ice, players):
+        """ Generates a lineup message for a given team.
+
+        Args:
+            game (Game): The current game instance.
+            period (Period): The current period instance.
+            on_ice (list): A list of players on the ice for the preferred team.
+            players (dict): A dictionary of all players of the preferred team.
+        """
+
+        logging.info("On Ice Players - %s", on_ice)
+
+        forwards = []
+        defense = []
+        goalies = []
+
+        for player in on_ice:
+            key_id = "ID{}".format(player)
+            player_obj = players[key_id]
+            logging.debug("Getting information for %s -- %s", key_id, player_obj)
+
+            player_last_name = player_obj["lastName"]
+            player_type = player_obj["primaryPosition"]["type"]
+            if player_type == "Forward":
+                forwards.append(player_last_name)
+            elif player_type == "Defenseman":
+                defense.append(player_last_name)
+            elif player_type == "Goalie":
+                goalies.append(player_last_name)
+
+        # Get Linenup for Periods 1-3 (applies to all games)
+        if self.period <= 3:
+            text_forwards = "-".join(forwards)
+            text_defense = "-".join(defense)
+            text_goalie = goalies[0]
+
+            social_msg = (f"On the ice to start the {self.period_ordinal} period for your "
+                          f"{self.game.preferred_team.team_name} -\n\n"
+                          f"{text_forwards}\n{text_defense}\n{text_goalie}")
+
+        # Get Lineup for pre-season or regular season overtime game (3-on-3)
+        elif self.period == 4 and self.game.game_type in ("PR", "R"):
+            all_players = forwards + defense
+            text_players = "-".join(all_players)
+            try:
+                text_goalie = goalies[0]
+                social_msg = (f"On the ice to start overtime for your "
+                              f"{self.game.preferred_team.team_name} "
+                              f"are:\n\n{text_players} & {text_goalie}.")
+            except IndexError:
+                # If for some reason a goalie isn't detected on ice
+                social_msg = (f"On the ice to start overtime for your "
+                              f"{self.game.preferred_team.team_name} "
+                              f"are:\n\n{text_players}.")
+
+        elif self.period > 3 and self.game.game_type == "P":
+            ot_number = self.period - 3
+            text_forwards = "-".join(forwards)
+            text_defense = "-".join(defense)
+            text_goalie = goalies[0]
+
+            social_msg = (f"On the ice to start OT{ot_number} for your "
+                          f"{self.game.preferred_team.team_name} -\n\n"
+                          f"{text_forwards}\n{text_defense}\n{text_goalie}")
+
+        return social_msg
+
+    @utils.check_social_timeout
+    def send_socials(self):
+        socialhandler.send(self.social_msg)
+
+
+class PeriodEndEvent(GenericEvent):
+    """ A Period End object contains all end of period-related attributes and extra methods.
+        It is a subclass of the GenericEvent class with the most basic attributes.
+    """
+
+    cache = Cache(__name__)
+
+    def __init__(self, data: dict, game: Game):
+        super().__init__(data, game)
         # Now call any functions that should be called when creating a new object
         self.send_socials()
 
     @utils.check_social_timeout
     def send_socials(self):
-        if self.event_type == "gamecenterPeriodStart":
-            msg = f"The {self.period_ordinal} period is underway at {self.game.venue}!"
-            socialhandler.send(msg)
+        pass
 
 
 class FaceoffEvent(GenericEvent):
@@ -192,8 +317,8 @@ class FaceoffEvent(GenericEvent):
 
     cache = Cache(__name__)
 
-    def __init__(self, data: dict):
-        super().__init__(data)
+    def __init__(self, data: dict, game: Game):
+        super().__init__(data, game)
 
         # Get the Players Section
         players = data.get("players")
@@ -229,8 +354,8 @@ class HitEvent(GenericEvent):
 
     cache = Cache(__name__)
 
-    def __init__(self, data: dict):
-        super().__init__(data)
+    def __init__(self, data: dict, game: Game):
+        super().__init__(data, game)
 
         # Get the Players Section
         players = data.get("players")
@@ -254,8 +379,8 @@ class StopEvent(GenericEvent):
 
     cache = Cache(__name__)
 
-    def __init__(self, data: dict):
-        super().__init__(data)
+    def __init__(self, data: dict, game: Game):
+        super().__init__(data, game)
         # TODO: Determine what stoppage tweets we want to send out
         pass
 
@@ -267,8 +392,8 @@ class GoalEvent(GenericEvent):
 
     cache = Cache(__name__)
 
-    def __init__(self, data: dict):
-        super().__init__(data)
+    def __init__(self, data: dict, game: Game):
+        super().__init__(data, game)
 
         # Shots have a few extra results attributes
         results = data.get("result")
@@ -395,11 +520,12 @@ class ShotEvent(GenericEvent):
 
     cache = Cache(__name__)
 
-    def __init__(self, data: dict):
-        super().__init__(data)
+    def __init__(self, data: dict, game: Game):
+        super().__init__(data, game)
 
-        # Shots have a secondary type
+        # Shots have a secondary type & a team name
         self.secondary_type = data.get("result").get("secondaryType")
+        self.event_team = data.get('team').get('name')
 
         # Get the Players Section
         players = data.get("players")
@@ -421,6 +547,48 @@ class ShotEvent(GenericEvent):
         self.x = coordinates.get("x", 0.0)
         self.y = coordinates.get("y", 0.0)
 
+        # Now call any functions that should be called when creating a new object
+        # (FOR NOW) we only checked for missed shots that hit the post.
+        if self.crossbar_or_post():
+            self.generate_social_msg()
+            self.send_socials()
+
+
+    def crossbar_or_post(self):
+        """ Checks shot text to determine if the shot was by the preferred
+            team and hit the crossbar or post. """
+
+        # This checks if the shot was taken by the preferred team
+        if self.event_team != self.game.preferred_team.team_name:
+            return False
+
+        # Check to see if the post hit the crossbar or the goal post
+        hit_keywords = ["crossbar", "goalpost"]
+        if any(x in self.description.lower() for x in hit_keywords):
+            logging.info("The preferred team hit a post or crossbar - social media message.")
+            return True
+        else:
+            logging.debug("The preferred team missed a shot, but didn't hit the post.")
+            return False
+
+
+    def generate_social_msg(self):
+        """ Used for generating the message that will be logged or sent to social media. """
+        if "crossbar" in self.description.lower():
+            shot_hit = "crossbar"
+        elif "goalpost" in self.description.lower():
+            shot_hit = "post"
+        else:
+            shot_hit = None
+
+        shot_distance = utils.calculate_shot_distance(self.x, self.y)
+
+        self.social_msg = (f'DING! 🛎\n\n{self.player_name} hits the {shot_hit} from {shot_distance} '
+                           f'away with {self.period_time_remain} remaining in the {self.period_ordinal} period.')
+
+    @utils.check_social_timeout
+    def send_socials(self):
+        socialhandler.send(self.social_msg)
 
 class PenaltyEvent(GenericEvent):
     """ A Faceoff object contains all faceoff-related attributes and extra methods.
@@ -429,14 +597,15 @@ class PenaltyEvent(GenericEvent):
 
     cache = Cache(__name__)
 
-    def __init__(self, data: dict):
-        super().__init__(data)
+    def __init__(self, data: dict, game: Game):
+        super().__init__(data, game)
 
         # Penalties have some extra result attributes
         results = data.get("result")
-        self.secondary_type = results.get("secondaryType")
-        self.severity = results.get("penaltySeverity")
+        self.secondary_type = self.penalty_type_fixer(results.get("secondaryType")).lower()
+        self.severity = results.get("penaltySeverity").lower()
         self.minutes = results.get("penaltyMinutes")
+        self.penalty_team = data.get('team').get('name')
 
         # Get the Players Section
         players = data.get("players")
@@ -458,15 +627,107 @@ class PenaltyEvent(GenericEvent):
         self.x = coordinates.get("x", 0.0)
         self.y = coordinates.get("y", 0.0)
 
-        self.call_socials()
+
+        # Now call any functions that should be called when creating a new object
+        # TODO: Figure out if theres a way to check for offsetting penalties
+        self.penalty_main_text = self.get_skaters()
+        self.penalty_rankstat_text = self.get_penalty_stats()
+        self.generate_social_msg()
+        self.send_socials()
+
+    def penalty_type_fixer(self, original_type):
+        """ A function that converts some poorly named penalty types. """
+        secondarty_types = {
+            "delaying game - puck over glass": "delay of game (puck over glass)"
+        }
+
+        return secondarty_types.get(original_type, original_type)
+
+
+    def get_skaters(self):
+        """ Used for determining how many skaters were on the ice at the time of event. """
+
+        # Get penalty team & skater attributes / numbers
+        if self.penalty_team == self.game.home_team.team_name:
+            self.penalty_on_team = self.game.home_team
+            self.penalty_draw_team = self.game.away_team
+        else:
+            self.penalty_on_team = self.game.away_team
+            self.penalty_draw_team = self.game.home_team
+
+        power_play_strength = self.game.power_play_strength
+        penalty_on_skaters = self.penalty_on_team.skaters
+        penalty_draw_skaters = self.penalty_draw_team.skaters
+
+        preferred_short_name = self.game.preferred_team.short_name
+        preferred_skaters = self.game.preferred_team.skaters
+        other_skaters = self.game.other_team.skaters
+
+        logging.info("PP Strength - %s | PenaltyOn Skaters - %s | PenaltyDraw Skaters - %s",
+                     power_play_strength, penalty_on_skaters, penalty_draw_skaters)
+
+        #TODO: Get periodTimeRemaining for some of these strings
+        if power_play_strength == "Even" and penalty_on_skaters == penalty_draw_skaters == 4:
+            penalty_text_skaters = "Teams will skate 4 on 4."
+        elif power_play_strength == "Even" and penalty_on_skaters == penalty_draw_skaters == 3:
+            penalty_text_skaters = "Teams will skate 3 on 3."
+        elif power_play_strength != "Even":
+            # Preferred Team Advantages
+            if preferred_skaters == 5 and other_skaters == 4:
+                penalty_text_skaters = f"{preferred_short_name} are headed to the power play!"
+            elif preferred_skaters == 5 and other_skaters == 3:
+                penalty_text_skaters = f"{preferred_short_name} will have a two-man advantage!"
+            elif preferred_skaters == 4 and other_skaters == 3:
+                penalty_text_skaters = f"{preferred_short_name} are headed a 4-on-3 power play!"
+
+            # Other Team Advantages
+            elif preferred_skaters == 4 and other_skaters == 5:
+                penalty_text_skaters = f"{preferred_short_name} are headed to the penalty kill!"
+            elif preferred_skaters == 3 and other_skaters == 5:
+                penalty_text_skaters = f"{preferred_short_name} will have to kill off a two-man advantage!"
+            elif preferred_skaters == 3 and other_skaters == 5:
+                penalty_text_skaters = f"{preferred_short_name} will have a 4-on-3 penalty to kill!"
+        else:
+            logging.info("Unkown penalty skater combination")
+            penalty_text_skaters = ""
+
+        penalty_text_players = (f"{self.penalty_on_name} takes a {self.minutes}-minute {self.severity} "
+                                f"penalty for {self.secondary_type} and heads to the penalty box with "
+                                f"{self.period_time_remain} remaining in the {self.period_ordinal} period. "
+                                f"That's his {utils.ordinal(self.penalty_on_game_ttl)} penalty of the game. "
+                                f"{penalty_text_skaters}")
+
+        return penalty_text_players
+
+
+    def get_penalty_stats(self):
+        """ Used for determining penalty kill / power play stats. """
+        penalty_on_stats = self.penalty_on_team.get_stat_and_rank("penaltyKillPercentage")
+        penalty_on_short_name = self.penalty_on_team.short_name
+        penalty_on_stat = penalty_on_stats[0]
+        penalty_on_rank = penalty_on_stats[1]
+        penalty_on_rankstat_text = f"{penalty_on_short_name} PK: {penalty_on_stat}% ({penalty_on_rank}"
+
+        penalty_draw_stats = self.penalty_draw_team.get_stat_and_rank("powerPlayPercentage")
+        penalty_draw_short_name = self.penalty_draw_team.short_name
+        penalty_draw_stat = penalty_draw_stats[0]
+        penalty_draw_rank = penalty_draw_stats[1]
+        penalty_draw_rankstat_text = f"{penalty_draw_short_name} PP: {penalty_draw_stat} ({penalty_draw_rank})"
+
+        penalty_rankstat_text = f"{penalty_on_rankstat_text}\n{penalty_draw_rankstat_text}"
+        return penalty_rankstat_text
+
+
+    def generate_social_msg(self):
+        """ Used for generating the message that will be logged or sent to social media. """
+        if self.game.power_play_strength != "Even":
+            self.social_msg = f"{self.penalty_main_text}\n\n{self.penalty_rankstat_text}"
+        else:
+            self.social_msg = f"{self.penalty_main_text}"
 
     @utils.check_social_timeout
-    def call_socials(self):
-        msg = (f"{self.penalty_on_name} takes a {self.minutes}-minute {self.severity.lower()} "
-               f"penalty for {self.secondary_type.lower()}. That's his {utils.ordinal(self.penalty_on_game_ttl)} "
-               f"penalty of the game.")
-        socialhandler.send(msg)
-
+    def send_socials(self):
+        socialhandler.send(self.social_msg)
 
 
 class ChallengeEvent(GenericEvent):
@@ -477,8 +738,6 @@ class ChallengeEvent(GenericEvent):
 
     cache = Cache(__name__)
 
-    pass
-
 
 class GameEndEvent(GenericEvent):
     """ A Faceoff object contains all faceoff-related attributes and extra methods.
@@ -487,6 +746,6 @@ class GameEndEvent(GenericEvent):
 
     cache = Cache(__name__)
 
-    def __init__(self, data: dict):
-        super().__init__(data)
+    def __init__(self, data: dict, game: Game):
+        super().__init__(data, game)
         self.winner = "home" if self.home_goals > self.away_goals else "away"

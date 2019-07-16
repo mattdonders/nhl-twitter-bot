@@ -6,9 +6,10 @@ import dateutil.tz
 from hockeygamebot.helpers import utils
 from hockeygamebot.models.period import Period
 from hockeygamebot.models.shootout import Shootout
+from hockeygamebot.models.team import Team
 
 
-class Game(object):
+class Game:
     """Holds all game related attributes - usually one instance created per game."""
 
     # pylint: disable=too-many-instance-attributes
@@ -25,8 +26,8 @@ class Game(object):
         date_time,
         game_state,
         venue,
-        home,
-        away,
+        home: Team,
+        away: Team,
         preferred,
         live_feed,
         season,
@@ -130,12 +131,20 @@ class Game(object):
 
     # Instance Functions
     def update_game(self, response):
-        logging.info("Updating all Game object attributes.")
-        self.game_state = response.get("gameData").get("status").get("abstractGameState")
+        """ Use the livefeed to update game attributes.
+            Including: game state, period attributes, etc.
+        """
 
-        # if self.game_state != "Preview":
-        #     self.period.current =
+        logging.info("Updating all Game object attributes.")
         linescore = response.get("liveData").get("linescore")
+
+        # Update Game State & Period related attributes
+        self.game_state = response.get("gameData").get("status").get("abstractGameState")
+        self.period.current = linescore["currentPeriod"]
+        self.period.current_ordinal = linescore["currentPeriodOrdinal"]
+        self.period.time_remaining = linescore["currentPeriodTimeRemaining"]
+        self.period.intermission = linescore["intermissionInfo"]["inIntermission"]
+
         linescore_home = linescore.get("teams").get("home")
         self.home_team.score = linescore_home.get("goals")
         self.home_team.shots = linescore_home.get("shots")
