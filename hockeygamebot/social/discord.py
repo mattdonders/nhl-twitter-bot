@@ -1,6 +1,8 @@
 """
 All functions related to posting messages, files & embeds to Discord.
 """
+import logging
+
 import requests
 
 from hockeygamebot.helpers.config import config
@@ -15,5 +17,8 @@ def send_discord_textonly(msg):
     Returns:
         None
     """
-    payload = {"content": msg}
-    requests.post(config.discord["webhook_url"], json=payload)
+    linebreak_msg = f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n{msg}"
+    payload = {"content": linebreak_msg}
+    response = requests.post(config.discord["webhook_url"], json=payload)
+    if not response.ok:
+        logging.warning(response.json())

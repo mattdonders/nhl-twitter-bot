@@ -30,12 +30,12 @@ def gameday_roster_update(game):
     try:
         gameday_roster = nhlapi.api.nhl_api(game.live_feed).json()
         all_players = gameday_roster.get("gameData").get("players")
-        for id, player in all_players.items():
+        for player_id, player in all_players.items():
             team = player.get("currentTeam").get("name")
             if team == home_team.team_name:
-                home_team.gameday_roster[id] = player
+                home_team.gameday_roster[player_id] = player
             else:
-                away_team.gameday_roster[id] = player
+                away_team.gameday_roster[player_id] = player
     except Exception as e:
         logging.error("Unable to get all players.")
         logging.error(e)

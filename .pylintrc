@@ -8,7 +8,10 @@
 # can either give multiple identifier separated by comma (,) or put this option
 # multiple time (only on the command line, not in the configuration file where
 # it should appear only once).
-disable=invalid-name, broad-except
+disable=invalid-name, broad-except, no-else-return
 
 [TYPECHECK]
 ignored-classes=responses,_Config
+
+[FORMAT]
+--max-line-length=110

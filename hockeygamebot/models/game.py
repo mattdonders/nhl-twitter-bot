@@ -12,10 +12,8 @@ from hockeygamebot.models.team import Team
 class Game:
     """Holds all game related attributes - usually one instance created per game."""
 
-    # pylint: disable=too-many-instance-attributes
-    # pylint: disable-msg=too-many-locals
-    # pylint: disable-msg=too-many-arguments
-    # pylint: disable-msg=too-many-locals
+    # pylint: disable=too-many-instance-attributes, too-many-locals, too-many-arguments
+    # pylint: disable=too-many-locals, bad-continuation
 
     # A Game has a lot of attributes that cannot be subclassed.
 

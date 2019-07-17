@@ -29,7 +29,7 @@ def send(msg, **kwargs):
 
     if args.notweets:
         logging.info("[SOCIAL] %s", msg)
-        # return
+        return
 
     if social_config["twitter"]:
         pass
