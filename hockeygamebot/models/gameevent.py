@@ -57,6 +57,9 @@ def event_factory(game: Game, response: dict, livefeed: dict):
     # Check whether this event is in our Cache
     obj = object_type.cache.get(event_idx)
 
+    # Check whether this is a shootout event
+    shootout = bool(response.get("about").get("periodType") == "SHOOTOUT")
+
     # Add the game object & livefeed to our response
     response["game"] = game
     response["livefeed"] = livefeed
@@ -65,11 +68,16 @@ def event_factory(game: Game, response: dict, livefeed: dict):
     # Check for scoring changes on GoalEvents
     # TODO: Compare eventIdx and only check for scoring changes on no new events
     if object_type == GoalEvent and obj is not None:
-        obj.check_for_scoring_changes(response)
+        score_change_msg = obj.check_for_scoring_changes(response)
+        if score_change_msg is not None:
+            social_ids = send_socials(msg=score_change_msg, tweet_reply=obj.tweet)
+            obj.tweet = social_ids.get("twitter")
 
     # If object doesn't exist, create it & add to Cache
     if obj is None:
         try:
+            # Shootout events are special, so catch them all
+            object_type = ShootoutEvent if shootout else object_type
             obj = object_type(data=response, game=game)
             object_type.cache.add(obj)
         except Exception as error:
@@ -100,15 +108,18 @@ def game_event_total(object_type: object, player: str, attribute: str):
 
 
 @utils.check_social_timeout
-def send_socials(msg: str):
+def send_socials(msg: str, **kwargs):
     """ Takes a generated social media string and passes it to the Social Media Handler.
         Hashtags and other formatting are done in the social media specific function.
         # TODO: Determine if this can be routed back to the social media file.
 
     Args:
         msg: Social media message
+        kwargs -
+            tweet_reply: a tweet id to reply to
     """
-    socialhandler.send(msg)
+    ids = socialhandler.send(msg, **kwargs)
+    return ids
 
 
 class Cache:
@@ -158,6 +169,7 @@ class GenericEvent:
         self.period_ordinal = about.get("ordinalNum")
         self.period_time = about.get("periodTime")
         self.period_time_remain = about.get("periodTimeRemaining")
+        self.period_time_remain_str = utils.time_remain_converter(self.period_time_remain)
         # self.date_time = dateutil.parser.parse(about.get("dateTime"))
         self.date_time = about.get("dateTime")
         self.away_goals = about.get("goals").get("away")
@@ -509,13 +521,21 @@ class GoalEvent(GenericEvent):
     def __init__(self, data: dict, game: Game):
         super().__init__(data, game)
 
-        # Shots have a few extra results attributes
+        # Goals have a few extra results attributes
         results = data.get("result")
-        self.secondary_type = results.get("secondaryType")
+        self.secondary_type = results.get("secondaryType").lower()
         self.strength_code = results.get("strength").get("code")
         self.strength_name = results.get("strength").get("name")
         self.game_winning_goal = results.get("gameWinningGoal")
         self.empty_net = results.get("emptyNet")
+        self.event_team = data.get("team").get("name")
+        self.tweet = None
+
+        # Get the Coordinates Section
+        coordinates = data.get("coordinates")
+        self.x = coordinates.get("x", 0.0)
+        self.y = coordinates.get("y", 0.0)
+        self.goal_distnace = utils.calculate_shot_distance(self.x, self.y)
 
         # Get the Players Section
         players = data.get("players")
@@ -525,6 +545,7 @@ class GoalEvent(GenericEvent):
         self.scorer_name = scorer[0].get("player").get("fullName")
         self.scorer_id = scorer[0].get("player").get("id")
         self.scorer_game_total = game_event_total(__class__, self.scorer_name, "scorer_name") + 1
+        self.scorer_game_total_ordinal = utils.ordinal(self.scorer_game_total)
         self.scorer_season_ttl = scorer[0].get("seasonTotal")
         # Goalie isn't recorded for empty net goals
         if not self.empty_net:
@@ -533,8 +554,24 @@ class GoalEvent(GenericEvent):
         else:
             self.goalie_name = None
             self.goalie_id = None
+        # Assist parsing is contained within a function
+        self.parse_assists(assist=assist)
+
+        # Now call any functions that should be called when creating a new object
+        self.goal_title_text = self.get_goal_title_text()
+        self.goal_main_text = self.get_goal_main_text()
+        self.social_msg = f"{self.goal_title_text}\n\n{self.goal_main_text}"
+        social_ids = send_socials(self.social_msg)
+
+        # Set any social media IDs
+        self.tweet = social_ids.get("twitter")
+
+    def parse_assists(self, assist: list):
+        """ Since we have to parse assists initially & for scoring changes, move this to a function. """
+
         self.assists = assist
         self.num_assists = len(assist)
+
         if len(assist) == 2:
             self.primary_name = assist[0].get("player").get("fullName")
             self.primary_id = assist[0].get("player").get("id")
@@ -560,32 +597,74 @@ class GoalEvent(GenericEvent):
             self.secondary_season_ttl = None
             self.unassisted = True
 
-        # Call social media functions
-        self.call_socials()
+    def get_goal_title_text(self):
+        """ Gets the main goal text / header. """
 
-    @utils.check_social_timeout
-    def call_socials(self):
-        if self.unassisted:
-            msg = (
-                f"GOAL - {self.scorer_name} ({self.scorer_season_ttl}) scores his "
-                f"{utils.ordinal(self.scorer_game_total)} of the game unassisted at "
-                f"{self.period_time} of the {self.period_ordinal} period."
-            )
-        if self.num_assists == 1:
-            msg = (
-                f"GOAL - {self.scorer_name} ({self.scorer_season_ttl}) scores his "
-                f"{utils.ordinal(self.scorer_game_total)} of the game from {self.primary_name} "
-                f"({self.primary_season_ttl}) at {self.period_time} of the {self.period_ordinal} period."
-            )
+        if self.event_team == self.game.preferred_team.team_name:
+            goal_emoji = "🚨" * self.pref_goals
+
+            if self.period_type == "OVERTIME":
+                goal_title_text = f"{self.event_team} OVERTIME GOAL!!"
+            elif self.strength_name != "Even":
+                goal_title_text = f"{self.event_team} {self.strength_name} GOAL!"
+            elif self.empty_net:
+                goal_title_text = f"{self.event_team} empty net GOAL!"
+            elif self.pref_goals == 7:
+                goal_title_text = f"{self.event_team} TOUCHDOWN!"
+            else:
+                goal_title_text = f"{self.event_team} GOAL!"
         else:
-            msg = (
-                f"GOAL - {self.scorer_name} ({self.scorer_season_ttl}) scores his "
-                f"{utils.ordinal(self.scorer_game_total)} of the game from {self.primary_name} "
-                f"({self.primary_season_ttl}) & {self.secondary_name} ({self.secondary_season_ttl}) "
-                f"at {self.period_time} of the {self.period_ordinal} period."
-            )
+            goal_title_text = f"{self.event_team} score."
+            goal_emoji = "👎🏻" * self.other_goals
 
-        socialhandler.send(msg)
+        goal_title_text = f"{goal_title_text} {goal_emoji}"
+        return goal_title_text
+
+    def get_goal_main_text(self):
+        """ Gets the main goal description (players, shots, etc). """
+        #TODO: Add randomness to this section of code.
+
+        # This section is for goals per game (only add for 2+ goals)
+        if self.scorer_game_total == 2:
+            goal_count_text = f"With his {self.scorer_game_total_ordinal} goal of the game,"
+        elif self.scorer_game_total == 3:
+            goal_count_text = "🎩🎩🎩 HAT TRICK!"
+        elif self.scorer_game_total == 4:
+            goal_count_text = f"{self.scorer_game_total} GOALS!!"
+        else:
+            goal_count_text = None
+
+        # Main goal scorere text (per season, shot type, etc)
+        if self.secondary_type == "deflected":
+            goal_scoring_text = (f"{self.scorer_name} ({self.scorer_season_ttl}) deflects a shot past "
+                                 f"{self.goalie_name} with {self.period_time_remain_str} left "
+                                 f"in the {self.period_ordinal} period.")
+        else:
+            goal_scoring_text = (f"{self.scorer_name} ({self.scorer_season_ttl}) scores on a "
+                                 f"{self.secondary_type} from {self.goal_distnace} away with "
+                                 f"{self.period_time_remain_str} left in the "
+                                 f"{self.period_ordinal} period.")
+
+        # Assists Section
+        if self.num_assists == 1:
+            goal_assist_text = f"Give the assist to {self.primary_name} ({self.primary_season_ttl})."
+        elif self.num_assists == 2:
+            goal_assist_text = (f"The goal was assisted by {self.primary_name} ({self.primary_season_ttl}) "
+                                f"and {self.secondary_name} ({self.secondary_season_ttl}).")
+        else:
+            goal_assist_text = None
+
+        # TODO: Can I fix this weird if / else - come back to it.
+        if goal_count_text is None and goal_assist_text is None:
+            goal_main_text = goal_scoring_text
+        elif goal_count_text is None:
+            goal_main_text = f"{goal_scoring_text} {goal_assist_text}"
+        elif goal_assist_text is None:
+            goal_main_text = f"{goal_count_text} {goal_scoring_text}"
+        else:
+            goal_main_text = f"{goal_count_text} {goal_scoring_text} {goal_assist_text}"
+
+        return goal_main_text
 
     def check_for_scoring_changes(self, data: dict):
         """ Checks for scoring changes or changes in assists (or even number of assists).
@@ -594,43 +673,69 @@ class GoalEvent(GenericEvent):
             data: Dictionary of a Goal Event from the Live Feed allPlays endpoint
 
         Returns:
-            None
+            None if no goal change / new social media string if goal change.
         """
 
-        print("Checking for scoring changes!")
+        logging.info("Checking for scoring changes (event ID %s / IDX %s).", self.event_id, self.event_idx)
         players = data.get("players")
         scorer = [x for x in players if x.get("playerType").lower() == "scorer"]
         assist = [x for x in players if x.get("playerType").lower() == "assist"]
-        num_assists = len(assist)
 
         # Check for Changes in Player IDs
         scorer_change = bool(scorer[0].get("player").get("id") != self.scorer_id)
         assist_change = bool(assist != self.assists)
-        print("Scoring Change -", scorer_change)
-        print("Assists Change -", assist_change)
+        logging.info("Scoring Change - %s", scorer_change)
+        logging.info("Assists Change - %s", assist_change)
 
         if scorer_change:
-            logging.info("Scoring change detected for event ID %s / IDX %s.", self.event_id, self.event_idx)
-            new_scorer_name = scorer[0].get("player").get("fullName")
-            new_scorer_id = scorer[0].get("player").get("id")
-            new_scorer_season_ttl = scorer[0].get("seasonTotal")
             print("Old Scorer -", self.scorer_name)
-            print("New Scorer -", new_scorer_name)
+            goal_scorechange_title = "The scoring on this goal has changed."
+            logging.info("Scoring change detected for event ID %s / IDX %s.", self.event_id, self.event_idx)
+            self.scorer_name = scorer[0].get("player").get("fullName")
+            self.scorer_id = scorer[0].get("player").get("id")
+            self.scorer_season_ttl = scorer[0].get("seasonTotal")
+            logging.info("New Scorer - %s", self.scorer_name)
+
+            # Re-parse assists too (a goal scoring change usually means assist changes too)
+            self.parse_assists(assist=assist)
 
             if not assist:
-                logging.info("New goal is scored as unassisted.")
-            if num_assists == 1:
-                logging.info("Now reads as XXX from XXX.")
+                goal_scorechange_text = (f"Now reads as an unassisted goal for {self.scorer_name} "
+                                         f"({self.scorer_season_ttl}).")
+            elif self.num_assists == 1:
+                goal_scorechange_text = (f"Now reads as {self.scorer_name} ({self.scorer_season_ttl}) "
+                                         f"from {self.primary_name} ({self.primary_season_ttl}).")
             else:
-                logging.info("Now reads as XXX from XXX.")
+                goal_scorechange_text = (f"Now reads as {self.scorer_name} ({self.scorer_season_ttl}) "
+                                         f"from {self.primary_name} ({self.primary_season_ttl}) "
+                                         f"and {self.secondary_name} ({self.secondary_season_ttl}).")
 
         elif assist_change:
-            if not assist:
-                logging.info("The goal is now unassisted.")
-            if num_assists == 1:
-                logging.info("Give the lone assist on XXXX's goal to YYYYY.")
+            # A change in assists could be a change or addition of a previously unassisted goal.
+            # To check which scenario this is, check previous num_assists before re-parsing.
+            goal_scorechange_title = "The assists on this goal have changed." if self.num_assists != 0 else None
+
+            # Re-parse assists too (a goal scoring change usually means assist changes too)
+            self.parse_assists(assist=assist)
+            if self.num_assists == 1:
+                goal_scorechange_text = (f"Give the lone assist on the {self.scorer_name} goal to "
+                                        f"{self.primary_name} ({self.primary_season_ttl}).")
+            elif self.num_assists == 2:
+                goal_scorechange_text = (f"The {self.scorer_name} goal is now assisted by "
+                                        f"{self.primary_name} ({self.primary_season_ttl}) "
+                                        f"and {self.secondary_name} ({self.secondary_season_ttl}).")
             else:
-                logging.info("The goal is now assisted by XXXXX and YYYYY.")
+                goal_scorechange_text = f"The {self.scorer_name} goal is now uniassisted!"
+        else:
+            goal_scorechange_text = None
+            return None
+
+        # Return a string based on
+        if goal_scorechange_title is None:
+            return goal_scorechange_text
+        else:
+            return f"{goal_scorechange_title}\n\n{goal_scorechange_text}"
+
 
 
 class ShotEvent(GenericEvent):
@@ -666,6 +771,7 @@ class ShotEvent(GenericEvent):
         coordinates = data.get("coordinates")
         self.x = coordinates.get("x", 0.0)
         self.y = coordinates.get("y", 0.0)
+        self.shot_distance = utils.calculate_shot_distance(self.x, self.y)
 
         # Now call any functions that should be called when creating a new object
         # (FOR NOW) we only checked for missed shots that hit the post.
@@ -699,10 +805,8 @@ class ShotEvent(GenericEvent):
         else:
             shot_hit = None
 
-        shot_distance = utils.calculate_shot_distance(self.x, self.y)
-
         self.social_msg = (
-            f"DING! 🛎\n\n{self.player_name} hits the {shot_hit} from {shot_distance} "
+            f"DING! 🛎\n\n{self.player_name} hits the {shot_hit} from {self.shot_distance} "
             f"away with {self.period_time_remain} remaining in the {self.period_ordinal} period."
         )
 
@@ -848,6 +952,14 @@ class ChallengeEvent(GenericEvent):
     """ A Challenge object contains all challenge-related attributes and extra methods.
         It is a subclass of the GenericEvent class with the most basic attributes.
         This event needs to be aware of events around it so it can understand reversals.
+    """
+
+    cache = Cache(__name__)
+
+
+class ShootoutEvent(GenericEvent):
+    """ A Shootout object contains all shootout-related attributes and extra methods.
+        It is a subclass of the GenericEvent class with the most basic attributes.
     """
 
     cache = Cache(__name__)

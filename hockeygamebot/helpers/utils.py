@@ -275,3 +275,20 @@ def calculate_shot_distance(x: int, y: int) -> str:
     shot_unit = "foot" if shot_dist == 1 else "feet"
     shot_text = f"{shot_dist} {shot_unit}"
     return shot_text
+
+
+def time_remain_converter(time: str) -> str:
+    """ Takes a time remaining string and determines if its less than 1 minute.
+
+    Args:
+        time: time remaining in the period
+
+    Returns:
+        time_new: possibly modified time string
+    """
+
+    minutes = time.split(":")[0]
+    seconds = time.split(":")[1]
+
+    time_new = f"{seconds} seconds" if minutes == "00" else time
+    return time_new

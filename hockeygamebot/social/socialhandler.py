@@ -27,9 +27,12 @@ def send(msg, **kwargs):
     args = arguments.get_arguments()
     social_config = config.socials
 
+    # Initialize a return dictionary
+    return_dict = {"twitter": None, "discord": None, "slack": None}
+
     if args.notweets:
         logging.info("[SOCIAL] %s", msg)
-        return
+        return return_dict
 
     if social_config["twitter"]:
         pass
@@ -39,3 +42,6 @@ def send(msg, **kwargs):
 
     if social_config["slack"]:
         pass
+
+    return return_dict
+
