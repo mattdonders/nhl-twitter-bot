@@ -21,7 +21,24 @@ endpoints:
     df_line_combos: https://www.dailyfaceoff.com/teams/TEAMNAME/line-combinations/
     hockeyref_base: https://www.hockey-reference.com/players
     scouting_refs: http://scoutingtherefs.com/wp-json/wp/v2/posts
+    nst: https://www.naturalstattrick.com
+
+socials:
+    twitter: True
+    discord: True
+    slack: False
+
+twitter:
+    prod:
+        consumer_key: XXX
+        consumer_secret: XXX
+        access_token: XXX
+        access_key: XXX
+    debug:
+        consumer_key: XXX
+        consumer_secret: XXX
+        access_token: XXX
+        access_key: XXX
 
 discord:
-    debug_channel_id: 513415230026547202
-    channel_id: 493573741167771649
+    webhook_url: XXX 

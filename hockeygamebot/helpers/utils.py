@@ -23,6 +23,8 @@ def check_social_timeout(func):
     """ A function decorate used within the GameEvent module to determine
         if we should send this event to social media. This can only wrap
         functions that have an attribute of a GameEvent.
+
+        #TODO: Fix 0th element issue
     """
 
     @functools.wraps(func)
@@ -34,21 +36,25 @@ def check_social_timeout(func):
         if parsed_args.notweets:
             return func(*args, **kwargs)
 
-        event = args[0]
-        event_time = dateutil.parser.parse(event.date_time)
-        timeout = config["script"]["event_timeout"]
-        utcnow = datetime.now(timezone.utc)
-        time_since_event = (utcnow - event_time).total_seconds()
-        if time_since_event < timeout:
+        try:
+            event = args[0]
+            event_time = dateutil.parser.parse(event.date_time)
+            timeout = config["script"]["event_timeout"]
+            utcnow = datetime.now(timezone.utc)
+            time_since_event = (utcnow - event_time).total_seconds()
+            if time_since_event < timeout:
+                return func(*args, **kwargs)
+            else:
+                logging.info(
+                    "Event #%s (%s) occurred %s second(s) in the past - older than our social timeout.",
+                    event.event_idx,
+                    event.event_type,
+                    time_since_event,
+                )
+                return False
+        except:
+            logging.warning("Timeout function should contain a event as the 0th element.")
             return func(*args, **kwargs)
-        else:
-            logging.info(
-                "Event #%s (%s) occurred %s second(s) in the past - older than our social timeout.",
-                event.event_idx,
-                event.event_type,
-                time_since_event,
-            )
-            return False
 
     return wrapper_social_timeout
 

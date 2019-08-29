@@ -2,7 +2,7 @@
 
 import pytest
 
-from hockeygamebot.helpers import stats
+from hockeygamebot.nhlapi import stats
 
 
 def test_career_stats():

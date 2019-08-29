@@ -6,9 +6,12 @@ This module contains all functions pertaining to a game in Preview State.
 
 import logging
 
+from hockeygamebot.core import images
 from hockeygamebot.helpers import utils
 from hockeygamebot.models.gametype import GameType
+from hockeygamebot.models.game import Game
 from hockeygamebot.nhlapi import schedule, thirdparty
+from hockeygamebot.social import socialhandler
 
 
 def generate_game_preview(game):
@@ -65,6 +68,12 @@ def generate_game_preview(game):
     # Generate final preview tweet text
     preview_tweet_text = f"{preview_text_teams}\n\n{preview_text_emojis}"
 
+    # Generate pre-game image
+    pregame_image = images.pregame_image(game)
+
+    # Send preview tweet w/ pre-game image to social media handler
+    game.pregame_lasttweet = socialhandler.send(msg=preview_tweet_text, media=pregame_image)
+
     # Generate Season Series Data
     season_series = schedule.season_series(game.game_id, pref_team, other_team)
     season_series_string = season_series[0]
@@ -76,8 +85,11 @@ def generate_game_preview(game):
             f"{pref_hashtag} {other_hashtag} {game.game_hashtag}"
         )
 
-    logging.info(preview_tweet_text)
-    logging.info(season_series_tweet_text)
+    # logging.info(preview_tweet_text)
+    # logging.info(season_series_tweet_text)
+    game.pregame_lasttweet = socialhandler.send(
+        msg=season_series_tweet_text, reply=game.pregame_lasttweet
+    )
     game.pregametweets["core"] = True
 
 

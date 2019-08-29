@@ -16,17 +16,16 @@ try:
 except ImportError:
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir))
 
-
-from hockeygamebot.core import preview
+from hockeygamebot.core import final, live, preview
 from hockeygamebot.definitions import VERSION
 from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.models.game import Game
 from hockeygamebot.models.gamestate import GameState
 from hockeygamebot.models.team import Team
-from hockeygamebot.nhlapi import livefeed, roster, schedule
+from hockeygamebot.nhlapi import livefeed, roster, schedule, thirdparty
 
 
-def start_game_loop(game):
+def start_game_loop(game: Game):
     """ The main game loop - tracks game state & calls all relevant functions.
 
     Args:
@@ -69,6 +68,8 @@ def start_game_loop(game):
                     "Game is LIVE - checking events after event Idx %s.", game.last_event_idx
                 )
                 livefeed_resp = livefeed.get_livefeed(game.game_id)
+                # all_events = live.live_loop(livefeed=livefeed_resp, game=game)
+                live.live_loop(livefeed=livefeed_resp, game=game)
                 game.update_game(livefeed_resp)
                 # game_events = get_game_events(game_obj)
                 # loop_game_events(game_events, game_obj)
@@ -80,14 +81,59 @@ def start_game_loop(game):
                 logging.error(error)
 
             time.sleep(config["script"]["live_sleep_time"])
+
         elif GameState(game.game_state) == GameState.FINAL:
-            # TODO: Implement refactored Final / Postgame Functions
-            pass
+            logging.info(
+                "Game is now over & 'Final' - run end of game functions with increased sleep time."
+            )
+
+            livefeed_resp = livefeed.get_livefeed(game.game_id)
+            game.update_game(livefeed_resp)
+
+            # Run all end of game / final functions
+            final.final_score(livefeed=livefeed_resp, game=game)
+            final.three_stars(livefeed=livefeed_resp, game=game)
+            thirdparty.nst_linetool(game=game, team=game.preferred_team)
+
+            if game.final_socials.all_social_sent or game.final_socials.retries_exeeded:
+                logging.info("All socials sent or retries exceeded - ending game!")
+                end_game_loop(game=game)
+
+            # If all socials aren't sent or retry limit is not exceeded, sleep & check again.
+            logging.info(
+                "Final loop #%s done - sleep for %s seconds and check again.",
+                game.final_socials.retry_count,
+                config["script"]["final_sleep_time"],
+            )
+
+            game.final_socials.retry_count += 1
+            time.sleep(config["script"]["final_sleep_time"])
+
         else:
             logging.warning(
                 "Game State %s is unknown - sleep for 5 seconds and check again.", game.game_state
             )
             time.sleep(config["script"]["live_sleep_time"])
+
+
+def end_game_loop(game: Game):
+    """ A function that is run once the game is finally over. Nothing fancy - just denotes a logical place
+        to end the game, log one last section & end the script."""
+    pref_team = game.preferred_team
+    other_team = game.other_team
+
+    logging.info("#" * 80)
+    logging.info("End of the %s Hockey Twitter Bot game.", pref_team.short_name)
+    logging.info(
+        "Final Score: %s: %s / %s: %s",
+        pref_team.short_name,
+        pref_team.score,
+        other_team.short_name,
+        other_team.score,
+    )
+    logging.info("TIME: %s", datetime.now())
+    logging.info("%s\n", "#" * 80)
+    sys.exit()
 
 
 def run():
@@ -173,4 +219,3 @@ if __name__ == "__main__":
 
     # All necessary Objects are created, start the game loop!
     start_game_loop(game)
-

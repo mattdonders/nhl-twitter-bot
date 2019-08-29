@@ -47,7 +47,7 @@ class Team(object):
             self.ot = None
 
         # Calculate Points
-        self.points = (2 * self.wins) + self.ot
+        self.points = (2 * self.wins) + self.ot if self.ot is not None else (2 * self.wins)
 
         # Send request for leading / trailing stats (via other API)
         try:
@@ -130,7 +130,7 @@ class Team(object):
         channel = broadcasts.get(homeaway)
         record = resp["teams"][homeaway]["leagueRecord"]
 
-        if resp["gameType"] in (GameType.PLAYOFFS, GameType.PREASEASON):
+        if GameType(resp["gameType"]) in (GameType.PLAYOFFS, GameType.PREASEASON):
             games = record["wins"] + record["losses"]
         else:
             games = record["wins"] + record["losses"] + record["ot"]
@@ -149,7 +149,10 @@ class Team(object):
 
     @property
     def current_record(self):
-        return f"{self.wins}-{self.losses}-{self.ot}"
+        if self.ot:
+            return f"{self.wins}-{self.losses}-{self.ot}"
+        else:
+            return f"{self.wins}-{self.losses}-0"
 
     def get_new_points(self, outcome):
         """Takes a game outcome and returns the team's udpated points."""

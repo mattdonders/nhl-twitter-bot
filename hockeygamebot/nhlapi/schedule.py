@@ -97,6 +97,30 @@ def get_broadcasts(resp):
     return broadcasts
 
 
+def get_next_game(team_id: int) -> dict:
+    """ Takes a team ID & gets the next game from the schedule API modified endpoint.
+
+    Args:
+        team_id (int) - The unique identifier of the team (from get_team function).
+
+    Returns:
+        next_game (dict) - Dictionary of next game attributes.
+    """
+
+    logging.info("Checking the schedule API endpoint for the next game.")
+    url = f"teams/{team_id}?expand=team.schedule.next"
+
+    response = api.nhl_api(url)
+    if not response:
+        return None
+
+    next_game_json = response.json()
+    next_game_sched = next_game_json.get("teams")[0].get("nextGameSchedule")
+    next_game = next_game_sched.get("dates")[0].get("games")[0]
+
+    return next_game
+
+
 def season_series(game_id, pref_team, other_team):
     """Generates season series, points leader & TOI leader.
 
@@ -125,7 +149,8 @@ def season_series(game_id, pref_team, other_team):
 
     season_start = str(game_id)[0:4]
     season_end = str(int(season_start) + 1)
-    yesterday = datetime.now() + timedelta(days=50)
+    yesterday = datetime.now() - timedelta(days=1)
+    # yesterday = datetime.now() + timedelta(days=50)
     schedule_url = (
         f"/schedule?teamId={pref_team.team_id}"
         f"&expand=schedule.broadcasts,schedule.teams&startDate="
@@ -145,7 +170,7 @@ def season_series(game_id, pref_team, other_team):
         game_team_away = game["teams"]["away"]["team"]["name"]
         teams = [game_team_away, game_team_home]
         if game_type == "R" and other_team.team_name in teams:
-            game_feed = f"{config['endpoints']['nhl_endpoint']}/game/{game_id}/feed/live"
+            game_feed = f"/game/{game_id}/feed/live"
             games_against.append(game_feed)
 
     # If the two teams haven't played yet, just exit this function

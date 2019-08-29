@@ -1,5 +1,6 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
+.pytest_cache/
 
 # Miscellaneous Files
 nohup.out
@@ -9,8 +10,9 @@ localdata/
 # Mac specific DS Store
 .DS_Store
 
-# VSCode Temp Files
+# IDE Temp Files
 .vscode/
+.idea/
 
 # Credentials
 secret.py

@@ -1,3 +1,7 @@
+"""
+This module contains the Class definition for the single Game object created during a game.
+"""
+
 import logging
 from datetime import datetime
 
@@ -79,6 +83,7 @@ class Game:
             "advstats": False,
             "shotmap": False,
         }
+        self.final_socials = EndOfGameSocial()
         self.finaltweets_retry = 0
 
         # Parse Game ID to get attributes
@@ -104,7 +109,19 @@ class Game:
             self.game_id_gametype = "Unknown"
 
     @classmethod
-    def from_json_and_teams(cls, resp, home_team, away_team):
+    def from_json_and_teams(cls, resp: dict, home_team: Team, away_team: Team) -> "Game":
+        """ A class method that creates a Game object from a combination of the argument fields
+            including a JSON livefeed response & the two Team objects (home & away).
+
+        Args:
+            resp: livefeed JSON response (dictionary)
+            home_team: Team object of home team
+            away_team: Team object of away team
+
+        Returns:
+            Game: single Game object
+        """
+
         # The venue is not always a 'cherry-pick' from the dictionary
         try:
             venue = resp["venue"]["name"]
@@ -151,6 +168,10 @@ class Game:
         self.away_team.score = linescore_away.get("goals")
         self.away_team.shots = linescore_away.get("shots")
 
+        self.last_event_idx = (
+            response.get("liveData").get("plays").get("currentPlay").get("about").get("eventIdx")
+        )
+
     # Commands used to calculate time related attributes
     localtz = dateutil.tz.tzlocal()
     localoffset = localtz.utcoffset(datetime.now(localtz))
@@ -181,6 +202,7 @@ class Game:
 
     @property
     def game_date_local(self):
+        """ Returns the game as Y-m-d format in local time zone. """
         game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
         game_date_local = game_date + self.localoffset
         game_date_local_api = game_date_local.strftime("%Y-%m-%d")
@@ -191,7 +213,7 @@ class Game:
         """Returns the game date_time in local server time in AM / PM format."""
         game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
         game_date_local = game_date + self.localoffset
-        game_date_local_short = game_date_local.strftime("%b %d").replace(" 0", " ").upper()
+        game_date_local_short = game_date_local.strftime("%B %d").replace(" 0", " ").upper()
         return game_date_local_short
 
     @property
@@ -230,3 +252,28 @@ class Game:
             return (self.home_team, self.away_team)
 
         return (self.away_team, self.home_team)
+
+
+class EndOfGameSocial:
+    """ A class that holds all end of game social media messages & statuses."""
+
+    def __init__(self):
+        self.retry_count = 0
+        self.final_score_msg = None
+        self.final_score_sent = False
+        self.three_stars_msg = None
+        self.three_stars_sent = False
+
+    @property
+    def all_social_sent(self):
+        """ Returns True / False depending on if all final socials were sent. """
+
+        all_final_social = [v for k, v in self.__dict__.items() if "sent" in k]
+        all_final_social_sent = all(all_final_social)
+        return all_final_social_sent
+
+    @property
+    def retries_exeeded(self):
+        """ Returns True if the number of retires (3 = default) has been exceeded. """
+        return bool(self.retry_count >= 3)
+

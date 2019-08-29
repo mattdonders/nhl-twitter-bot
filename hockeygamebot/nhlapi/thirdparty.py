@@ -4,16 +4,18 @@ from non NHL APIs & websites (ex - lineups, officials, etc).
 """
 
 import logging
-from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
 
 import requests
-from datetime import datetime, timedelta
+from bs4 import BeautifulSoup
 from dateutil.parser import parse
-from requests.adapters import HTTPAdapter
 from fake_useragent import UserAgent
+from requests.adapters import HTTPAdapter
 
 from hockeygamebot.helpers import utils
 from hockeygamebot.models.sessions import SessionFactory
+from hockeygamebot.models.team import Team
+from hockeygamebot.models.game import Game
 
 
 def thirdparty_request(url, headers=None):
@@ -61,6 +63,131 @@ def bs4_parse(content):
     except TypeError as e:
         logging.error(e)
         return None
+
+
+def nst_abbreviation(team_name: str) -> str:
+    """ Returns the 3-character team abbreviation used in Shift Charts & therefore by most other
+        third party stats sites (ex - N.J instead of NJD).
+
+    Args:
+        team_name: NHL Team Name
+
+    Returns:
+        nss_team: 3-character team abbreviation used at NSS
+    """
+
+    team_name = team_name.replace("é", "e")
+    nss_teams = {
+        "Anaheim Ducks": "ANA",
+        "Arizona Coyotes": "ARI",
+        "Boston Bruins": "BOS",
+        "Buffalo Sabres": "BUF",
+        "Carolina Hurricanes": "CAR",
+        "Columbus Blue Jackets": "CBJ",
+        "Calgary Flames": "CGY",
+        "Chicago Blackhawks": "CHI",
+        "Colorado Avalanche": "COL",
+        "Dallas Stars": "DAL",
+        "Detroit Red Wings": "DET",
+        "Edmonton Oilers": "EDM",
+        "Florida Panthers": "FLA",
+        "Los Angeles Kings": "L.A",
+        "Minnesota Wild": "MIN",
+        "Montreal Canadiens": "MTL",
+        "New Jersey Devils": "N.J",
+        "Nashville Predators": "NSH",
+        "New York Islanders": "NYI",
+        "New York Rangers": "NYR",
+        "Ottawa Senators": "OTT",
+        "Philadelphia Flyers": "PHI",
+        "Pittsburgh Penguins": "PIT",
+        "San Jose Sharks": "S.J",
+        "St Louis Blues": "STL",
+        "Tampa Bay Lightning": "T.B",
+        "Toronto Maple Leafs": "TOR",
+        "Vancouver Canucks": "VAN",
+        "Vegas Golden Knights": "VGK",
+        "Winnipeg Jets": "WPG",
+        "Washington Capitals": "WSH",
+    }
+    return nss_teams[team_name]
+
+def get_nst_stat(list, index):
+    if list[index].text == '-':
+        return 'N/A'
+    try:
+        return list[index].text
+    except ValueError:
+        return 'N/A'
+
+def nst_linetool(game: Game, team: Team):
+    """ Scrapes Natural Stat Trick's Limited Report to get advanced stats for forward lines
+        and defensive pairings.
+
+        #TODO: Defensive Pairings are manually calc'd & retrieved.
+               https://twitter.com/Sammich_BLT/status/1154007222634065920?s=20
+
+    Args:
+        game (game): An NHL Game Event game object.
+        team (Team): A NHL Game Event team object.
+
+    Returns:
+        TBD
+    """
+
+    config = utils.load_config()
+    nst_base = config["endpoints"]["nst"]
+
+    nst_rpt_url = (
+        f"{nst_base}/game.php?season={game.season}&view=limited"
+        f"&game={game.game_id_gametype_shortid}{game.game_id_shortid}"
+    )
+
+    logging.info("Requesting & souping the Natural Stat Trick limited report.")
+    resp = thirdparty_request(nst_rpt_url)
+    soup = bs4_parse(resp.content)
+
+    # Find the Forward Lines label & then the corresponding 5v5 table on the soup'd page
+    nst_abrv = nst_abbreviation(team_name=team.team_name)
+    nst_abrv_nopd = nst_abrv.replace(".", "")
+
+    # fwd_lines_header = f'{team.short_name} - Forward Lines'
+    fwd_lines_label = soup.find("label", {"for": f"{nst_abrv_nopd}fltg"})
+    fwd_lines = fwd_lines_label.parent
+    fwd_lines_5v5 = fwd_lines.find("div", class_="t5v5 datadiv").find("tbody")
+    fwd_lines_5v5_rows = fwd_lines_5v5.find_all("tr")
+
+    for idx, line in enumerate(fwd_lines_5v5_rows):
+        line_stats = list()
+        line = line.find_all("td")
+        line_players = '-'.join([' '.join(x.text.split()[1:]) for x in line][0:3])
+        line_toi = float(line[3].text)
+        line_toi_mm = int(line_toi)
+        line_toi_ss = (line_toi * 60) % 60
+        line_toi_mmss = "%02d:%02d" % (line_toi_mm, line_toi_ss)
+        line_cf_pct = get_nst_stat(line, 6)
+        line_cfpct_rel = get_nst_stat(line, 7)
+        line_gf_pct = get_nst_stat(line, 18)
+        line_scf_pct = get_nst_stat(line, 22)
+        line_hdcf_pct = get_nst_stat(line, 26)
+        line_stats.extend(
+            [line_players, line_toi_mmss, line_cf_pct, line_cfpct_rel,
+            line_gf_pct, line_scf_pct, line_hdcf_pct]
+        )
+
+        if idx == 0:
+            # Headers (Centered)
+            print("{: ^25s} {: ^10s} {: ^10s} {: ^10s} {: ^10s} {: ^10s} {: ^10s}".format(
+                "Players", "TOI", "CF%", "CF% REL", "GF%", "SCF%", "HDCF%")
+            )
+            # Dashes (not very readable, but I'm lazy)
+            print("-" * 25 + " " + " ".join([("-" * 10)] * 6))
+
+        print("{:25s} {:^10s} {:^10s} {:^10s} {:^10s} {:^10s} {:^10s}".format(*line_stats))
+
+    # print(f"{line_players} ({line_toi_mmss}) \t CF% {line_cf_pct} \t CF% REL {line_cfpct_rel} \t "
+    #         f"GF% {line_gf_pct} \t SCF% {line_scf_pct} \t HDCF% {line_hdcf_pct}")
+
 
 
 def hockeyref_goalie_against_team(goalie, opponent):
@@ -135,10 +262,6 @@ def hockeyref_goalie_against_team(goalie, opponent):
     return True
 
 
-def fantasy_lab_lines(game, preferred_team):
-    return True
-
-
 def dailyfaceoff_lines_parser(lines, soup):
     """ A sub-function of the dailyfaceoff_lines(...) that takes a BS4 Soup
         and parses it to break it down by individual player & position.
@@ -153,7 +276,7 @@ def dailyfaceoff_lines_parser(lines, soup):
 
     for player in soup:
         try:
-            soup_position = player['id']
+            soup_position = player["id"]
             line = soup_position[-1]
             position = soup_position[0:-1]
             player_position = f"{line}{position}"
@@ -162,7 +285,7 @@ def dailyfaceoff_lines_parser(lines, soup):
             # Add player & position to existing lines dictionary
             lines[player_position] = name
         except KeyError:
-            pass    # This is a valid exception - not a player.
+            pass  # This is a valid exception - not a player.
 
     return lines
 
@@ -188,7 +311,7 @@ def dailyfaceoff_lines(game, team):
 
     # Setup a Fake User Agent (simulates a real visit)
     ua = UserAgent()
-    ua_header = {'User-Agent':str(ua.chrome)}
+    ua_header = {"User-Agent": str(ua.chrome)}
 
     df_team_encoded = team.team_name.replace(" ", "-").replace("é", "e").lower()
     df_lines_url = df_linecombos_url.replace("TEAMNAME", df_team_encoded)
@@ -199,30 +322,29 @@ def dailyfaceoff_lines(game, team):
 
     # Grab the last update line from Daily Faceoff
     # If Update Time != Game Date, return not confirmed
-    soup_update = soup.find('div', class_="team-lineup-last-updated")
-    last_update = soup_update.text.replace('\n', '').strip().split(': ')[1]
+    soup_update = soup.find("div", class_="team-lineup-last-updated")
+    last_update = soup_update.text.replace("\n", "").strip().split(": ")[1]
     last_update_date = parse(last_update)
     game_day = parse(game.game_date_local)
     confirmed = bool(last_update_date.date() == game_day.date())
-    return_dict['confirmed'] = confirmed
+    return_dict["confirmed"] = confirmed
     # if not confirmed:
     #     return return_dict
 
     # If the lines are confirmed (updated today) then parse & return
     combos = soup.find("div", class_="team-line-combination-wrap")
-    soup_forwards = combos.find('table', {"id":"forwards"}).find('tbody').find_all('td')
-    soup_defense = combos.find('table', {"id":"defense"}).find('tbody').find_all('td')
+    soup_forwards = combos.find("table", {"id": "forwards"}).find("tbody").find_all("td")
+    soup_defense = combos.find("table", {"id": "defense"}).find("tbody").find_all("td")
 
     lines = dailyfaceoff_lines_parser(lines, soup_forwards)
     lines = dailyfaceoff_lines_parser(lines, soup_defense)
 
     # Put the lines in the return dictionary
     # And set the property on the team object
-    return_dict['lines'] = lines
+    return_dict["lines"] = lines
     team.lines = lines
 
     return return_dict
-
 
 
 def scouting_the_refs(game, pref_team):
@@ -240,7 +362,7 @@ def scouting_the_refs(game, pref_team):
 
     config = utils.load_config()
     refs_url = config["endpoints"]["scouting_refs"]
-    logging.info('Getting officials information from Scouting the Refs!')
+    logging.info("Getting officials information from Scouting the Refs!")
     response = thirdparty_request(refs_url).json()
 
     # If we get a bad response from the function above, return False
@@ -248,18 +370,23 @@ def scouting_the_refs(game, pref_team):
         return False
 
     for post in response:
-        categories = post.get('categories')
-        post_date = parse(post.get('date'))
+        categories = post.get("categories")
+        post_date = parse(post.get("date"))
         posted_today = bool(post_date.date() == datetime.today().date())
-        post_title = post.get('title').get('rendered')
+        post_title = post.get("title").get("rendered")
         # if (921 in categories and posted_today) or (posted_today and 'NHL' in post_title):
         if 921 in categories:
-            content = post.get('content').get('rendered')
+            content = post.get("content").get("rendered")
             soup = bs4_parse(content)
             break
 
     # TESTING
-    soup = BeautifulSoup(requests.get('https://scoutingtherefs.com/2019/04/25706/tonights-nhl-referees-and-linesmen-4-6-19/').content, 'lxml')
+    soup = BeautifulSoup(
+        requests.get(
+            "https://scoutingtherefs.com/2019/04/25706/tonights-nhl-referees-and-linesmen-4-6-19/"
+        ).content,
+        "lxml",
+    )
 
     # If we get some bad soup, return False
     if soup is None:
@@ -268,7 +395,7 @@ def scouting_the_refs(game, pref_team):
     games = soup.find_all("h1")
     for game in games:
         if pref_team.team_name in game.text:
-            game_details = game.find_next('table')
+            game_details = game.find_next("table")
             break
 
     return_referees = list()
@@ -283,9 +410,9 @@ def scouting_the_refs(game, pref_team):
         ref_career_games = refs_career_games[i].text
         if ref_name:
             ref_dict = dict()
-            ref_dict['name'] = ref_name
-            ref_dict['seasongames'] = ref_season_games
-            ref_dict['careergames'] = ref_career_games
+            ref_dict["name"] = ref_name
+            ref_dict["seasongames"] = ref_season_games
+            ref_dict["careergames"] = ref_career_games
             return_referees.append(ref_dict)
 
     linesmen = game_details.find_all("tr")[22].find_all("td")
@@ -297,15 +424,15 @@ def scouting_the_refs(game, pref_team):
         linesman_career_games = linesmen_career_games[i].text
         if linesman_name:
             linesman_dict = dict()
-            linesman_dict['name'] = linesman_name
-            linesman_dict['seasongames'] = linesman_season_games
-            linesman_dict['careergames'] = linesman_career_games
+            linesman_dict["name"] = linesman_name
+            linesman_dict["seasongames"] = linesman_season_games
+            linesman_dict["careergames"] = linesman_career_games
             return_linesmen.append(linesman_dict)
 
-    return_dict['referees'] = return_referees
-    return_dict['linesmen'] = return_linesmen
-    return_dict['confirmed'] = False if not bool(return_dict) else True
-    logging.debug('Scouting the Refs - %s', return_dict)
+    return_dict["referees"] = return_referees
+    return_dict["linesmen"] = return_linesmen
+    return_dict["confirmed"] = False if not bool(return_dict) else True
+    logging.debug("Scouting the Refs - %s", return_dict)
     return return_dict
 
 

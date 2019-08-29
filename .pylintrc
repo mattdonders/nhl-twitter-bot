@@ -14,4 +14,4 @@ disable=invalid-name, broad-except, no-else-return
 ignored-classes=responses,_Config
 
 [FORMAT]
---max-line-length=110
+--max-line-length=120

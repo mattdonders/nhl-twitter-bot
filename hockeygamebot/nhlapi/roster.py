@@ -3,7 +3,7 @@ Functions pertaining to the NHL Roster (via API).
 """
 import logging
 
-from hockeygamebot import nhlapi
+from hockeygamebot.nhlapi import livefeed, api
 from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.models.sessions import SessionFactory
 
@@ -28,14 +28,17 @@ def gameday_roster_update(game):
     logging.info("Getting gameday rosters from Live Feed endpoint.")
 
     try:
-        gameday_roster = nhlapi.api.nhl_api(game.live_feed).json()
+        gameday_roster = livefeed.get_livefeed(game.game_id)
         all_players = gameday_roster.get("gameData").get("players")
         for player_id, player in all_players.items():
-            team = player.get("currentTeam").get("name")
-            if team == home_team.team_name:
-                home_team.gameday_roster[player_id] = player
-            else:
-                away_team.gameday_roster[player_id] = player
+            try:
+                team = player.get("currentTeam").get("name")
+                if team == home_team.team_name:
+                    home_team.gameday_roster[player_id] = player
+                else:
+                    away_team.gameday_roster[player_id] = player
+            except Exception as e:
+                logging.error("%s doesn't have a team - skipping.", player["fullName"])
     except Exception as e:
         logging.error("Unable to get all players.")
         logging.error(e)
@@ -71,6 +74,6 @@ def nonroster_player_attr_by_id(player_id, attribute):
         string: Attribute of the person requested.
     """
     api_player_url = f"/people/{[player_id]}"
-    api_player = nhlapi.nhl_api(api_player_url).json()
+    api_player = api.nhl_api(api_player_url).json()
     player_attr = api_player["people"][0][attribute]
     return player_attr

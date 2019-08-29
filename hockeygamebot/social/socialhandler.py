@@ -4,11 +4,12 @@ social networks in our configuration file.
 """
 import logging
 
-from hockeygamebot.helpers import arguments
+from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.helpers.config import config
 from hockeygamebot.social import discord, slack, twitter
 
 
+@utils.check_social_timeout
 def send(msg, **kwargs):
     """ The handler function that takes a message and a set of key-value arguments
         to be routed to social media functions.
@@ -32,6 +33,8 @@ def send(msg, **kwargs):
 
     if args.notweets:
         logging.info("[SOCIAL] %s", msg)
+        if kwargs.get("media"):
+            kwargs.get("media").show()
         return return_dict
 
     if social_config["twitter"]:
