@@ -38,10 +38,11 @@ def send(msg, **kwargs):
         return return_dict
 
     if social_config["twitter"]:
-        pass
+        tweet_id = twitter.send_tweet(msg, media=kwargs.get("media"), reply=kwargs.get("reply"))
+        return_dict["twitter"] = tweet_id
 
     if social_config["discord"]:
-        discord.send_discord_textonly(msg)
+        discord.send_discord(msg, media=kwargs.get("media"))
 
     if social_config["slack"]:
         pass

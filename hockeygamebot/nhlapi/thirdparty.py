@@ -304,6 +304,8 @@ def dailyfaceoff_lines(game, team):
 
     # Instantiate blank dictionaries
     return_dict = dict()
+    fwd_lines = dict()
+    def_lines = dict()
     lines = dict()
 
     config = utils.load_config()
@@ -336,13 +338,21 @@ def dailyfaceoff_lines(game, team):
     soup_forwards = combos.find("table", {"id": "forwards"}).find("tbody").find_all("td")
     soup_defense = combos.find("table", {"id": "defense"}).find("tbody").find_all("td")
 
-    lines = dailyfaceoff_lines_parser(lines, soup_forwards)
-    lines = dailyfaceoff_lines_parser(lines, soup_defense)
+    # fwd_lines = dailyfaceoff_lines_parser(lines, soup_forwards)
+    # def_lines = dailyfaceoff_lines_parser(lines, soup_defense)
+    fwd_lines = dailyfaceoff_lines_parser(fwd_lines, soup_forwards)
+    def_lines = dailyfaceoff_lines_parser(def_lines, soup_defense)
+
+    # dict1.update(dict2) merges the two dictionaries together
+    # res = {**dict1, **dict2}
+    all_lines = {**fwd_lines, **def_lines}
 
     # Put the lines in the return dictionary
     # And set the property on the team object
-    return_dict["lines"] = lines
-    team.lines = lines
+    return_dict["fwd"] = fwd_lines
+    return_dict["def"] = def_lines
+    return_dict["lines"] = all_lines
+    team.lines = all_lines
 
     return return_dict
 
@@ -507,10 +517,12 @@ def dailyfaceoff_goalies(pref_team, other_team, pref_homeaway):
             if pref_homeaway == "home":
                 return_dict["pref"] = home_goalie
                 return_dict["other"] = away_goalie
+                return_dict["pref"]["homeaway"] = "home"
+                return_dict["other"]["homeaway"] = "away"
             else:
                 return_dict["pref"] = away_goalie
-                return_dict["pref"]["homeaway"] = "away"
                 return_dict["other"] = home_goalie
+                return_dict["pref"]["homeaway"] = "away"
                 return_dict["other"]["homeaway"] = "home"
 
             return_dict["home"] = home_goalie

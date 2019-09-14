@@ -121,7 +121,7 @@ def get_next_game(team_id: int) -> dict:
     return next_game
 
 
-def season_series(game_id, pref_team, other_team):
+def season_series(game_id, pref_team, other_team, last_season=False):
     """Generates season series, points leader & TOI leader.
 
     Args:
@@ -147,15 +147,28 @@ def season_series(game_id, pref_team, other_team):
     pref_record = {"wins": 0, "losses": 0, "ot": 0}
     roster_player = True
 
-    season_start = str(game_id)[0:4]
-    season_end = str(int(season_start) + 1)
-    yesterday = datetime.now() - timedelta(days=1)
-    # yesterday = datetime.now() + timedelta(days=50)
-    schedule_url = (
-        f"/schedule?teamId={pref_team.team_id}"
-        f"&expand=schedule.broadcasts,schedule.teams&startDate="
-        f"{season_start}-08-01&endDate={yesterday:%Y-%m-%d}"
-    )
+    # If this is the first game of the season, we can set the 'last_season' flag to enable the
+    # season series function to check last year's season series between the two teams.
+    if not last_season:
+        season_start = str(game_id)[0:4]
+        season_end = str(int(season_start) + 1)
+        yesterday = datetime.now() - timedelta(days=1)
+        # yesterday = datetime.now() + timedelta(days=50)
+        schedule_url = (
+            f"/schedule?teamId={pref_team.team_id}"
+            f"&expand=schedule.broadcasts,schedule.teams&startDate="
+            f"{season_start}-08-01&endDate={yesterday:%Y-%m-%d}"
+        )
+    else:
+        season_start = int(str(game_id)[0:4]) - 1
+        season_end = str(int(season_start) + 1)
+        yesterday = datetime.now() - timedelta(days=1)
+        # yesterday = datetime.now() + timedelta(days=50)
+        schedule_url = (
+            f"/schedule?teamId={pref_team.team_id}"
+            f"&expand=schedule.broadcasts,schedule.teams&startDate="
+            f"{season_start}-08-01&endDate={season_end}-06-01"
+        )
 
     schedule = api.nhl_api(schedule_url).json()
     dates = schedule["dates"]

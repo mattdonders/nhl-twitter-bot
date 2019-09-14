@@ -5,7 +5,9 @@ This module contains all functions pertaining to a game in Preview State.
 """
 
 import logging
+import os
 
+from hockeygamebot.definitions import IMAGES_PATH
 from hockeygamebot.core import images
 from hockeygamebot.helpers import utils
 from hockeygamebot.models.gametype import GameType
@@ -70,26 +72,62 @@ def generate_game_preview(game):
 
     # Generate pre-game image
     pregame_image = images.pregame_image(game)
+    img_filename = os.path.join(IMAGES_PATH, f"temp/Pregame-{game.preferred_team.games + 1}.png")
+    pregame_image.save(img_filename)
 
     # Send preview tweet w/ pre-game image to social media handler
-    game.pregame_lasttweet = socialhandler.send(msg=preview_tweet_text, media=pregame_image)
+    social_dict = socialhandler.send(msg=preview_tweet_text, media=img_filename, force_send=True)
+    game.pregame_lasttweet = social_dict["twitter"]
 
     # Generate Season Series Data
     season_series = schedule.season_series(game.game_id, pref_team, other_team)
     season_series_string = season_series[0]
 
     if season_series_string is None:
-        season_series_tweet_text = (
-            f"This is the first meeting of the season between "
-            f"the {pref_team.short_name} & the {other_team.short_name}.\n\n"
-            f"{pref_hashtag} {other_hashtag} {game.game_hashtag}"
+        # If this is the first game of the season, we can set the 'last_season' flag to enable the
+        # season series function to check last year's season series between the two teams.
+        logging.info(
+            "First game of the season - re-run the season series function with the last_season flag."
         )
+
+        season_series = schedule.season_series(
+            game.game_id, pref_team, other_team, last_season=True
+        )
+
+        season_series_string = season_series[0]
+        season_series_string = (
+            f"This is the first meeting of the season between the "
+            f"{pref_team.short_name} & the {other_team.short_name}. "
+            f"Last season -\n\n{season_series_string}"
+        )
+
+        # season_series_tweet_text = (
+        #     f"This is the first meeting of the season between the "
+        #     f"{pref_team.short_name} & the {other_team.short_name}. "
+        #     f"Last season's stats -"
+        #     f"\n\n{season_series_string}\n{points_leader_str}\n{toi_leader_str}"
+        #     f"\n\n{pref_hashtag} {other_hashtag} {game.game_hashtag}"
+        # )
+
+    # Extract strings from returned list / tuple
+    points_leader_str = season_series[1]
+    toi_leader_str = season_series[2]
+
+    if game.game_type == "P":
+        # season_series_str = season_series_str.replace("season series", "regular season series")
+        season_series_string = f"Regular Season Stats -\n\n{season_series_string}"
+
+    season_series_tweet_text = (
+        f"{season_series_string}\n{points_leader_str}\n{toi_leader_str}"
+        f"\n\n{pref_hashtag} {other_hashtag} {game.game_hashtag}"
+    )
 
     # logging.info(preview_tweet_text)
     # logging.info(season_series_tweet_text)
-    game.pregame_lasttweet = socialhandler.send(
-        msg=season_series_tweet_text, reply=game.pregame_lasttweet
+    social_dict = socialhandler.send(
+        msg=season_series_tweet_text, reply=game.pregame_lasttweet, force_send=True
     )
+    game.pregame_lasttweet = social_dict["twitter"]
     game.pregametweets["core"] = True
 
 
@@ -118,44 +156,190 @@ def game_preview_others(game):
     pref_team, other_team = game.get_preferred_team()
     pref_team_homeaway = game.preferred_team.home_away
 
+    # Get Team Hashtags
+    pref_hashtag = utils.team_hashtag(pref_team.team_name, game.game_type)
+    other_hashtag = utils.team_hashtag(other_team.team_name, game.game_type)
+
+    # Process the pre-game information for the starting goalies
     if not game.pregametweets["goalies_pref"] or not game.pregametweets["goalies_other"]:
+        logging.info("One of the two goalies is not yet confirmed - getting their info now.")
+        goalies_confirmed_values = ("Confirmed", "Likely", "Unconfirmed")
         # goalies_confirmed_values = ("Confirmed", "Likely")
         try:
             goalies_df = thirdparty.dailyfaceoff_goalies(pref_team, other_team, pref_team_homeaway)
             logging.info(goalies_df)
+
+            goalie_confirm_pref = bool(
+                goalies_df.get("pref").get("confirm") in goalies_confirmed_values
+            )
+            goalie_confirm_other = bool(
+                goalies_df.get("pref").get("confirm") in goalies_confirmed_values
+            )
+
+            logging.info("Goalie Confirmed PREF : %s", goalie_confirm_pref)
+            logging.info("Goalie Confirmed OTHER : %s", goalie_confirm_other)
+
+            if goalie_confirm_pref and not game.pregametweets["goalies_pref"]:
+                try:
+                    goalie_pref = goalies_df.get("pref")
+                    goalie_pref_name = goalie_pref.get("name")
+                    goalie_pref_confirm = goalie_pref.get("confirm")
+                    goalie_pref_season = goalie_pref.get("season")
+                    goalie_hr_pref = thirdparty.hockeyref_goalie_against_team(
+                        goalie_pref_name, game.other_team.team_name
+                    )
+                    logging.info("Hockey Reference Goalie PREF : %s", goalie_hr_pref)
+
+                    pref_goalie_tweet_text = (
+                        f"{goalie_pref_confirm} goalie for the {pref_team.short_name} -\n"
+                        f"(via @DailyFaceoff)\n\n{goalie_pref_name}\n"
+                        f"Season Stats: {goalie_pref_season}\n"
+                        f"Career (vs. {other_team.short_name}): {goalie_hr_pref}\n\n"
+                        f"{pref_hashtag} {game.game_hashtag}\n(via @DailyFaceoff)"
+                    )
+
+                    social_dict = socialhandler.send(
+                        msg=pref_goalie_tweet_text, reply=game.pregame_lasttweet, force_send=True
+                    )
+                    game.pregame_lasttweet = social_dict["twitter"]
+                    game.pregametweets["goalies_pref"] = True
+
+                except Exception as e:
+                    logging.error(
+                        "Exception getting PREFERRED Hockey Reference splits - try again next loop."
+                    )
+                    logging.error(e)
+            else:
+                logging.info("Preferred goalie not yet confirmed - try again next loop.")
+
+            if goalie_confirm_other and not game.pregametweets["goalies_other"]:
+                try:
+                    goalie_other = goalies_df.get("other")
+                    goalie_other_name = goalie_other.get("name")
+                    goalie_other_confirm = goalie_other.get("confirm")
+                    goalie_other_season = goalie_other.get("season")
+                    goalie_hr_other = thirdparty.hockeyref_goalie_against_team(
+                        goalie_other_name, game.preferred_team.team_name
+                    )
+                    logging.info("Hockey Reference Goalie OTHER : %s", goalie_hr_other)
+
+                    other_goalie_tweet_text = (
+                        f"{goalie_other_confirm} goalie for the {other_team.short_name} -\n"
+                        f"(via @DailyFaceoff)\n\n{goalie_other_name}\n"
+                        f"Season Stats: {goalie_other_season}\n"
+                        f"Career (vs. {pref_team.short_name}): {goalie_hr_other}\n\n"
+                        f"{other_hashtag} {game.game_hashtag}"
+                    )
+
+                    social_dict = socialhandler.send(
+                        msg=other_goalie_tweet_text, reply=game.pregame_lasttweet, force_send=True
+                    )
+
+                    game.pregame_lasttweet = social_dict["twitter"]
+                    game.pregametweets["goalies_other"] = True
+
+                except Exception as e:
+                    logging.error(
+                        "Exception getting OTHER Hockey Reference splits - try again next loop."
+                    )
+                    logging.error(e)
+            else:
+                logging.info("Other goalie not yet confirmed - try again next loop.")
+
         except Exception as e:
             logging.error("Exception getting Daily Faceoff goalies - try again next loop.")
             logging.error(e)
 
+    # Process the pre-game information for the game officials
+    if not game.pregametweets["officials"]:
         try:
-            goalie_away = goalies_df.get("away").get("name")
-            goalie_home = goalies_df.get("home").get("name")
-            goalie_hr_home = thirdparty.hockeyref_goalie_against_team(
-                goalie_home, game.away_team.team_name
-            )
-            logging.info(goalie_hr_home)
-            goalie_hr_away = thirdparty.hockeyref_goalie_against_team(
-                goalie_away, game.home_team.team_name
-            )
-            logging.info(goalie_hr_away)
+            officials = thirdparty.scouting_the_refs(game, pref_team)
+            logging.info(officials)
+
+            officials_confirmed = officials.get("confirmed")
+
+            if officials_confirmed:
+                officials_tweet_text = (
+                    f"The officials for {game.game_hashtag} are -\n(via @ScoutingTheRefs)"
+                )
+                for key, attrs in officials.items():
+                    if key == "confirmed":
+                        continue
+                    officials_tweet_text = f"{officials_tweet_text}\n\n{key.title()}:"
+                    for official in attrs:
+                        official_name = official.get("name")
+                        official_season = official.get("seasongames")
+                        official_career = official.get("careergames")
+                        official_detail = (
+                            f"{official_name} (Games: {official_season} / {official_career})"
+                        )
+                        officials_tweet_text = f"{officials_tweet_text}\n- {official_detail}"
+
+                social_dict = socialhandler.send(
+                    msg=officials_tweet_text, reply=game.pregame_lasttweet, force_send=True
+                )
+
+                game.pregame_lasttweet = social_dict["twitter"]
+                game.pregametweets["officials"] = True
+            else:
+                logging.info("Officials not yet confirmed - try again next loop.")
+
         except Exception as e:
-            logging.error("Exception getting Hockey Reference splits - try again next loop.")
+            logging.error("Exception getting Scouting the Refs information - try again next loop.")
             logging.error(e)
 
+    # Process the pre-game information for the preferred team lines
     if not game.pregametweets["lines"]:
         try:
             lines = thirdparty.dailyfaceoff_lines(game, pref_team)
             logging.info(lines)
-        except Exception as e:
-            logging.error("Exception getting lines from Daily Faceoff - try again next loop.")
-            logging.error(e)
 
-    if not game.pregametweets["refs"]:
-        try:
-            officials = thirdparty.scouting_the_refs(game, pref_team)
-            logging.info(officials)
+            # Iterate over the forwards dictionary & take into account 11/7 lineups
+            fwd_line_string = list()
+            fwd_all_list = list()
+            fwds = lines.get("fwd")
+            fwd_num = len(fwds.items())
+            for idx, (_, player) in enumerate(fwds.items()):
+                last_name = " ".join(player.split()[1:])
+                fwd_line_string.append(last_name)
+                if len(fwd_line_string) == 3 or (idx + 1) == fwd_num:
+                    fwd_line_string = " - ".join(fwd_line_string)
+                    fwd_all_list.append(fwd_line_string)
+                    fwd_line_string = list()
+
+            # Iterate over the defense dictionary & take into account 11/7 lineups
+            def_line_string = list()
+            def_all_list = list()
+            defs = lines.get("def")
+            def_num = len(defs.items())
+            for idx, (_, player) in enumerate(defs.items()):
+                last_name = " ".join(player.split()[1:])
+                def_line_string.append(last_name)
+                if len(def_line_string) == 2 or (idx + 1) == def_num:
+                    def_line_string = " - ".join(def_line_string)
+                    def_all_list.append(def_line_string)
+                    def_line_string = list()
+
+            # Combine the 'all-strings' separated by new lines
+            fwd_all_string = "\n".join(fwd_all_list)
+            def_all_string = "\n".join(def_all_list)
+
+            lines_tweet_text = (
+                f"{pref_hashtag} Forwards:\n{fwd_all_string}\n\n"
+                f"{pref_hashtag} Defense:\n{def_all_string}\n\n"
+            )
+
+            social_dict = socialhandler.send(
+                msg=lines_tweet_text, reply=game.pregame_lasttweet, force_send=True
+            )
+
+            game.pregame_lasttweet = social_dict["twitter"]
+            game.pregametweets["lines"] = True
+
         except Exception as e:
-            logging.error("Exception getting Scouting the Refs information - try again next loop.")
+            logging.error(
+                "Exception getting Daily Faceoff lines information - try again next loop."
+            )
             logging.error(e)
 
     # Check if all pre-game tweets are sent

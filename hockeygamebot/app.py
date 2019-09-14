@@ -182,7 +182,8 @@ def run():
     if not game_today:
         sys.exit()
 
-    # logging.info("%s", game_info)
+    # For debugging purposes, print all game_info
+    logging.debug("%s", game_info)
 
     # Create the Home & Away Team objects
     away_team = Team.from_json(game_info, "away")

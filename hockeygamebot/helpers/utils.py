@@ -24,7 +24,6 @@ def check_social_timeout(func):
         if we should send this event to social media. This can only wrap
         functions that have an attribute of a GameEvent.
 
-        #TODO: Fix 0th element issue
     """
 
     @functools.wraps(func)
@@ -36,8 +35,12 @@ def check_social_timeout(func):
         if parsed_args.notweets:
             return func(*args, **kwargs)
 
+        # Check for a force-send flag & if not False, force the message through
+        if kwargs.get("force_send"):
+            return func(*args, **kwargs)
+
         try:
-            event = args[0]
+            event = kwargs.get("event")
             event_time = dateutil.parser.parse(event.date_time)
             timeout = config["script"]["event_timeout"]
             utcnow = datetime.now(timezone.utc)
@@ -53,7 +56,7 @@ def check_social_timeout(func):
                 )
                 return False
         except:
-            logging.warning("Timeout function should contain a event as the 0th element.")
+            logging.warning("Timeout function should contain an event key:value.")
             return func(*args, **kwargs)
 
     return wrapper_social_timeout

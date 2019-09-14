@@ -70,7 +70,7 @@ class Game:
         self.pregametweets = {
             "core": False,
             "lines": False,
-            "refs": False,
+            "officials": False,
             "goalies_pref": False,
             "goalies_other": False,
         }
