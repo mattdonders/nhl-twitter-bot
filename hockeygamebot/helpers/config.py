@@ -2,6 +2,8 @@
 This module contains a single Configuration class used for read-only once.
 """
 
+# pylint: disable=too-few-public-methods
+
 import yaml
 
 from hockeygamebot.definitions import CONFIG_PATH

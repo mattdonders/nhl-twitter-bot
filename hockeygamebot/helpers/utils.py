@@ -7,7 +7,6 @@ import functools
 import logging
 import math
 import os
-import sys
 from datetime import datetime, timezone
 
 import dateutil.parser
@@ -55,8 +54,8 @@ def check_social_timeout(func):
                     time_since_event,
                 )
                 return False
-        except:
-            logging.warning("Timeout function should contain an event key:value.")
+        except Exception as e:
+            logging.warning("Timeout function should contain an event key:value. %s", e)
             return func(*args, **kwargs)
 
     return wrapper_social_timeout
@@ -136,6 +135,15 @@ def ordinal(n):
 
 
 def date_parser(date):
+    """ Converts a string in Y-m-d format to datetime object.
+
+    Args:
+        date: a string in Y-m-d format
+
+    Returns:
+        date_dt: the passed in date as a datetime object
+    """
+
     try:
         date_dt = datetime.strptime(date, "%Y-%m-%d")
         return date_dt
@@ -280,6 +288,8 @@ def calculate_shot_distance(x: int, y: int) -> str:
         shot_text: shot distance with unit
     """
 
+    x = abs(x)
+
     shot_dist = math.ceil(math.hypot(x - 89, y))
     shot_unit = "foot" if shot_dist == 1 else "feet"
     shot_text = f"{shot_dist} {shot_unit}"
@@ -301,3 +311,26 @@ def time_remain_converter(time: str) -> str:
 
     time_new = f"{seconds} seconds" if minutes == "00" else time
     return time_new
+
+
+# def localdata_simulator(directory, game, sleep):
+#     """ Takes a directory of json livefeed files & simulates a live game.
+
+#     Args:
+#         directory: directory of live feed json files
+#         game: current game object
+#         sleep: time in seconds to sleep between each parsing event
+
+#     Returns:
+#         data: livefeed response (similar to API response)
+#     """
+
+#     for file in os.listdir(directory):
+#         filename = os.fsdecode(file)
+#         if filename.endswith(".json"):
+#             feed_json = os.path.join(directory, filename)
+#             with open(feed_json) as json_file:
+#                 data = json.load(json_file)
+#             live.live_loop(livefeed=data, game=game)
+#             game.update_game(data)
+#             time.sleep(sleep)

@@ -2,8 +2,9 @@
 The main application entrypoint in the hockeygamebot script!
 """
 
-# pylint: disable=broad-except
+# pylint: disable=broad-except, too-many-statements, too-many-branches, too-many-nested-blocks
 
+import json
 import logging
 import os
 import sys
@@ -34,6 +35,8 @@ def start_game_loop(game: Game):
     Returns:
         None
     """
+
+    args = arguments.get_arguments()
     config = utils.load_config()
 
     # ------------------------------------------------------------------------------
@@ -45,7 +48,7 @@ def start_game_loop(game: Game):
             if game.game_time_countdown > 0:
                 logging.info("Game is in Preview state - send out all pregame information.")
                 # The core game preview function should run only once
-                if not game.pregametweets["core"]:
+                if not game.preview_socials.core_sent:
                     preview.generate_game_preview(game)
 
                 # The other game preview function should run every xxx minutes
@@ -67,16 +70,42 @@ def start_game_loop(game: Game):
                 logging.info(
                     "Game is LIVE - checking events after event Idx %s.", game.last_event_idx
                 )
+
+                # On my development machine, this command starts the files for this game
+                # python -m hockeygamebot --console --notweets --team 'Vancouver Canucks' --date '2019-09-17' --localdata
+                if args.localdata:
+                    logging.info(
+                        "SIMULATION DETECTED - running a live game replay for Game %s (%s vs. %s).",
+                        game.game_id,
+                        game.home_team.team_name,
+                        game.away_team.team_name,
+                    )
+                    directory = "/Users/mattdonders/Development/python/devils-goal-twitter-bitbucket/scratchpad/feed-samples"
+                    for file in sorted(os.listdir(directory)):
+                        filename = os.fsdecode(file)
+                        if filename.endswith(".json"):
+                            feed_json = os.path.join(directory, filename)
+                            with open(feed_json) as json_file:
+                                data = json.load(json_file)
+
+                            live.live_loop(livefeed=data, game=game)
+                            game.update_game(data)
+                            time.sleep(1)
+
                 livefeed_resp = livefeed.get_livefeed(game.game_id)
                 # all_events = live.live_loop(livefeed=livefeed_resp, game=game)
                 live.live_loop(livefeed=livefeed_resp, game=game)
                 game.update_game(livefeed_resp)
                 # game_events = get_game_events(game_obj)
                 # loop_game_events(game_events, game_obj)
-                logging.info("Sleeping for configured live game time.")
+                logging.info(
+                    "Sleeping for configured live game time (%ss).",
+                    config["script"]["live_sleep_time"],
+                )
             except Exception as error:
                 logging.error(
-                    "Uncaught exception in live game loop - sleep for configured live game time."
+                    "Uncaught exception in live game loop - sleep for configured live game time (%ss).",
+                    config["script"]["live_sleep_time"],
                 )
                 logging.error(error)
 
@@ -95,8 +124,14 @@ def start_game_loop(game: Game):
             final.three_stars(livefeed=livefeed_resp, game=game)
             thirdparty.nst_linetool(game=game, team=game.preferred_team)
 
-            if game.final_socials.all_social_sent or game.final_socials.retries_exeeded:
-                logging.info("All socials sent or retries exceeded - ending game!")
+            # If we have exceeded the number of retries, stop pinging NST
+            if game.final_socials.retries_exeeded:
+                game.final_socials.nst_linetool_sent = True
+
+            if game.final_socials.all_social_sent:
+                logging.info(
+                    "All end of game socials sent  or retries were exceeded - ending game!"
+                )
                 end_game_loop(game=game)
 
             # If all socials aren't sent or retry limit is not exceeded, sleep & check again.
@@ -145,7 +180,7 @@ def run():
     utils.setup_logging()
 
     # Get the team name the bot is running as
-    team_name = config["default"]["team_name"]
+    team_name = args.team if args.team else config["default"]["team_name"]
 
     # ------------------------------------------------------------------------------
     # PRE-SCRIPT STARTS PROCESSING BELOW
@@ -161,24 +196,25 @@ def run():
         "ARGS - notweets: %s, console: %s, teamoverride: %s", args.notweets, args.console, args.team
     )
     logging.info(
-        "ARGS - debug: %s, debugtweets: %s, overridelines: %s",
+        "ARGS - debug: %s, debugsocial: %s, overridelines: %s",
         args.debug,
-        args.debugtweets,
+        args.debugsocial,
         args.overridelines,
     )
+    logging.info("ARGS - date: %s, split: %s, localdata: %s", args.date, args.split, args.localdata)
     logging.info(
-        "ARGS - date: %s, split: %s, localdata: %s, discord: %s",
-        args.date,
-        args.split,
-        args.localdata,
-        args.discord,
+        "SOCIAL - twitter: %s, discord: %s, slack: %s",
+        config["socials"]["twitter"],
+        config["socials"]["discord"],
+        config["socials"]["slack"],
     )
     logging.info("%s\n", "#" * 80)
 
     # Check if there is a game scheduled for today -
     # If there is no game, exit the script.
     date = utils.date_parser(args.date) if args.date else datetime.now()
-    game_today, game_info = schedule.is_game_today(1, date)
+    team_id = schedule.get_team_id(team_name)
+    game_today, game_info = schedule.is_game_today(team_id, date)
     if not game_today:
         sys.exit()
 
@@ -203,6 +239,9 @@ def run():
     # Create the Game Object!
     game = Game.from_json_and_teams(game_info, home_team, away_team)
 
+    # Override Game State for localdata testing
+    game.game_state = "Live" if args.localdata else game.game_state
+
     # Update the Team Objects with the gameday rosters
     roster.gameday_roster_update(game)
 
@@ -219,4 +258,5 @@ if __name__ == "__main__":
     game = run()
 
     # All necessary Objects are created, start the game loop!
+    logging.info("Starting main game loop now!")
     start_game_loop(game)

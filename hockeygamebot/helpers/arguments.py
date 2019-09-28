@@ -34,6 +34,7 @@ def _parse_local_arguments(sysargs):
     parser.add_argument("--debug", help="print debug log items", action="store_true")
     parser.add_argument("--team", help="override team in configuration", action="store")
     parser.add_argument("--debugtweets", help="send tweets from debug account", action="store_true")
+    parser.add_argument("--debugsocial", help="use debug social accounts", action="store_true")
     parser.add_argument("--localdata", help="use local data instead of API", action="store_true")
     parser.add_argument(
         "--overridelines", help="override lines if None are returned", action="store_true"
@@ -71,8 +72,8 @@ def _parse_env_variables(args):
     if "ARGS_TEAM" in os.environ:
         args.team = os.environ["ARGS_TEAM"]
 
-    if "ARGS_DEBUGTWEETS" in os.environ and os.environ["ARGS_DEBUGTWEETS"] == "TRUE":
-        args.debugtweets = True
+    if "ARGS_DEBUGSOCIAL" in os.environ and os.environ["ARGS_DEBUGSOCIAL"] == "TRUE":
+        args.debugsocial = True
 
     if "ARGS_DATE" in os.environ:
         args.date = os.environ["ARGS_DATE"]

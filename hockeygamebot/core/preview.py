@@ -16,7 +16,7 @@ from hockeygamebot.nhlapi import schedule, thirdparty
 from hockeygamebot.social import socialhandler
 
 
-def generate_game_preview(game):
+def generate_game_preview(game: Game):
     """Generates and sends the game preview to social media.
 
     This function runs when the game is in Preview State and it is not yet
@@ -33,13 +33,13 @@ def generate_game_preview(game):
     logging.info("Game Date: Local - %s, UTC - %s", game.game_time_local, game.date_time)
 
     # Load our Config
-    config = utils.load_config()
-    preview_sleep_time = config["script"]["preview_sleep_time"]
-    preview_sleep_mins = preview_sleep_time / 60
+    # config = utils.load_config()
+    # preview_sleep_time = config["script"]["preview_sleep_time"]
+    # preview_sleep_mins = preview_sleep_time / 60
 
     # Get the preferred team, other teams & homeaway from the Game object
     pref_team, other_team = game.get_preferred_team()
-    pref_team_homeaway = game.preferred_team.home_away
+    # pref_team_homeaway = game.preferred_team.home_away
 
     # Get Team Hashtags
     pref_hashtag = utils.team_hashtag(pref_team.team_name, game.game_type)
@@ -69,6 +69,7 @@ def generate_game_preview(game):
 
     # Generate final preview tweet text
     preview_tweet_text = f"{preview_text_teams}\n\n{preview_text_emojis}"
+    game.preview_socials.core_msg = preview_tweet_text
 
     # Generate pre-game image
     pregame_image = images.pregame_image(game)
@@ -122,16 +123,20 @@ def generate_game_preview(game):
         f"\n\n{pref_hashtag} {other_hashtag} {game.game_hashtag}"
     )
 
+    game.preview_socials.season_series_msg = season_series_tweet_text
+
     # logging.info(preview_tweet_text)
     # logging.info(season_series_tweet_text)
     social_dict = socialhandler.send(
         msg=season_series_tweet_text, reply=game.pregame_lasttweet, force_send=True
     )
+
     game.pregame_lasttweet = social_dict["twitter"]
-    game.pregametweets["core"] = True
+    game.preview_socials.core_sent = True
+    game.preview_socials.season_series_sent = True
 
 
-def game_preview_others(game):
+def game_preview_others(game: Game):
     """ Other game preview information (excluding our core game preview).
         This includes things like goalies, lines, referees, etc.
 
@@ -161,10 +166,10 @@ def game_preview_others(game):
     other_hashtag = utils.team_hashtag(other_team.team_name, game.game_type)
 
     # Process the pre-game information for the starting goalies
-    if not game.pregametweets["goalies_pref"] or not game.pregametweets["goalies_other"]:
+    if not game.preview_socials.goalies_pref_sent or not game.preview_socials.goalies_other_sent:
         logging.info("One of the two goalies is not yet confirmed - getting their info now.")
-        goalies_confirmed_values = ("Confirmed", "Likely", "Unconfirmed")
-        # goalies_confirmed_values = ("Confirmed", "Likely")
+        # goalies_confirmed_values = ("Confirmed", "Likely", "Unconfirmed")
+        goalies_confirmed_values = ("Confirmed", "Likely")
         try:
             goalies_df = thirdparty.dailyfaceoff_goalies(pref_team, other_team, pref_team_homeaway)
             logging.info(goalies_df)
@@ -179,7 +184,7 @@ def game_preview_others(game):
             logging.info("Goalie Confirmed PREF : %s", goalie_confirm_pref)
             logging.info("Goalie Confirmed OTHER : %s", goalie_confirm_other)
 
-            if goalie_confirm_pref and not game.pregametweets["goalies_pref"]:
+            if goalie_confirm_pref and not game.preview_socials.goalies_pref_sent:
                 try:
                     goalie_pref = goalies_df.get("pref")
                     goalie_pref_name = goalie_pref.get("name")
@@ -195,14 +200,14 @@ def game_preview_others(game):
                         f"(via @DailyFaceoff)\n\n{goalie_pref_name}\n"
                         f"Season Stats: {goalie_pref_season}\n"
                         f"Career (vs. {other_team.short_name}): {goalie_hr_pref}\n\n"
-                        f"{pref_hashtag} {game.game_hashtag}\n(via @DailyFaceoff)"
+                        f"{pref_hashtag} {game.game_hashtag}"
                     )
 
                     social_dict = socialhandler.send(
                         msg=pref_goalie_tweet_text, reply=game.pregame_lasttweet, force_send=True
                     )
                     game.pregame_lasttweet = social_dict["twitter"]
-                    game.pregametweets["goalies_pref"] = True
+                    game.preview_socials.goalies_pref_sent = True
 
                 except Exception as e:
                     logging.error(
@@ -212,7 +217,7 @@ def game_preview_others(game):
             else:
                 logging.info("Preferred goalie not yet confirmed - try again next loop.")
 
-            if goalie_confirm_other and not game.pregametweets["goalies_other"]:
+            if goalie_confirm_other and not game.preview_socials.goalies_other_sent:
                 try:
                     goalie_other = goalies_df.get("other")
                     goalie_other_name = goalie_other.get("name")
@@ -236,7 +241,7 @@ def game_preview_others(game):
                     )
 
                     game.pregame_lasttweet = social_dict["twitter"]
-                    game.pregametweets["goalies_other"] = True
+                    game.preview_socials.goalies_other_sent = True
 
                 except Exception as e:
                     logging.error(
@@ -251,7 +256,7 @@ def game_preview_others(game):
             logging.error(e)
 
     # Process the pre-game information for the game officials
-    if not game.pregametweets["officials"]:
+    if not game.preview_socials.officials_sent:
         try:
             officials = thirdparty.scouting_the_refs(game, pref_team)
             logging.info(officials)
@@ -280,7 +285,7 @@ def game_preview_others(game):
                 )
 
                 game.pregame_lasttweet = social_dict["twitter"]
-                game.pregametweets["officials"] = True
+                game.preview_socials.officials_sent = True
             else:
                 logging.info("Officials not yet confirmed - try again next loop.")
 
@@ -289,7 +294,7 @@ def game_preview_others(game):
             logging.error(e)
 
     # Process the pre-game information for the preferred team lines
-    if not game.pregametweets["lines"]:
+    if not game.preview_socials.lines_sent:
         try:
             lines = thirdparty.dailyfaceoff_lines(game, pref_team)
             logging.info(lines)
@@ -334,7 +339,7 @@ def game_preview_others(game):
             )
 
             game.pregame_lasttweet = social_dict["twitter"]
-            game.pregametweets["lines"] = True
+            game.preview_socials.lines_sent = True
 
         except Exception as e:
             logging.error(

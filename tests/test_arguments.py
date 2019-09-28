@@ -26,7 +26,7 @@ def test_no_arguments():
     default_args = [
         args.console,
         args.date,
-        args.debugtweets,
+        args.debugsocial,
         args.discord,
         args.docker,
         args.localdata,

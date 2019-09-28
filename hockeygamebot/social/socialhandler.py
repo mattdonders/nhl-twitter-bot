@@ -8,6 +8,8 @@ from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.helpers.config import config
 from hockeygamebot.social import discord, slack, twitter
 
+from PIL import Image  # Used for debugging images (notweets)
+
 
 @utils.check_social_timeout
 def send(msg, **kwargs):
@@ -16,7 +18,7 @@ def send(msg, **kwargs):
 
     Args:
         message: The main message to be sent to all social media sites.
-        #TODO: **kwargs
+        # TODO: **kwargs
 
     Returns:
         None
@@ -34,7 +36,8 @@ def send(msg, **kwargs):
     if args.notweets:
         logging.info("[SOCIAL] %s", msg)
         if kwargs.get("media"):
-            kwargs.get("media").show()
+            Image.open(kwargs.get("media")).show()
+            # kwargs.get("media").show()
         return return_dict
 
     if social_config["twitter"]:

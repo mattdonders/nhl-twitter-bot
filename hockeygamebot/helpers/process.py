@@ -29,7 +29,14 @@ def spawn_another_process():
         logging.debug("Spawning Process: %s", full_exec)
         Popen(full_exec, shell=True)
     else:
+        python_exec = sys.executable
+        script_path = os.path.join(PROJECT_ROOT, "app.py")
+        spawn_args = " ".join(sys.argv[1:])
+        full_exec = [
+            "{python} {script} --split {args}".format(
+                python=python_exec, script=script_path, args=spawn_args
+            )
+        ]
         logging.debug("Spawning Process: %s", full_exec)
         # Popen(["nohup python3 " + dirname + "/hockey_twitter_bot.py --split &"], shell=True)
         Popen(full_exec, shell=True)
-

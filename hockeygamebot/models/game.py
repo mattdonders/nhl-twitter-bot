@@ -64,6 +64,8 @@ class Game:
         self.shootout = Shootout()
         self.period = Period()
         self.events = []
+        self.pref_goals = []
+        self.other_goals = []
 
         # Initialize Pregame Tweets dictionary
         self.pregame_lasttweet = None
@@ -83,6 +85,8 @@ class Game:
             "advstats": False,
             "shotmap": False,
         }
+
+        self.preview_socials = StartOfGameSocial()
         self.final_socials = EndOfGameSocial()
         self.finaltweets_retry = 0
 
@@ -254,15 +258,25 @@ class Game:
         return (self.away_team, self.home_team)
 
 
-class EndOfGameSocial:
+class StartOfGameSocial:
     """ A class that holds all end of game social media messages & statuses."""
 
     def __init__(self):
         self.retry_count = 0
-        self.final_score_msg = None
-        self.final_score_sent = False
-        self.three_stars_msg = None
-        self.three_stars_sent = False
+        self.lasttweet = None
+
+        self.core_msg = None
+        self.core_sent = False
+        self.season_series_msg = None
+        self.season_series_sent = None
+        self.goalies_pref_msg = None
+        self.goalies_pref_sent = False
+        self.goalies_other_msg = None
+        self.goalies_other_sent = False
+        self.officials_msg = None
+        self.officials_sent = False
+        self.lines_msg = None
+        self.lines_sent = False
 
     @property
     def all_social_sent(self):
@@ -277,3 +291,28 @@ class EndOfGameSocial:
         """ Returns True if the number of retires (3 = default) has been exceeded. """
         return bool(self.retry_count >= 3)
 
+
+class EndOfGameSocial:
+    """ A class that holds all end of game social media messages & statuses."""
+
+    def __init__(self):
+        self.retry_count = 0
+        self.final_score_msg = None
+        self.final_score_sent = False
+        self.three_stars_msg = None
+        self.three_stars_sent = False
+        self.nst_linetool_msg = None
+        self.nst_linetool_sent = False
+
+    @property
+    def all_social_sent(self):
+        """ Returns True / False depending on if all final socials were sent. """
+
+        all_final_social = [v for k, v in self.__dict__.items() if "sent" in k]
+        all_final_social_sent = all(all_final_social)
+        return all_final_social_sent
+
+    @property
+    def retries_exeeded(self):
+        """ Returns True if the number of retires (3 = default) has been exceeded. """
+        return bool(self.retry_count >= 3)

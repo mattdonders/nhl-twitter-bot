@@ -118,10 +118,11 @@ def event_factory(game: Game, play: dict, livefeed: dict, new_plays: bool):
     event_type = play.get("result").get("eventTypeId")
     event = play.get("result").get("event")
     object_type = event_mapper(event=event, event_type=event_type)
+    event_id = play.get("about").get("eventId")
     event_idx = play.get("about").get("eventIdx")
 
     # Check whether this event is in our Cache
-    obj = object_type.cache.get(event_idx)
+    obj = object_type.cache.get(event_id)
 
     # Check whether this is a shootout event & re-assigned the object_type accordingly
     shootout = bool(play.get("about").get("periodType") == "SHOOTOUT")
@@ -143,11 +144,11 @@ def event_factory(game: Game, play: dict, livefeed: dict, new_plays: bool):
     # If object doesn't exist, create it & add to Cache
     if obj is None:
         try:
-            # logging.info("Creating %s event for Idx %s.", object_type, event_idx)
+            logging.info("Creating %s event for Id %s / IdX %s.", object_type.__name__, event_id, event_idx)
             obj = object_type(data=play, game=game)
             object_type.cache.add(obj)
         except Exception as error:
-            logging.error("Error creating %s event for Idx %s.", object_type, event_idx)
+            logging.error("Error creating %s event for Id %s. / IdX %s.", object_type, event_id, event_idx)
             # logging.error(response)
             logging.error(error)
             logging.error(traceback.format_exc())
@@ -212,11 +213,11 @@ class Cache:
 
     def add(self, entry: object):
         """ Adds an object to this Cache. """
-        self.entries[entry.event_idx] = entry
+        self.entries[entry.event_id] = entry
 
-    def get(self, idx: int):
+    def get(self, id: int):
         """ Gets an entry from the cache / checks if exists via None return. """
-        entry = self.entries.get(idx)
+        entry = self.entries.get(id)
         return entry
 
 
@@ -232,6 +233,7 @@ class GenericEvent:
         self.game = game
         self.livefeed = data.get("livefeed")
         self.social_msg = None
+        self.game.events.append(self)
 
         # Get the Result Section
         results = data.get("result")
@@ -372,7 +374,7 @@ class PeriodStartEvent(GenericEvent):
         if self.period <= 3:
             text_forwards = "-".join(forwards)
             text_defense = "-".join(defense)
-            text_goalie = goalies[0]
+            text_goalie = goalies[0] if goalies else ''
 
             social_msg = (
                 f"On the ice to start the {self.period_ordinal} period for your "
@@ -623,6 +625,11 @@ class GoalEvent(GenericEvent):
         self.event_team = data.get("team").get("name")
         self.tweet = None
 
+        # Add this event to the goals list in the game
+        goals_list = self.game.pref_goals if self.event_team == self.game.preferred_team.team_name \
+            else self.game.other_goals
+        goals_list.append(self)
+
         # Get the Coordinates Section
         coordinates = data.get("coordinates")
         self.x = coordinates.get("x", 0.0)
@@ -674,6 +681,23 @@ class GoalEvent(GenericEvent):
 
         # Set any social media IDs
         self.tweet = social_ids.get("twitter")
+
+        # Now that the main goal text is sent, check for milestones
+        if self.scorer_career_points % 100 == 0:
+            logging.info("Goal Scorer - Career Point Milestone - %s", self.scorer_career_points)
+
+        if self.primary_career_assists % 100 == 0:
+            logging.info("Primary - Career Assist Milestone - %s", self.primary_career_assists)
+
+        if self.primary_career_points % 100 == 0:
+            logging.info("Primary - Career Point Milestone - %s", self.scorer_career_points)
+
+        if self.secondary_career_assists % 100 == 0:
+            logging.info("Secondary - Career Assist Milestone - %s", self.secondary_career_assists)
+
+        if self.secondary_career_points % 100 == 0:
+            logging.info("Secondary - Career Point Milestone - %s", self.secondary_career_points)
+
 
     def parse_assists(self, assist: list):
         """ Since we have to parse assists initially & for scoring changes, move this to a function. """
@@ -778,6 +802,14 @@ class GoalEvent(GenericEvent):
         if self.event_team == self.game.preferred_team.team_name:
             goal_emoji = "🚨" * self.pref_goals
 
+            if self.scorer_career_goals == 1:
+                goal_milestone_text = "🚨 FIRST GOAL ALERT! 🚨\n\n"
+            elif self.scorer_career_goals % 100 == 0:
+                goal_ordinal = utils.ordinal(self.scorer_career_goals)
+                goal_milestone_text = f"🚨 {goal_ordinal} CAREER GOALS! 🚨\n\n"
+            else:
+                goal_milestone_text = ""
+
             if self.period_type == "OVERTIME":
                 goal_title_text = f"{self.event_team} OVERTIME GOAL!!"
             elif self.strength_name != "Even":
@@ -791,8 +823,9 @@ class GoalEvent(GenericEvent):
         else:
             goal_title_text = f"{self.event_team} score."
             goal_emoji = "👎🏻" * self.other_goals
+            goal_milestone_text = ""
 
-        goal_title_text = f"{goal_title_text} {goal_emoji}"
+        goal_title_text = f"{goal_milestone_text}{goal_title_text} {goal_emoji}"
         return goal_title_text
 
     def get_goal_main_text(self):
@@ -837,7 +870,7 @@ class GoalEvent(GenericEvent):
         else:
             goal_assist_text = None
 
-        # TODO: Can I fix this weird if / else - come back to it.
+        # FIXME: Can I fix this weird if / else - come back to it.
         if goal_count_text is None and goal_assist_text is None:
             goal_main_text = goal_scoring_text
         elif goal_count_text is None:
@@ -860,7 +893,7 @@ class GoalEvent(GenericEvent):
         """
 
         logging.info(
-            "Checking for scoring changes (event ID %s / IDX %s).", self.event_id, self.event_idx
+            "Checking for scoring changes (team : %s / event ID %s / IDX %s).", self.event_team, self.event_id, self.event_idx
         )
         players = data.get("players")
         scorer = [x for x in players if x.get("playerType").lower() == "scorer"]
@@ -869,8 +902,7 @@ class GoalEvent(GenericEvent):
         # Check for Changes in Player IDs
         scorer_change = bool(scorer[0].get("player").get("id") != self.scorer_id)
         assist_change = bool(assist != self.assists)
-        logging.info("Scoring Change - %s", scorer_change)
-        logging.info("Assists Change - %s", assist_change)
+        logging.info("Scoring Change - %s / Assists Change - %s", scorer_change, assist_change)
 
         if scorer_change:
             print("Old Scorer -", self.scorer_name)

@@ -2,18 +2,48 @@
 Functions pertaining to the NHL schedule (via API).
 """
 
+# pylint: disable=redefined-builtin
+
 import logging
-import os
-import sys
 import time
 from datetime import datetime, timedelta
-from subprocess import Popen
 
-import requests
-
-from hockeygamebot.helpers import arguments, process, utils
-from hockeygamebot.models.sessions import SessionFactory
+from hockeygamebot.helpers import arguments, process
 from hockeygamebot.nhlapi import api, roster
+
+
+def get_team_id(team_name):
+    """ Passes team name to NHL API and returns team ID.
+
+    Args:
+        team_name: Valid NHL team name.
+
+    Returns:
+        team_id: NHL Team ID
+    """
+
+    team_name = team_name.lower()
+    endpoint = "/teams"
+    response = api.nhl_api(endpoint)
+
+    if not response:
+        raise ConnectionError("An invalid response was returned from the NHL Teams API.")
+
+    teams_json = response.json()
+    teams = teams_json["teams"]
+
+    team_id = None
+    for team in teams:
+        if team["name"].lower() == team_name:
+            team_id = team["id"]
+            break
+
+    if not team_id:
+        raise ValueError(
+            "{} is not a valid NHL team. Check your configuraiton file!".format(team_name)
+        )
+
+    return team_id
 
 
 def is_game_today(team_id, date):
@@ -28,7 +58,6 @@ def is_game_today(team_id, date):
         games_info (dict) - A dictionary from the Schedule API that describes game information.
     """
     args = arguments.get_arguments()
-    config = utils.load_config()
 
     url = (
         "/schedule?teamId={id}&expand="
@@ -78,6 +107,10 @@ def get_broadcasts(resp):
     """
     broadcasts = {}
 
+    # Set defaults in case one team doesn't have a broadcast yet
+    # broadcasts["home"] = "TBD"
+    # broadcasts["away"] = "TBD"
+
     try:
         resp_broadcasts = resp["broadcasts"]
         for broadcast in resp_broadcasts:
@@ -87,12 +120,12 @@ def get_broadcasts(resp):
                 broadcasts["home"] = broadcast["name"]
                 break
             else:
-                broadcast_channel = resp_broadcasts["name"]
+                broadcast_channel = broadcast["name"]
                 broadcasts[broadcast_team] = broadcast_channel
     except KeyError:
         logging.warning("Broadcasts not available - setting them to TBD.")
         broadcasts["home"] = "TBD"
-        broadcasts["home"] = "TBD"
+        broadcasts["away"] = "TBD"
 
     return broadcasts
 
@@ -136,8 +169,6 @@ def season_series(game_id, pref_team, other_team, last_season=False):
         toi_leader_str: TOI Leader(s)
     """
 
-    config = utils.load_config()
-
     # Init empty dictionaries and lists
     games_against = list()
     pref_toi = dict()
@@ -154,35 +185,45 @@ def season_series(game_id, pref_team, other_team, last_season=False):
         season_end = str(int(season_start) + 1)
         yesterday = datetime.now() - timedelta(days=1)
         # yesterday = datetime.now() + timedelta(days=50)
+        # schedule_url = (
+        #     f"/schedule?teamId={pref_team.team_id}"
+        #     f"&expand=schedule.broadcasts,schedule.teams&startDate="
+        #     f"{season_start}-08-01&endDate={yesterday:%Y-%m-%d}"
+        # )
         schedule_url = (
             f"/schedule?teamId={pref_team.team_id}"
-            f"&expand=schedule.broadcasts,schedule.teams&startDate="
-            f"{season_start}-08-01&endDate={yesterday:%Y-%m-%d}"
+            f"&expand=schedule.broadcasts,schedule.teams"
+            f"&season={season_start}{season_end}"
         )
     else:
         season_start = int(str(game_id)[0:4]) - 1
         season_end = str(int(season_start) + 1)
         yesterday = datetime.now() - timedelta(days=1)
         # yesterday = datetime.now() + timedelta(days=50)
+        # schedule_url = (
+        #     f"/schedule?teamId={pref_team.team_id}"
+        #     f"&expand=schedule.broadcasts,schedule.teams&startDate="
+        #     f"{season_start}-08-01&endDate={season_end}-06-01"
+        # )
         schedule_url = (
             f"/schedule?teamId={pref_team.team_id}"
-            f"&expand=schedule.broadcasts,schedule.teams&startDate="
-            f"{season_start}-08-01&endDate={season_end}-06-01"
+            f"&expand=schedule.broadcasts,schedule.teams"
+            f"&season={season_start}{season_end}"
         )
 
     schedule = api.nhl_api(schedule_url).json()
     dates = schedule["dates"]
 
     # Loop through scheduled to get previously played games against
-    for idx, date in enumerate(dates):
+    for date in dates:
         game = date["games"][0]
         game_type = game["gameType"]
         game_id = game["gamePk"]
-        game_date = game["gameDate"]
         game_team_home = game["teams"]["home"]["team"]["name"]
         game_team_away = game["teams"]["away"]["team"]["name"]
         teams = [game_team_away, game_team_home]
-        if game_type == "R" and other_team.team_name in teams:
+        game_status = game["status"]["abstractGameState"]
+        if game_type == "R" and game_status == "Final" and other_team.team_name in teams:
             game_feed = f"/game/{game_id}/feed/live"
             games_against.append(game_feed)
 

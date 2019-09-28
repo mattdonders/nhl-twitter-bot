@@ -21,7 +21,7 @@ def get_api():
     """
     args = arguments.get_arguments()
 
-    twitterenv = "debug" if args.debugtweets else "prod"
+    twitterenv = "debug" if args.debugsocial else "prod"
     twitter_config = utils.load_config()["twitter"][twitterenv]
 
     consumer_key = twitter_config["consumer_key"]
@@ -51,7 +51,7 @@ def send_tweet(tweet_text, media=None, reply=None):
     logging.info("[TWITTER] %s (Media: %s, Reply: %s)", tweet_text, media, reply)
     args = arguments.get_arguments()
 
-    twitterenv = "debug" if args.debugtweets else "prod"
+    twitterenv = "debug" if args.debugsocial else "prod"
     twitter_config = utils.load_config()["twitter"][twitterenv]
     twitter_handle = twitter_config["handle"]
     if args.notweets:
@@ -74,8 +74,11 @@ def send_tweet(tweet_text, media=None, reply=None):
             status = api.update_with_media(
                 status=tweet_text, filename=media, in_reply_to_status_id=reply
             )
+
+        return status.id_str
+
     except Exception as e:
         logging.error("Failed to send tweet : %s", tweet_text)
         logging.error(e)
+        return None
 
-    return status.id_str

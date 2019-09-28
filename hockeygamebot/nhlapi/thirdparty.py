@@ -384,19 +384,19 @@ def scouting_the_refs(game, pref_team):
         post_date = parse(post.get("date"))
         posted_today = bool(post_date.date() == datetime.today().date())
         post_title = post.get("title").get("rendered")
-        # if (921 in categories and posted_today) or (posted_today and 'NHL' in post_title):
-        if 921 in categories:
+        if (921 in categories and posted_today) or (posted_today and 'NHL' in post_title):
+        # if 921 in categories:     # This line is uncommented for testing on non-game days
             content = post.get("content").get("rendered")
             soup = bs4_parse(content)
             break
 
-    # TESTING
-    soup = BeautifulSoup(
-        requests.get(
-            "https://scoutingtherefs.com/2019/04/25706/tonights-nhl-referees-and-linesmen-4-6-19/"
-        ).content,
-        "lxml",
-    )
+    # TESTING: This section gets commented out when needed for testing.
+    # soup = BeautifulSoup(
+    #     requests.get(
+    #         "https://scoutingtherefs.com/2019/04/25706/tonights-nhl-referees-and-linesmen-4-6-19/"
+    #     ).content,
+    #     "lxml",
+    # )
 
     # If we get some bad soup, return False
     if soup is None:
