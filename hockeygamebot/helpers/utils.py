@@ -208,7 +208,7 @@ def clock_emoji(time):
 def team_hashtag(team, game_type):
     """Generates a team hashtag from a team name & game type.
 
-    UPDATED: 2019-06-30
+    UPDATED: 2019-09-30 (NHL Updated Hashtags)
 
     Args:
         team: full team name
@@ -220,30 +220,31 @@ def team_hashtag(team, game_type):
 
     team_hashtags = {
         "Anaheim Ducks": "#LetsGoDucks",
-        "Arizona Coyotes": "#OurPack",
+        "Arizona Coyotes": "#Yotes",
         "Boston Bruins": "#NHLBruins",
-        "Buffalo Sabres": "#Sabres",
+        "Buffalo Sabres": "#Sabres50",
         "Calgary Flames": "#Flames",
-        "Carolina Hurricanes": "#TakeWarning",
+        "Carolina Hurricanes": "#LetsGoCanes",
         "Chicago Blackhawks": "#Blackhawks",
         "Colorado Avalanche": "#GoAvsGo",
         "Columbus Blue Jackets": "#CBJ",
         "Dallas Stars": "#GoStars",
         "Detroit Red Wings": "#LGRW",
         "Edmonton Oilers": "#LetsGoOilers",
-        "Florida Panthers": "#FlaPanthers",
+        "Florida Panthers": "#FLAPanthers",
         "Los Angeles Kings": "#GoKingsGo",
-        "Minnesota Wild": "#mnwild",
+        "Minnesota Wild": "#MNWild",
         "Montréal Canadiens": "#GoHabsGo",
+        "Montreal Canadiens": "#GoHabsGo",
         "Nashville Predators": "#Preds",
         "New Jersey Devils": "#NJDevils",
         "New York Islanders": "#Isles",
         "New York Rangers": "#NYR",
-        "Ottawa Senators": "#Sens",
-        "Philadelphia Flyers": "#LetsGoFlyers",
+        "Ottawa Senators": "#GoSensGo",
+        "Philadelphia Flyers": "#FlyOrDie",
         "Pittsburgh Penguins": "#LetsGoPens",
         "San Jose Sharks": "#SJSharks",
-        "St. Louis Blues": "#stlblues",
+        "St. Louis Blues": "#STLBlues",
         "Tampa Bay Lightning": "#GoBolts",
         "Toronto Maple Leafs": "#LeafsForever",
         "Vancouver Canucks": "#Canucks",
@@ -271,10 +272,12 @@ def team_hashtag(team, game_type):
         "Winnipeg Jets": "#WPGWhiteout",
     }
 
-    if GameType(game_type) == GameType.PLAYOFFS:
-        return team_hashtags_playoffs[team]
-    else:
-        return team_hashtags[team]
+    # if GameType(game_type) == GameType.PLAYOFFS:
+    #     return team_hashtags_playoffs[team]
+    # else:
+    #     return team_hashtags[team]
+
+    return team_hashtags.get(team)
 
 
 def calculate_shot_distance(x: int, y: int) -> str:
