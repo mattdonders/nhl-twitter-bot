@@ -239,7 +239,7 @@ def team_hashtag(team, game_type):
         "Nashville Predators": "#Preds",
         "New Jersey Devils": "#NJDevils",
         "New York Islanders": "#Isles",
-        "New York Rangers": "#NYR",
+        "New York Rangers": "#PlayLikeANewYorker",
         "Ottawa Senators": "#GoSensGo",
         "Philadelphia Flyers": "#FlyOrDie",
         "Pittsburgh Penguins": "#LetsGoPens",
