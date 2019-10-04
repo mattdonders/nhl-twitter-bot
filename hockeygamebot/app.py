@@ -147,7 +147,10 @@ def start_game_loop(game: Game):
             if not game.final_socials.three_stars_sent:
                 final.three_stars(livefeed=livefeed_resp, game=game)
 
-            # thirdparty.nst_linetool(game=game, team=game.preferred_team)
+            if not game.final_socials.nst_linetool_sent:
+                # thirdparty.nst_linetool(game=game, team=game.preferred_team)
+                game.final_socials.nst_linetool_sent = True
+
             if not game.final_socials.hsc_sent:
                 final.hockeystatcards(game=game)
 
