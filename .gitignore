@@ -43,6 +43,7 @@ env/
 
 # Other Files
 .coverage
+config.yaml
 
 #############################################
 # Github Python Default .gitignore
