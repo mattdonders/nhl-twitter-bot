@@ -335,8 +335,10 @@ def game_preview_others(game: Game):
             def_all_string = "\n".join(def_all_list)
 
             lines_tweet_text = (
-                f"{pref_hashtag} Forwards:\n{fwd_all_string}\n\n"
-                f"{pref_hashtag} Defense:\n{def_all_string}\n\n"
+                f"Lines for the {pref_hashtag} -\n"
+                f"(via @DailyFaceoff)\n\n"
+                f"Forwards:\n{fwd_all_string}\n\n"
+                f"Defense:\n{def_all_string}"
             )
 
             social_dict = socialhandler.send(

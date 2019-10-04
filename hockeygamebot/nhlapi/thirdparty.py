@@ -421,8 +421,8 @@ def scouting_the_refs(game, pref_team):
     return_linesmen = list()
 
     refs = game_details.find_all("tr")[1].find_all("td")
-    refs_season_games = game_details.find_all("tr")[3].find_all("td")
-    refs_career_games = game_details.find_all("tr")[4].find_all("td")
+    refs_season_games = game_details.find_all("tr")[2].find_all("td")
+    refs_career_games = game_details.find_all("tr")[3].find_all("td")
     for i, ref in enumerate(refs):
         ref_name = ref.text
         ref_season_games = refs_season_games[i].text
@@ -434,9 +434,9 @@ def scouting_the_refs(game, pref_team):
             ref_dict["careergames"] = ref_career_games
             return_referees.append(ref_dict)
 
-    linesmen = game_details.find_all("tr")[22].find_all("td")
-    linesmen_season_games = game_details.find_all("tr")[24].find_all("td")
-    linesmen_career_games = game_details.find_all("tr")[25].find_all("td")
+    linesmen = game_details.find_all("tr")[21].find_all("td")
+    linesmen_season_games = game_details.find_all("tr")[22].find_all("td")
+    linesmen_career_games = game_details.find_all("tr")[23].find_all("td")
     for i, linesman in enumerate(linesmen):
         linesman_name = linesman.text
         linesman_season_games = linesmen_season_games[i].text

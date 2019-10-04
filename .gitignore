@@ -30,7 +30,9 @@ resources/images/RinkShotmap-*.png
 resources/images/GamedayAdvStats-*.png
 resources/images/Rink-Shotmap-Blank-Backup.png
 resources/images/Rink-Shotmap-Generated.png
+resources/images/Final*.png
 resources/PSDs
+resources/images/temp
 
 # VirtualEnv Files
 bin/
