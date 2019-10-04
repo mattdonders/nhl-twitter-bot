@@ -5,14 +5,17 @@ This module contains all functions pertaining to a game in a Final State.
 """
 
 import logging
+import os
 from datetime import datetime, timedelta
 
 import dateutil.tz
 from dateutil.parser import parse
 
+from hockeygamebot.definitions import IMAGES_PATH
 from hockeygamebot.models.game import Game
-from hockeygamebot.nhlapi import schedule
+from hockeygamebot.nhlapi import schedule, thirdparty
 from hockeygamebot.social import socialhandler
+from hockeygamebot.core import images
 
 
 def final_score(livefeed: dict, game: Game):
@@ -34,9 +37,10 @@ def final_score(livefeed: dict, game: Game):
 
     # Get all nested dictionaries frmo the livefeed response
     all_plays = livefeed["liveData"]["plays"]["allPlays"]
-    boxscore = livefeed["liveData"]["boxscore"]["teams"]
-    boxscore_pref = boxscore[game.preferred_team.home_away]
-    boxscore_other = boxscore[game.other_team.home_away]
+    boxscore = livefeed["liveData"]["boxscore"]
+    boxscore_teams = boxscore["teams"]
+    boxscore_pref = boxscore_teams[game.preferred_team.home_away]
+    boxscore_other = boxscore_teams[game.other_team.home_away]
 
     pref_home_text = "on the road" if game.preferred_team.home_away == "away" else "at home"
     score_pref = boxscore_pref["teamStats"]["teamSkaterStats"]["goals"]
@@ -91,8 +95,13 @@ def final_score(livefeed: dict, game: Game):
         logging.error(e)
         next_game_text = ""
 
+    final_image = images.stats_image(game=game, game_end=True, boxscore=boxscore)
+    img_filename = os.path.join(IMAGES_PATH, f"Final-{game.game_id}.png")
+    final_image.save(img_filename)
+
     final_score_msg = f"{final_score_text}\n\n{next_game_text}"
-    socialhandler.send(final_score_msg)
+    # socialhandler.send(final_score_msg)
+    socialhandler.send(msg=final_score_msg, media=img_filename)
 
     # Set the final score message & status in the EndOfGame Social object
     game.final_socials.final_score_msg = final_score_msg
@@ -148,3 +157,38 @@ def three_stars(livefeed: dict, game: Game):
     # Set the final score message & status in the EndOfGame Social object
     game.final_socials.three_stars_msg = three_stars_msg
     game.final_socials.three_stars_sent = True
+
+
+def hockeystatcards(game: Game):
+    """ Uses the Hockey Stat Cards API to retrieve gamescores for the current game.
+        Generates an image based on those values & sends the socials.
+
+    Args:
+        game (Game): Current Game object.
+
+    Returns:
+        None
+    """
+
+    game_scores = thirdparty.hockeystatcard_gamescores(game=game)
+    if not game_scores:
+        logging.warning("Could not get game scores, exiting.")
+        return False
+
+    home_gs = game_scores[0]
+    away_gs = game_scores[1]
+
+    hsc_image = images.hockeystatcards_image(game=game, home_gs=home_gs, away_gs=away_gs)
+    img_filename = os.path.join(IMAGES_PATH, f"Final-HSC-{game.game_id}.png")
+    hsc_image.save(img_filename)
+
+    hsc_social_text = (
+        f"{game.preferred_team.short_name} & {game.other_team.short_name} Game Score leaderboard."
+        f"\n\n(via @cepvi0 @NatStatTrick @domluszczyszyn)"
+    )
+
+    socialhandler.send(msg=hsc_social_text, media=img_filename)
+
+    # Set the end of game social attributes
+    game.final_socials.hsc_msg = hsc_social_text
+    game.final_socials.hsc_sent = True

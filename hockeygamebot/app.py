@@ -94,22 +94,43 @@ def start_game_loop(game: Game):
 
                 livefeed_resp = livefeed.get_livefeed(game.game_id)
                 # all_events = live.live_loop(livefeed=livefeed_resp, game=game)
-                live.live_loop(livefeed=livefeed_resp, game=game)
+
+                # Update all game attributes & check for goalie pulls
                 game.update_game(livefeed_resp)
+                game.goalie_pull_updater(livefeed_resp)
+
+                # Pass the live feed response to the live loop (to parse events)
+                live.live_loop(livefeed=livefeed_resp, game=game)
                 # game_events = get_game_events(game_obj)
                 # loop_game_events(game_events, game_obj)
+
+            except Exception as error:
+                logging.error("Uncaught exception in live game loop - see below error.")
+                logging.error(error)
+
+            # Calculate proper sleep time based on intermission status
+            if game.period.intermission:
+                if game.period.intermission_remaining > config["script"]["intermission_sleep_time"]:
+                    live_sleep_time = config["script"]["intermission_sleep_time"]
+                    logging.info(
+                        "Sleeping for configured intermission time (%ss).",
+                        config["script"]["intermission_sleep_time"],
+                    )
+                else:
+                    live_sleep_time = game.period.intermission_remaining
+                    logging.info(
+                        "Sleeping for remaining intermission time (%ss).",
+                        game.period.intermission_remaining,
+                    )
+            else:
+                live_sleep_time = config["script"]["live_sleep_time"]
                 logging.info(
                     "Sleeping for configured live game time (%ss).",
                     config["script"]["live_sleep_time"],
                 )
-            except Exception as error:
-                logging.error(
-                    "Uncaught exception in live game loop - sleep for configured live game time (%ss).",
-                    config["script"]["live_sleep_time"],
-                )
-                logging.error(error)
 
-            time.sleep(config["script"]["live_sleep_time"])
+            # Now sleep for the calculated time above
+            time.sleep(live_sleep_time)
 
         elif GameState(game.game_state) == GameState.FINAL:
             logging.info(
@@ -120,18 +141,22 @@ def start_game_loop(game: Game):
             game.update_game(livefeed_resp)
 
             # Run all end of game / final functions
-            final.final_score(livefeed=livefeed_resp, game=game)
-            final.three_stars(livefeed=livefeed_resp, game=game)
-            thirdparty.nst_linetool(game=game, team=game.preferred_team)
+            if not game.final_socials.final_score_sent:
+                final.final_score(livefeed=livefeed_resp, game=game)
+
+            if not game.final_socials.three_stars_sent:
+                final.three_stars(livefeed=livefeed_resp, game=game)
+
+            # thirdparty.nst_linetool(game=game, team=game.preferred_team)
+            if not game.final_socials.hsc_sent:
+                final.hockeystatcards(game=game)
 
             # If we have exceeded the number of retries, stop pinging NST
             if game.final_socials.retries_exeeded:
                 game.final_socials.nst_linetool_sent = True
 
             if game.final_socials.all_social_sent:
-                logging.info(
-                    "All end of game socials sent  or retries were exceeded - ending game!"
-                )
+                logging.info("All end of game socials sent or retries were exceeded - ending game!")
                 end_game_loop(game=game)
 
             # If all socials aren't sent or retry limit is not exceeded, sleep & check again.

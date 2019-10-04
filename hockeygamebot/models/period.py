@@ -6,3 +6,4 @@ class Period(object):
         self.current_ordinal = "1st"
         self.time_remaining = "20:00"
         self.intermission = False
+        self.intermission_remaining = 0

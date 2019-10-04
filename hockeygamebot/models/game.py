@@ -7,10 +7,12 @@ from datetime import datetime
 
 import dateutil.tz
 
+from hockeygamebot import models
 from hockeygamebot.helpers import utils
 from hockeygamebot.models.period import Period
 from hockeygamebot.models.shootout import Shootout
 from hockeygamebot.models.team import Team
+from hockeygamebot.social import socialhandler
 
 
 class Game:
@@ -162,7 +164,10 @@ class Game:
         self.period.current = linescore["currentPeriod"]
         self.period.current_ordinal = linescore["currentPeriodOrdinal"]
         self.period.time_remaining = linescore["currentPeriodTimeRemaining"]
-        self.period.intermission = linescore["intermissionInfo"]["inIntermission"]
+
+        intermission = linescore["intermissionInfo"]
+        self.period.intermission = intermission["inIntermission"]
+        self.period.intermission_remaining = intermission["intermissionTimeRemaining"]
 
         linescore_home = linescore.get("teams").get("home")
         self.home_team.score = linescore_home.get("goals")
@@ -172,9 +177,87 @@ class Game:
         self.away_team.score = linescore_away.get("goals")
         self.away_team.shots = linescore_away.get("shots")
 
-        self.last_event_idx = (
-            response.get("liveData").get("plays").get("currentPlay").get("about").get("eventIdx")
+        self.power_play_strength = linescore["powerPlayStrength"]
+        self.home_team.power_play = linescore_home["powerPlay"]
+        self.home_team.skaters = linescore_home["numSkaters"]
+        self.away_team.power_play = linescore_away["powerPlay"]
+        self.away_team.skaters = linescore_away["numSkaters"]
+
+        # self.last_event_idx = (
+        #     response.get("liveData").get("plays").get("currentPlay").get("about").get("eventIdx")
+        # )
+
+
+    def goalie_pull_updater(self, response):
+        """ Use the livefeed to determine if the goalie of either team has been pulled.
+            And keep the attribute updated in each team object.
+        """
+        try:
+            linescore = response.get("liveData").get("linescore")
+            linescore_home = linescore.get("teams").get("home")
+            linescore_away = linescore.get("teams").get("away")
+
+            # Goalie Pulled Updater
+            last_tracked_event = self.events[-1]
+            event_filter_list = (models.gameevent.GoalEvent, models.gameevent.PenaltyEvent)
+
+            # Get current values from the linescore
+            home_goalie_current = linescore_home["goaliePulled"]
+            away_goalie_current = linescore_away["goaliePulled"]
+
+
+            # Logic to determine previous & current goalie state
+            # If the goalie was in net last update, update with new value & check the change.
+            # If the goalie was pulled in last update & an important event happened - update & check change.
+            # If the goalie was pulled in last update & nothing important happened, don't update or check.
+            if not self.home_team.goalie_pulled:
+                logging.debug("Home goalie in net - check & update goalie attribute.")
+                home_goalie_pulled = self.home_team.goalie_pulled_setter(home_goalie_current)
+            elif self.home_team.goalie_pulled and isinstance(last_tracked_event, event_filter_list):
+                logging.info("Home goalie previously pulled, but important event detected - update & check.")
+                home_goalie_pulled = self.home_team.goalie_pulled_setter(home_goalie_current)
+            else:
+                logging.info("Home goalie is pulled and either no event or a non-important event happened - do nothing.")
+                return
+
+            if not self.away_team.goalie_pulled:
+                logging.debug("Home goalie in net - check & update goalie attribute.")
+                away_goalie_pulled = self.away_team.goalie_pulled_setter(away_goalie_current)
+            elif self.away_team.goalie_pulled and isinstance(last_tracked_event, event_filter_list):
+                logging.info("Away goalie previously pulled, but important event detected - update & check.")
+                away_goalie_pulled = self.home_team.goalie_pulled_setter(away_goalie_current)
+            else:
+                logging.info("Away goalie is pulled and either no event or a non-important event happened - do nothing.")
+                return
+
+            if home_goalie_pulled:
+                trailing_score = self.away_team.score - self.home_team.score
+                self.goalie_pull_social(self.home_team.short_name, trailing_score)
+            elif away_goalie_pulled:
+                trailing_score = self.home_team.score - self.away_team.score
+                self.goalie_pull_social(self.away_team.short_name, trailing_score)
+        except IndexError as e:
+            logging.warning("Tried to update goalie pulled status, but got an error - try again next loop.")
+            logging.warning(e)
+
+    def goalie_pull_social(self, team_name, trailing_score):
+        """ Sends a message to social media about the goalie for a team being pulled.
+
+        Args:
+            self: current game instance
+            team_name: team short name (from the team's object)
+            trailing_score: the amount of goals the pulled team is trailing by
+
+        Returns:
+            None
+        """
+
+        goalie_pull_text = (
+            f"The {team_name} have pulled their goalie trailing by {trailing_score} with "
+            f"{self.period.time_remaining} left in the {self.period.current_ordinal} period."
         )
+
+        socialhandler.send(msg=goalie_pull_text, force_send=True)
 
     # Commands used to calculate time related attributes
     localtz = dateutil.tz.tzlocal()
@@ -211,6 +294,14 @@ class Game:
         game_date_local = game_date + self.localoffset
         game_date_local_api = game_date_local.strftime("%Y-%m-%d")
         return game_date_local_api
+
+    @property
+    def game_date_mmddyyyy(self):
+        """ Returns the game as Y-m-d format in local time zone. """
+        game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
+        game_date_local = game_date + self.localoffset
+        game_date_local_mmddyyyy = game_date_local.strftime("%m/%d/%Y")
+        return game_date_local_mmddyyyy
 
     @property
     def game_date_short(self):
@@ -297,12 +388,20 @@ class EndOfGameSocial:
 
     def __init__(self):
         self.retry_count = 0
+
+        # These attributes hold scraped values to avoid having to scrape multiple times
+        self.hsc_homegs = None
+        self.hsc_awaygs = None
+
+        # These attributes hold messages and message sent boolean values
         self.final_score_msg = None
         self.final_score_sent = False
         self.three_stars_msg = None
         self.three_stars_sent = False
         self.nst_linetool_msg = None
         self.nst_linetool_sent = False
+        self.hsc_msg = None
+        self.hsc_sent = False
 
     @property
     def all_social_sent(self):

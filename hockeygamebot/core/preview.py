@@ -73,7 +73,7 @@ def generate_game_preview(game: Game):
 
     # Generate pre-game image
     pregame_image = images.pregame_image(game)
-    img_filename = os.path.join(IMAGES_PATH, f"temp/Pregame-{game.preferred_team.games + 1}.png")
+    img_filename = os.path.join(IMAGES_PATH, f"temp/Pregame-{game.game_id}.png")
     pregame_image.save(img_filename)
 
     # Send preview tweet w/ pre-game image to social media handler
@@ -178,7 +178,7 @@ def game_preview_others(game: Game):
                 goalies_df.get("pref").get("confirm") in goalies_confirmed_values
             )
             goalie_confirm_other = bool(
-                goalies_df.get("pref").get("confirm") in goalies_confirmed_values
+                goalies_df.get("other").get("confirm") in goalies_confirmed_values
             )
 
             logging.info("Goalie Confirmed PREF : %s", goalie_confirm_pref)
@@ -190,6 +190,8 @@ def game_preview_others(game: Game):
                     goalie_pref_name = goalie_pref.get("name")
                     goalie_pref_confirm = goalie_pref.get("confirm")
                     goalie_pref_season = goalie_pref.get("season")
+                    if goalie_pref_season == "-- W-L | GAA | SV% | SO":
+                        goalie_pref_season = "None (Season Debut)"
                     goalie_hr_pref = thirdparty.hockeyref_goalie_against_team(
                         goalie_pref_name, game.other_team.team_name
                     )
@@ -223,6 +225,8 @@ def game_preview_others(game: Game):
                     goalie_other_name = goalie_other.get("name")
                     goalie_other_confirm = goalie_other.get("confirm")
                     goalie_other_season = goalie_other.get("season")
+                    if goalie_other_season == "-- W-L | GAA | SV% | SO":
+                        goalie_other_season = "None (Season Debut)"
                     goalie_hr_other = thirdparty.hockeyref_goalie_against_team(
                         goalie_other_name, game.preferred_team.team_name
                     )
@@ -297,7 +301,8 @@ def game_preview_others(game: Game):
     if not game.preview_socials.lines_sent:
         try:
             lines = thirdparty.dailyfaceoff_lines(game, pref_team)
-            logging.info(lines)
+            if not lines.get("confirmed"):
+                raise AttributeError("Lines are not yet confirmed yet - try again next loop.")
 
             # Iterate over the forwards dictionary & take into account 11/7 lineups
             fwd_line_string = list()
@@ -341,6 +346,8 @@ def game_preview_others(game: Game):
             game.pregame_lasttweet = social_dict["twitter"]
             game.preview_socials.lines_sent = True
 
+        except AttributeError as e:
+            logging.info(e)
         except Exception as e:
             logging.error(
                 "Exception getting Daily Faceoff lines information - try again next loop."

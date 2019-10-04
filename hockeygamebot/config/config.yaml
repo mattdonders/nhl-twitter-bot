@@ -4,6 +4,7 @@ script:
     preview_sleep_time: 1800
     pregame_sleep_time: 15
     live_sleep_time: 4
+    intermission_sleep_time: 60
     final_sleep_time: 10
 
 default:
@@ -22,6 +23,7 @@ endpoints:
     hockeyref_base: https://www.hockey-reference.com/players
     scouting_refs: http://scoutingtherefs.com/wp-json/wp/v2/posts
     nst: https://www.naturalstattrick.com
+    hockey_stat_cards: https://api.hockeystatcards.com/webapi
 
 socials:
     twitter: True

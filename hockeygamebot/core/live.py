@@ -7,6 +7,7 @@ This module contains all functions pertaining to a game in Live State.
 import logging
 import time
 
+from hockeygamebot.models.gameevent import GoalEvent
 from hockeygamebot.helpers import utils
 from hockeygamebot.models import gameevent
 
@@ -58,6 +59,11 @@ def live_loop(livefeed, game):
     # it will be created because it doesn't exist in the Cache.
     for play in all_plays:
         gameevent.event_factory(game=game, play=play, livefeed=livefeed, new_plays=new_plays)
+
+    # Check here for goal object changes
+    # if not new_plays:
+    #     for k, v in GoalEvent.cache.entries:
+    #         print(k, v)
 
     # all_plays_objs = [
     #     gameevent.event_factory(game, play, livefeed, new_plays) for play in all_plays

@@ -10,6 +10,7 @@ from hockeygamebot.models.game import Game
 from hockeygamebot.models.gametype import GameType
 from hockeygamebot.nhlapi import stats
 from hockeygamebot.social import socialhandler
+from hockeygamebot.core import images
 
 
 def event_mapper(event: str, event_type: str) -> object:
@@ -152,6 +153,9 @@ def event_factory(game: Game, play: dict, livefeed: dict, new_plays: bool):
             # logging.error(response)
             logging.error(error)
             logging.error(traceback.format_exc())
+
+    # Update our Game EventIDX for Tracking
+    game.last_event_idx = event_idx
 
     return obj
 
@@ -372,8 +376,8 @@ class PeriodStartEvent(GenericEvent):
 
         # Get Linenup for Periods 1-3 (applies to all games)
         if self.period <= 3:
-            text_forwards = "-".join(forwards)
-            text_defense = "-".join(defense)
+            text_forwards = " - ".join(forwards)
+            text_defense = " - ".join(defense)
             text_goalie = goalies[0] if goalies else ''
 
             social_msg = (
@@ -385,7 +389,7 @@ class PeriodStartEvent(GenericEvent):
         # Get Lineup for pre-season or regular season overtime game (3-on-3)
         elif self.period == 4 and self.game.game_type in ("PR", "R"):
             all_players = forwards + defense
-            text_players = "-".join(all_players)
+            text_players = " - ".join(all_players)
             try:
                 text_goalie = goalies[0]
                 social_msg = (
@@ -429,10 +433,14 @@ class PeriodEndEvent(GenericEvent):
 
         # Now call any functions that should be called when creating a new object
         # Only do these for Period Official event type
-        if self.event_type in ("gamecenterPeriodEnd", "gamecenterPeroidEnd"):
+        if self.event_type == "PERIOD_END":
             self.period_end_text = self.get_period_end_text()
             self.lead_trail_text = self.get_lead_trail()
             self.social_msg = self.generate_social_msg()
+
+            # Generate Stats Image
+            boxscore = self.livefeed.get("liveData").get("boxscore")
+            self.stats_image = images.stats_image(game=self.game, game_end=False, boxscore=boxscore)
             ids = socialhandler.send(msg=self.social_msg, event=self)
 
     def get_period_end_text(self):
@@ -617,7 +625,7 @@ class GoalEvent(GenericEvent):
 
         # Goals have a few extra results attributes
         results = data.get("result")
-        self.secondary_type = results.get("secondaryType").lower()
+        self.secondary_type = results.get("secondaryType", "shot").lower()
         self.strength_code = results.get("strength").get("code")
         self.strength_name = results.get("strength").get("name")
         self.game_winning_goal = results.get("gameWinningGoal")
@@ -670,6 +678,7 @@ class GoalEvent(GenericEvent):
         else:
             self.goalie_name = None
             self.goalie_id = None
+
         # Assist parsing is contained within a function
         self.parse_assists(assist=assist)
 
@@ -683,19 +692,19 @@ class GoalEvent(GenericEvent):
         self.tweet = social_ids.get("twitter")
 
         # Now that the main goal text is sent, check for milestones
-        if self.scorer_career_points % 100 == 0:
+        if hasattr(self, 'scorer_career_points') and  self.scorer_career_points % 100 == 0:
             logging.info("Goal Scorer - Career Point Milestone - %s", self.scorer_career_points)
 
-        if self.primary_career_assists % 100 == 0:
+        if hasattr(self, 'primary_career_assists') and self.primary_career_assists % 100 == 0:
             logging.info("Primary - Career Assist Milestone - %s", self.primary_career_assists)
 
-        if self.primary_career_points % 100 == 0:
+        if hasattr(self, 'primary_career_points') and self.primary_career_points % 100 == 0:
             logging.info("Primary - Career Point Milestone - %s", self.scorer_career_points)
 
-        if self.secondary_career_assists % 100 == 0:
+        if hasattr(self, 'secondary_career_assists') and self.secondary_career_assists % 100 == 0:
             logging.info("Secondary - Career Assist Milestone - %s", self.secondary_career_assists)
 
-        if self.secondary_career_points % 100 == 0:
+        if hasattr(self, 'secondary_career_points') and self.secondary_career_points % 100 == 0:
             logging.info("Secondary - Career Point Milestone - %s", self.secondary_career_points)
 
 
@@ -1089,7 +1098,10 @@ class PenaltyEvent(GenericEvent):
 
     def penalty_type_fixer(self, original_type):
         """ A function that converts some poorly named penalty types. """
-        secondarty_types = {"delaying game - puck over glass": "delay of game (puck over glass)"}
+        secondarty_types = {
+            "delaying game - puck over glass": "delay of game (puck over glass)",
+            "interference - goalkeeper": "goalie interference"
+        }
         return secondarty_types.get(original_type, original_type)
 
     def get_skaters(self):
@@ -1149,7 +1161,7 @@ class PenaltyEvent(GenericEvent):
             f"{self.penalty_on_name} takes a {self.minutes}-minute {self.severity} "
             f"penalty for {self.secondary_type} and heads to the penalty box with "
             f"{self.period_time_remain} remaining in the {self.period_ordinal} period. "
-            f"That's his {utils.ordinal(self.penalty_on_game_ttl)} penalty of the game. "
+            # f"That's his {utils.ordinal(self.penalty_on_game_ttl)} penalty of the game. "
             f"{penalty_text_skaters}"
         )
 
@@ -1162,7 +1174,7 @@ class PenaltyEvent(GenericEvent):
         penalty_on_stat = penalty_on_stats[0]
         penalty_on_rank = penalty_on_stats[1]
         penalty_on_rankstat_text = (
-            f"{penalty_on_short_name} PK: {penalty_on_stat}% ({penalty_on_rank}"
+            f"{penalty_on_short_name} PK: {penalty_on_stat}% ({penalty_on_rank})"
         )
 
         penalty_draw_stats = self.penalty_draw_team.get_stat_and_rank("powerPlayPercentage")

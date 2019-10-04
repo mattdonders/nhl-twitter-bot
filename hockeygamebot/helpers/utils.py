@@ -53,7 +53,8 @@ def check_social_timeout(func):
                     event.event_type,
                     time_since_event,
                 )
-                return False
+                # return False
+                return {"twitter": None, "discord": None, "slack": None}
         except Exception as e:
             logging.warning("Timeout function should contain an event key:value. %s", e)
             return func(*args, **kwargs)

@@ -12,7 +12,7 @@ from dateutil.parser import parse
 from fake_useragent import UserAgent
 from requests.adapters import HTTPAdapter
 
-from hockeygamebot.helpers import utils
+from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.models.sessions import SessionFactory
 from hockeygamebot.models.team import Team
 from hockeygamebot.models.game import Game
@@ -328,10 +328,11 @@ def dailyfaceoff_lines(game, team):
     last_update = soup_update.text.replace("\n", "").strip().split(": ")[1]
     last_update_date = parse(last_update)
     game_day = parse(game.game_date_local)
+
     confirmed = bool(last_update_date.date() == game_day.date())
     return_dict["confirmed"] = confirmed
-    # if not confirmed:
-    #     return return_dict
+    if not confirmed:
+        return return_dict
 
     # If the lines are confirmed (updated today) then parse & return
     combos = soup.find("div", class_="team-line-combination-wrap")
@@ -369,6 +370,7 @@ def scouting_the_refs(game, pref_team):
     """
     # Initialized return dictionary
     return_dict = dict()
+    return_dict["confirmed"] = False
 
     config = utils.load_config()
     refs_url = config["endpoints"]["scouting_refs"]
@@ -384,11 +386,14 @@ def scouting_the_refs(game, pref_team):
         post_date = parse(post.get("date"))
         posted_today = bool(post_date.date() == datetime.today().date())
         post_title = post.get("title").get("rendered")
-        if (921 in categories and posted_today) or (posted_today and 'NHL' in post_title):
+        if (921 in categories and posted_today) or (posted_today and 'NHL Referees and Linesmen' in post_title):
         # if 921 in categories:     # This line is uncommented for testing on non-game days
             content = post.get("content").get("rendered")
             soup = bs4_parse(content)
             break
+    else:
+        logging.warning("BS4 result is empty - either no posts found or bad scraping.")
+        return return_dict
 
     # TESTING: This section gets commented out when needed for testing.
     # soup = BeautifulSoup(
@@ -400,13 +405,17 @@ def scouting_the_refs(game, pref_team):
 
     # If we get some bad soup, return False
     if soup is None:
-        return False
+        logging.warning("BS4 result is empty - either no posts found or bad scraping.")
+        return return_dict
 
     games = soup.find_all("h1")
     for game in games:
         if pref_team.team_name in game.text:
             game_details = game.find_next("table")
             break
+    else:
+        logging.warning("No game details found - your team is probably not playing today.")
+        return return_dict
 
     return_referees = list()
     return_linesmen = list()
@@ -459,7 +468,14 @@ def dailyfaceoff_goalies(pref_team, other_team, pref_homeaway):
     """
     return_dict = {}
     config = utils.load_config()
+    args = arguments.get_arguments()
+
     df_goalies_url = config["endpoints"]["df_starting_goalies"]
+    if args.date:
+        logging.info("Date was passed - append to the end of Daily Faceoff URL.")
+        game_date = datetime.strptime(args.date, "%Y-%m-%d")
+        game_date_mmddyyyy = game_date.strftime("%m-%d-%Y")
+        df_goalies_url = f"{df_goalies_url}{game_date_mmddyyyy}"
     df_linecombos_url = config["endpoints"]["df_line_combos"]
 
     logging.info("Trying to get starting goalie information via Daily Faceoff.")
@@ -560,3 +576,74 @@ def dailyfaceoff_goalies(pref_team, other_team, pref_homeaway):
         return return_dict
 
     return True
+
+def hockeystatcard_gamescores(game: Game):
+    """ Uses the Hockey Stat Cards API to retrieve gamescores for the current game.
+        Returns two lists of game scores - one for the home team and one for the away team.
+
+    Args:
+        game (Game): Current Game object.
+
+    Returns:
+        gamescores (tuple):  (home_gs, away_gs)
+    """
+
+    config = utils.load_config()
+    hsc_base = config["endpoints"]["hockey_stat_cards"]
+
+    hsc_season = f"{game.season[2:4]}{game.season[6:8]}"
+    hsc_gametype = "ps" if game.game_id_gametype_shortid == '1' else "rs"
+    hsc_nst_num = int(f"{game.game_id_gametype_id}{game.game_id_shortid}")
+    hsc_game_num = None
+
+    hsc_games_url = f"{hsc_base}/get-games?date={game.game_date_local}&y={hsc_season}&s={hsc_gametype}"
+    resp = thirdparty_request(hsc_games_url)
+
+    # If we get a bad response from the function above, return False
+    if resp is None:
+        return False
+
+    hsc_games_json = resp.json()
+    hsc_games = hsc_games_json["gameList"]
+
+    for hsc_game in hsc_games:
+        if hsc_nst_num == hsc_game["nstnum"]:
+            hsc_game_num = hsc_game["gamenum"]
+            logging.info("Hockey Stat Cards valid game found - HSC Game #%s", hsc_game_num)
+            break
+
+    # If we don't have a valid Hockey Stat Cards game number, return False
+    if not hsc_game_num:
+        return False
+
+    hsc_gs_url = f"{hsc_base}/get-gamescore-card/{hsc_game_num}?date={game.game_date_local}&y={hsc_season}&s={hsc_gametype}"
+    resp = thirdparty_request(hsc_gs_url)
+
+    # If we get a bad response from the function above, return False
+    if resp is None:
+        return False
+
+    home_team = game.home_team.team_name
+    home_abbrev = nst_abbreviation(team_name=home_team).replace('.', '')
+    # home_abbrev = game.home_team.tri_code
+    away_team = game.away_team.team_name
+    away_abbrev = nst_abbreviation(team_name=away_team).replace('.', '')
+    # away_abbrev = game.away_team.tri_code
+
+    hsc_gs = resp.json()
+    home_gs = list()
+    away_gs = list()
+    # all_player_data = hsc_gs['playerData'] + hsc_gs['goalieData']
+    all_player_data = hsc_gs['playerData']
+
+    home_gs = [x for x in all_player_data if x['team'] == home_abbrev or home_team.replace(' ', '_') in x['src']]
+    away_gs = [x for x in all_player_data if x['team'] == away_abbrev or away_team.replace(' ', '_') in x['src']]
+
+    # This [:5] returns the top 5 values only - leave this out and return all for better functionality.
+    # home_gs_sorted = sorted(home_gs, key = lambda i: i['GameScore'], reverse=True)[:5]
+    # away_gs_sorted = sorted(away_gs, key = lambda i: i['GameScore'], reverse=True)[:5]
+    home_gs_sorted = sorted(home_gs, key = lambda i: i['GameScore'], reverse=True)
+    away_gs_sorted = sorted(away_gs, key = lambda i: i['GameScore'], reverse=True)
+
+    game_scores = (home_gs_sorted, away_gs_sorted)
+    return game_scores
