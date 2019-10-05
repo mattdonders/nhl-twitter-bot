@@ -443,7 +443,7 @@ class PeriodEndEvent(GenericEvent):
             # Generate Stats Image
             boxscore = self.livefeed.get("liveData").get("boxscore")
             stats_image = images.stats_image(game=self.game, game_end=False, boxscore=boxscore)
-            img_filename = os.path.join(IMAGES_PATH, "temp", f"Intermission-{self.}-{game.game_id}.png")
+            img_filename = os.path.join(IMAGES_PATH, "temp", f"Intermission-{self.period}-{game.game_id}.png")
             stats_image.save(img_filename)
 
             ids = socialhandler.send(msg=self.social_msg, media=img_filename, event=self)
