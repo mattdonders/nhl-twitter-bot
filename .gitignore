@@ -33,6 +33,7 @@ resources/images/Rink-Shotmap-Generated.png
 resources/images/Final*.png
 resources/PSDs
 resources/images/temp
+hockeygamebot/resources/images/temp/
 
 # VirtualEnv Files
 bin/
@@ -46,6 +47,7 @@ env/
 # Other Files
 .coverage
 config.yaml
+
 
 #############################################
 # Github Python Default .gitignore

@@ -96,7 +96,7 @@ def final_score(livefeed: dict, game: Game):
         next_game_text = ""
 
     final_image = images.stats_image(game=game, game_end=True, boxscore=boxscore)
-    img_filename = os.path.join(IMAGES_PATH, f"Final-{game.game_id}.png")
+    img_filename = os.path.join(IMAGES_PATH, "temp", f"Final-{game.game_id}.png")
     final_image.save(img_filename)
 
     final_score_msg = f"{final_score_text}\n\n{next_game_text}"
@@ -179,7 +179,7 @@ def hockeystatcards(game: Game):
     away_gs = game_scores[1]
 
     hsc_image = images.hockeystatcards_image(game=game, home_gs=home_gs, away_gs=away_gs)
-    img_filename = os.path.join(IMAGES_PATH, f"Final-HSC-{game.game_id}.png")
+    img_filename = os.path.join(IMAGES_PATH, "temp", f"Final-HSC-{game.game_id}.png")
     hsc_image.save(img_filename)
 
     hsc_social_text = (

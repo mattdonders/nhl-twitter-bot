@@ -73,7 +73,7 @@ def generate_game_preview(game: Game):
 
     # Generate pre-game image
     pregame_image = images.pregame_image(game)
-    img_filename = os.path.join(IMAGES_PATH, f"temp/Pregame-{game.game_id}.png")
+    img_filename = os.path.join(IMAGES_PATH, "temp", f"Pregame-{game.game_id}.png")
     pregame_image.save(img_filename)
 
     # Send preview tweet w/ pre-game image to social media handler
@@ -298,47 +298,20 @@ def game_preview_others(game: Game):
             logging.error(e)
 
     # Process the pre-game information for the preferred team lines
-    if not game.preview_socials.lines_sent:
+    if not game.preview_socials.pref_lines_sent:
         try:
-            lines = thirdparty.dailyfaceoff_lines(game, pref_team)
-            if not lines.get("confirmed"):
-                raise AttributeError("Lines are not yet confirmed yet - try again next loop.")
+            pref_lines = thirdparty.dailyfaceoff_lines(game, pref_team)
+            if not pref_lines.get("confirmed"):
+                raise AttributeError("Preferred team lines are not yet confirmed yet - try again next loop.")
 
-            # Iterate over the forwards dictionary & take into account 11/7 lineups
-            fwd_line_string = list()
-            fwd_all_list = list()
-            fwds = lines.get("fwd")
-            fwd_num = len(fwds.items())
-            for idx, (_, player) in enumerate(fwds.items()):
-                last_name = " ".join(player.split()[1:])
-                fwd_line_string.append(last_name)
-                if len(fwd_line_string) == 3 or (idx + 1) == fwd_num:
-                    fwd_line_string = " - ".join(fwd_line_string)
-                    fwd_all_list.append(fwd_line_string)
-                    fwd_line_string = list()
-
-            # Iterate over the defense dictionary & take into account 11/7 lineups
-            def_line_string = list()
-            def_all_list = list()
-            defs = lines.get("def")
-            def_num = len(defs.items())
-            for idx, (_, player) in enumerate(defs.items()):
-                last_name = " ".join(player.split()[1:])
-                def_line_string.append(last_name)
-                if len(def_line_string) == 2 or (idx + 1) == def_num:
-                    def_line_string = " - ".join(def_line_string)
-                    def_all_list.append(def_line_string)
-                    def_line_string = list()
-
-            # Combine the 'all-strings' separated by new lines
-            fwd_all_string = "\n".join(fwd_all_list)
-            def_all_string = "\n".join(def_all_list)
+            fwd_string = pref_lines.get("fwd_string")
+            def_string = pref_lines.get("def_string")
 
             lines_tweet_text = (
                 f"Lines for the {pref_hashtag} -\n"
                 f"(via @DailyFaceoff)\n\n"
-                f"Forwards:\n{fwd_all_string}\n\n"
-                f"Defense:\n{def_all_string}"
+                f"Forwards:\n{fwd_string}\n\n"
+                f"Defense:\n{def_string}"
             )
 
             social_dict = socialhandler.send(
@@ -346,7 +319,39 @@ def game_preview_others(game: Game):
             )
 
             game.pregame_lasttweet = social_dict["twitter"]
-            game.preview_socials.lines_sent = True
+            game.preview_socials.pref_lines_sent = True
+
+        except AttributeError as e:
+            logging.info(e)
+        except Exception as e:
+            logging.error(
+                "Exception getting Daily Faceoff lines information - try again next loop."
+            )
+            logging.error(e)
+
+    # Process the pre-game information for the preferred team lines
+    if not game.preview_socials.other_lines_sent:
+        try:
+            other_lines = thirdparty.dailyfaceoff_lines(game, other_team)
+            if not other_lines.get("confirmed"):
+                raise AttributeError("Other team lines are not yet confirmed yet - try again next loop.")
+
+            fwd_string = other_lines.get("fwd_string")
+            def_string = other_lines.get("def_string")
+
+            lines_tweet_text = (
+                f"Lines for the {other_hashtag} -\n"
+                f"(via @DailyFaceoff)\n\n"
+                f"Forwards:\n{fwd_string}\n\n"
+                f"Defense:\n{def_string}"
+            )
+
+            social_dict = socialhandler.send(
+                msg=lines_tweet_text, reply=game.pregame_lasttweet, force_send=True
+            )
+
+            game.pregame_lasttweet = social_dict["twitter"]
+            game.preview_socials.other_lines_sent = True
 
         except AttributeError as e:
             logging.info(e)

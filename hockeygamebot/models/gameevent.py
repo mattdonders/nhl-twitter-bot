@@ -3,8 +3,10 @@ This module contains object creation for all Game Events.
 """
 
 import logging
+import os
 import traceback
 
+from hockeygamebot.definitions import IMAGES_PATH
 from hockeygamebot.helpers import utils
 from hockeygamebot.models.game import Game
 from hockeygamebot.models.gametype import GameType
@@ -139,7 +141,7 @@ def event_factory(game: Game, play: dict, livefeed: dict, new_plays: bool):
     if object_type == GoalEvent and obj is not None and not new_plays:
         score_change_msg = obj.check_for_scoring_changes(play)
         if score_change_msg is not None:
-            social_ids = socialhandler.send(msg=score_change_msg, tweet_reply=obj.tweet, force_send=True)
+            social_ids = socialhandler.send(msg=score_change_msg, reply=obj.tweet, force_send=True)
             obj.tweet = social_ids.get("twitter")
 
     # If object doesn't exist, create it & add to Cache
@@ -440,8 +442,11 @@ class PeriodEndEvent(GenericEvent):
 
             # Generate Stats Image
             boxscore = self.livefeed.get("liveData").get("boxscore")
-            self.stats_image = images.stats_image(game=self.game, game_end=False, boxscore=boxscore)
-            ids = socialhandler.send(msg=self.social_msg, event=self)
+            stats_image = images.stats_image(game=self.game, game_end=False, boxscore=boxscore)
+            img_filename = os.path.join(IMAGES_PATH, "temp", f"Intermission-{self.}-{game.game_id}.png")
+            stats_image.save(img_filename)
+
+            ids = socialhandler.send(msg=self.social_msg, media=img_filename, event=self)
 
     def get_period_end_text(self):
         """ Formats the main period end text with some logic based on score & period. """

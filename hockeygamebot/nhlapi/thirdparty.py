@@ -38,7 +38,7 @@ def thirdparty_request(url, headers=None):
 
     try:
         logging.info("Sending Third Party URL Request - %s", url)
-        response = session.get(url, headers=headers)
+        response = session.get(url, headers=headers, timeout=5)
         return response
     except requests.ConnectionError as ce:
         logging.error(ce)
@@ -353,6 +353,40 @@ def dailyfaceoff_lines(game, team):
     return_dict["fwd"] = fwd_lines
     return_dict["def"] = def_lines
     return_dict["lines"] = all_lines
+
+    # Now create the forward & defense strings
+    # Iterate over the forwards dictionary & take into account 11/7 lineups
+    fwd_line_string = list()
+    fwd_all_list = list()
+
+    fwd_num = len(fwd_lines.items())
+    for idx, (_, player) in enumerate(fwd_lines.items()):
+        last_name = " ".join(player.split()[1:])
+        fwd_line_string.append(last_name)
+        if len(fwd_line_string) == 3 or (idx + 1) == fwd_num:
+            fwd_line_string = " - ".join(fwd_line_string)
+            fwd_all_list.append(fwd_line_string)
+            fwd_line_string = list()
+
+    # Iterate over the defense dictionary & take into account 11/7 lineups
+    def_line_string = list()
+    def_all_list = list()
+
+    def_num = len(def_lines.items())
+    for idx, (_, player) in enumerate(def_lines.items()):
+        last_name = " ".join(player.split()[1:])
+        def_line_string.append(last_name)
+        if len(def_line_string) == 2 or (idx + 1) == def_num:
+            def_line_string = " - ".join(def_line_string)
+            def_all_list.append(def_line_string)
+            def_line_string = list()
+
+    # Combine the 'all-strings' separated by new lines
+    fwd_all_string = "\n".join(fwd_all_list)
+    def_all_string = "\n".join(def_all_list)
+    return_dict["fwd_string"] = fwd_all_string
+    return_dict["def_string"] = def_all_string
+
     team.lines = all_lines
 
     return return_dict

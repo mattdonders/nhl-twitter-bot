@@ -130,20 +130,20 @@ class Game:
 
         # The venue is not always a 'cherry-pick' from the dictionary
         try:
-            venue = resp["venue"]["name"]
+            venue = resp.get("venue").get("name")
         except KeyError:
-            venue = resp["teams"]["home"]["team"]["venue"]["name"]
+            venue = resp.get("teams").get("home").get("team").get("venue").get("name")
 
         # Get the preferred team flag from the Team objects attribute
         preferred = "home" if home_team.preferred else "away"
 
         return Game(
-            game_id=resp["gamePk"],
-            season=resp["season"],
-            game_type=resp["gameType"],
-            date_time=resp["gameDate"],
-            game_state=resp["status"]["abstractGameState"],
-            live_feed=resp["link"],
+            game_id=resp.get("gamePk"),
+            season=resp.get("season"),
+            game_type=resp.get("gameType"),
+            date_time=resp.get("gameDate"),
+            game_state=resp.get("status").get("abstractGameState"),
+            live_feed=resp.get("link"),
             venue=venue,
             home=home_team,
             away=away_team,
@@ -161,13 +161,13 @@ class Game:
 
         # Update Game State & Period related attributes
         self.game_state = response.get("gameData").get("status").get("abstractGameState")
-        self.period.current = linescore["currentPeriod"]
-        self.period.current_ordinal = linescore["currentPeriodOrdinal"]
-        self.period.time_remaining = linescore["currentPeriodTimeRemaining"]
+        self.period.current = linescore.get("currentPeriod")
+        self.period.current_ordinal = linescore.get("currentPeriodOrdinal")
+        self.period.time_remaining = linescore.get("currentPeriodTimeRemaining")
 
-        intermission = linescore["intermissionInfo"]
-        self.period.intermission = intermission["inIntermission"]
-        self.period.intermission_remaining = intermission["intermissionTimeRemaining"]
+        intermission = linescore.get("intermissionInfo")
+        self.period.intermission = intermission.get("inIntermission")
+        self.period.intermission_remaining = intermission.get("intermissionTimeRemaining")
 
         linescore_home = linescore.get("teams").get("home")
         self.home_team.score = linescore_home.get("goals")
@@ -177,11 +177,11 @@ class Game:
         self.away_team.score = linescore_away.get("goals")
         self.away_team.shots = linescore_away.get("shots")
 
-        self.power_play_strength = linescore["powerPlayStrength"]
-        self.home_team.power_play = linescore_home["powerPlay"]
-        self.home_team.skaters = linescore_home["numSkaters"]
-        self.away_team.power_play = linescore_away["powerPlay"]
-        self.away_team.skaters = linescore_away["numSkaters"]
+        self.power_play_strength = linescore.get("powerPlayStrength")
+        self.home_team.power_play = linescore_home.get("powerPlay")
+        self.home_team.skaters = linescore_home.get("numSkaters")
+        self.away_team.power_play = linescore_away.get("powerPlay")
+        self.away_team.skaters = linescore_away.get("numSkaters")
 
         # self.last_event_idx = (
         #     response.get("liveData").get("plays").get("currentPlay").get("about").get("eventIdx")
@@ -202,8 +202,8 @@ class Game:
             event_filter_list = (models.gameevent.GoalEvent, models.gameevent.PenaltyEvent)
 
             # Get current values from the linescore
-            home_goalie_current = linescore_home["goaliePulled"]
-            away_goalie_current = linescore_away["goaliePulled"]
+            home_goalie_current = linescore_home.get("goaliePulled")
+            away_goalie_current = linescore_away.get("goaliePulled")
 
 
             # Logic to determine previous & current goalie state
@@ -331,7 +331,7 @@ class Game:
     @property
     def live_feed(self):
         """Returns a full URL to the livefeed API endpoint."""
-        base_url = utils.load_config()["endpoints"]["nhl_base"]
+        base_url = utils.load_config().get("endpoints").get("nhl_base")
         full_url = "{}{}".format(base_url, self.live_feed_endpoint)
         return full_url
 
@@ -366,8 +366,10 @@ class StartOfGameSocial:
         self.goalies_other_sent = False
         self.officials_msg = None
         self.officials_sent = False
-        self.lines_msg = None
-        self.lines_sent = False
+        self.pref_lines_msg = None
+        self.pref_lines_sent = False
+        self.other_lines_msg = None
+        self.other_lines_sent = False
 
     @property
     def all_social_sent(self):
