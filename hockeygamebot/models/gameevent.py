@@ -970,7 +970,7 @@ class GoalEvent(GenericEvent):
                     f"and {self.secondary_name} ({self.secondary_season_ttl})."
                 )
             else:
-                goal_scorechange_text = f"The {self.scorer_name} goal is now uniassisted!"
+                goal_scorechange_text = f"The {self.scorer_name} goal is now unassisted!"
         else:
             goal_scorechange_text = None
             return None
@@ -1187,7 +1187,7 @@ class PenaltyEvent(GenericEvent):
         penalty_draw_stat = penalty_draw_stats[0]
         penalty_draw_rank = penalty_draw_stats[1]
         penalty_draw_rankstat_text = (
-            f"{penalty_draw_short_name} PP: {penalty_draw_stat} ({penalty_draw_rank})"
+            f"{penalty_draw_short_name} PP: {penalty_draw_stat}% ({penalty_draw_rank})"
         )
 
         penalty_rankstat_text = f"{penalty_on_rankstat_text}\n{penalty_draw_rankstat_text}"
