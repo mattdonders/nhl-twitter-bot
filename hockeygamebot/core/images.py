@@ -2,12 +2,12 @@ import logging
 import os
 from enum import Enum
 
-import numpy as np
-import pandas as pd
-import matplotlib
-matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
-from PIL import Image, ImageColor, ImageDraw, ImageFont, ImageOps
+# import numpy as np
+# import pandas as pd
+# import matplotlib
+# matplotlib.use('TkAgg')
+# import matplotlib.pyplot as plt
+from PIL import Image, ImageDraw, ImageFont
 
 from hockeygamebot.definitions import IMAGES_PATH, PROJECT_ROOT
 from hockeygamebot.helpers import utils

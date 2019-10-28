@@ -48,6 +48,10 @@ env/
 .coverage
 config.yaml
 
+# V1 Files (Ignoring After V2)
+hockey_twitter_bot.py
+nhl_game_events.py
+
 
 #############################################
 # Github Python Default .gitignore
