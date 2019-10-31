@@ -73,7 +73,7 @@ def nonroster_player_attr_by_id(player_id, attribute):
     Returns:
         string: Attribute of the person requested.
     """
-    api_player_url = f"/people/{[player_id]}"
+    api_player_url = f"/people/{player_id}"
     api_player = api.nhl_api(api_player_url).json()
     player_attr = api_player["people"][0][attribute]
     return player_attr
