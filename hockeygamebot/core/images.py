@@ -761,7 +761,7 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
         )
 
     # Loop through other goals (unless there are none)
-    if not game.pref_goals:
+    if not game.other_goals:
         TOP = Constants.GOALBOX_START_Y + Constants.GOALBOX_H + Constants.GOALBOX_SEPARATOR
         center_text(
             draw, Constants.GOALBOX_START_X, top=TOP, width=Constants.GOALBOX_W,
