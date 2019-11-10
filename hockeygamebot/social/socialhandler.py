@@ -41,7 +41,19 @@ def send(msg, **kwargs):
         return return_dict
 
     if social_config["twitter"]:
-        tweet_id = twitter.send_tweet(msg, media=kwargs.get("media"), reply=kwargs.get("reply"))
+        # tweet_id = twitter.send_tweet(
+        #     msg, media=kwargs.get("media"), reply=kwargs.get("reply"), hashtag=kwargs.get("hashtag")
+        # )
+        team_hashtag = kwargs.get("team_hashtag")
+        game_hashtag = kwargs.get("game_hashtag")
+        tweet_id = twitter.send_tweet(
+            msg,
+            media=kwargs.get("media"),
+            reply=kwargs.get("reply"),
+            hashtags=kwargs.get("hashtags"),
+            team_hashtag=kwargs.get("team_hashtag"),
+            game_hashtag=kwargs.get("game_hashtag"),
+        )
         return_dict["twitter"] = tweet_id
 
     if social_config["discord"]:
@@ -51,4 +63,3 @@ def send(msg, **kwargs):
         pass
 
     return return_dict
-

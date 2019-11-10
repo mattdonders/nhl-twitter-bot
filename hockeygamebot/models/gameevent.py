@@ -141,7 +141,7 @@ def event_factory(game: Game, play: dict, livefeed: dict, new_plays: bool):
     if object_type == GoalEvent and obj is not None and not new_plays:
         score_change_msg = obj.check_for_scoring_changes(play)
         if score_change_msg is not None:
-            social_ids = socialhandler.send(msg=score_change_msg, reply=obj.tweet, force_send=True)
+            social_ids = socialhandler.send(msg=score_change_msg, reply=obj.tweet, force_send=True, game_hashtag=True)
             obj.tweet = social_ids.get("twitter")
 
     # If object doesn't exist, create it & add to Cache
@@ -297,7 +297,7 @@ class PeriodStartEvent(GenericEvent):
 
         # Now call any functions that should be called when creating a new object
         self.generate_social_msg()
-        ids = socialhandler.send(msg=self.social_msg, event=self)
+        ids = socialhandler.send(msg=self.social_msg, event=self, game_hashtag=True)
 
     def generate_social_msg(self):
         """ Used for generating the message that will be logged or sent to social media. """
@@ -446,7 +446,7 @@ class PeriodEndEvent(GenericEvent):
             img_filename = os.path.join(IMAGES_PATH, "temp", f"Intermission-{self.period}-{game.game_id}.png")
             stats_image.save(img_filename)
 
-            ids = socialhandler.send(msg=self.social_msg, media=img_filename, event=self)
+            ids = socialhandler.send(msg=self.social_msg, media=img_filename, event=self, game_hashtag=True)
 
     def get_period_end_text(self):
         """ Formats the main period end text with some logic based on score & period. """
@@ -570,7 +570,7 @@ class FaceoffEvent(GenericEvent):
         # Now call any functions that should be called when creating a new object
         if self.opening_faceoff:
             self.generate_social_msg()
-            ids = socialhandler.send(msg=self.social_msg, event=self)
+            ids = socialhandler.send(msg=self.social_msg, event=self, game_hashtag=True)
 
     def generate_social_msg(self):
         """ Used for generating the message that will be logged or sent to social media. """
@@ -691,7 +691,7 @@ class GoalEvent(GenericEvent):
         self.goal_title_text = self.get_goal_title_text()
         self.goal_main_text = self.get_goal_main_text()
         self.social_msg = f"{self.goal_title_text}\n\n{self.goal_main_text}"
-        social_ids = socialhandler.send(msg=self.social_msg, event=self)
+        social_ids = socialhandler.send(msg=self.social_msg, event=self, game_hashtag=True)
 
         # Set any social media IDs
         self.tweet = social_ids.get("twitter")
@@ -1021,7 +1021,7 @@ class ShotEvent(GenericEvent):
         # (FOR NOW) we only checked for missed shots that hit the post.
         if self.crossbar_or_post():
             self.generate_social_msg()
-            ids = socialhandler.send(msg=self.social_msg, event=self)
+            ids = socialhandler.send(msg=self.social_msg, event=self, game_hashtag=True)
 
     def crossbar_or_post(self):
         """ Checks shot text to determine if the shot was by the preferred
@@ -1099,7 +1099,7 @@ class PenaltyEvent(GenericEvent):
         self.penalty_main_text = self.get_skaters()
         self.penalty_rankstat_text = self.get_penalty_stats()
         self.generate_social_msg()
-        ids = socialhandler.send(msg=self.social_msg, event=self)
+        ids = socialhandler.send(msg=self.social_msg, event=self, game_hashtag=True)
 
     def penalty_type_fixer(self, original_type):
         """ A function that converts some poorly named penalty types. """

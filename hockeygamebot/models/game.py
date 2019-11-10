@@ -12,7 +12,18 @@ from hockeygamebot.helpers import utils
 from hockeygamebot.models.period import Period
 from hockeygamebot.models.shootout import Shootout
 from hockeygamebot.models.team import Team
+from hockeygamebot.models.hashtag import Hashtag
 from hockeygamebot.social import socialhandler
+
+
+# class Hashtag:
+#     """ A class to hold hashtags for the game to reference anywhere in the code that we need them. """
+
+#     game_hashtag = None
+#     pref_hashtag = None
+#     other_hashtag = None
+#     home_hashtag = None
+#     away_hashtag = None
 
 
 class Game:
@@ -114,6 +125,13 @@ class Game:
         else:
             self.game_id_gametype = "Unknown"
 
+        # Set the hashtags in the Hashtag class
+        Hashtag.game_hashtag = f"#{self.away_team.tri_code}vs{self.home_team.tri_code}"
+        Hashtag.pref_hashtag = utils.team_hashtag(self.preferred_team.team_name, self.game_type)
+        Hashtag.other_hashtag = utils.team_hashtag(self.other_team.team_name, self.game_type)
+        Hashtag.home_hashtag = utils.team_hashtag(self.home_team.team_name, self.game_type)
+        Hashtag.away_hashtag = utils.team_hashtag(self.away_team.team_name, self.game_type)
+
     @classmethod
     def from_json_and_teams(cls, resp: dict, home_team: Team, away_team: Team) -> "Game":
         """ A class method that creates a Game object from a combination of the argument fields
@@ -187,7 +205,6 @@ class Game:
         #     response.get("liveData").get("plays").get("currentPlay").get("about").get("eventIdx")
         # )
 
-
     def goalie_pull_updater(self, response):
         """ Use the livefeed to determine if the goalie of either team has been pulled.
             And keep the attribute updated in each team object.
@@ -205,7 +222,6 @@ class Game:
             home_goalie_current = linescore_home.get("goaliePulled")
             away_goalie_current = linescore_away.get("goaliePulled")
 
-
             # Logic to determine previous & current goalie state
             # If the goalie was in net last update, update with new value & check the change.
             # If the goalie was pulled in last update & an important event happened - update & check change.
@@ -214,20 +230,28 @@ class Game:
                 logging.debug("Home goalie in net - check & update goalie attribute.")
                 home_goalie_pulled = self.home_team.goalie_pulled_setter(home_goalie_current)
             elif self.home_team.goalie_pulled and isinstance(last_tracked_event, event_filter_list):
-                logging.info("Home goalie previously pulled, but important event detected - update & check.")
+                logging.info(
+                    "Home goalie previously pulled, but important event detected - update & check."
+                )
                 home_goalie_pulled = self.home_team.goalie_pulled_setter(home_goalie_current)
             else:
-                logging.info("Home goalie is pulled and either no event or a non-important event happened - do nothing.")
+                logging.info(
+                    "Home goalie is pulled and either no event or a non-important event happened - do nothing."
+                )
                 return
 
             if not self.away_team.goalie_pulled:
                 logging.debug("Home goalie in net - check & update goalie attribute.")
                 away_goalie_pulled = self.away_team.goalie_pulled_setter(away_goalie_current)
             elif self.away_team.goalie_pulled and isinstance(last_tracked_event, event_filter_list):
-                logging.info("Away goalie previously pulled, but important event detected - update & check.")
+                logging.info(
+                    "Away goalie previously pulled, but important event detected - update & check."
+                )
                 away_goalie_pulled = self.home_team.goalie_pulled_setter(away_goalie_current)
             else:
-                logging.info("Away goalie is pulled and either no event or a non-important event happened - do nothing.")
+                logging.info(
+                    "Away goalie is pulled and either no event or a non-important event happened - do nothing."
+                )
                 return
 
             if home_goalie_pulled:
@@ -237,7 +261,9 @@ class Game:
                 trailing_score = self.home_team.score - self.away_team.score
                 self.goalie_pull_social(self.away_team.short_name, trailing_score)
         except IndexError as e:
-            logging.warning("Tried to update goalie pulled status, but got an error - try again next loop.")
+            logging.warning(
+                "Tried to update goalie pulled status, but got an error - try again next loop."
+            )
             logging.warning(e)
 
     def goalie_pull_social(self, team_name, trailing_score):

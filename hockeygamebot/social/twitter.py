@@ -7,6 +7,7 @@ import logging
 import tweepy
 
 from hockeygamebot.helpers import arguments, utils
+from hockeygamebot.models.hashtag import Hashtag
 
 
 def get_api():
@@ -36,7 +37,7 @@ def get_api():
     return tweepy_session
 
 
-def send_tweet(tweet_text, media=None, reply=None):
+def send_tweet(tweet_text, media=None, reply=None, hashtags=None, team_hashtag=None, game_hashtag=None):
     """ Generic tweet function that uses logic to call other specific functions.
 
     Args:
@@ -61,6 +62,13 @@ def send_tweet(tweet_text, media=None, reply=None):
     # Get the API session & send a tweet depending on the parameters sent
     api = get_api()
 
+    # Add any hashtags that need to be added
+    # Start with team hashtag (most required)
+    # if hashtags:
+    #     tweet_text = f'{tweet_text}\n\n{hashtags}'
+    if game_hashtag:
+        tweet_text = f"{tweet_text}\n\n{Hashtag.game_hashtag}"
+
     try:
         if not reply and not media:
             status = api.update_status(status=tweet_text)
@@ -71,9 +79,7 @@ def send_tweet(tweet_text, media=None, reply=None):
             status = api.update_status(status=tweet_text, in_reply_to_status_id=reply)
         elif reply and media:
             tweet_text = f"@{twitter_handle} {tweet_text}"
-            status = api.update_with_media(
-                status=tweet_text, filename=media, in_reply_to_status_id=reply
-            )
+            status = api.update_with_media(status=tweet_text, filename=media, in_reply_to_status_id=reply)
 
         return status.id_str
 
@@ -81,4 +87,3 @@ def send_tweet(tweet_text, media=None, reply=None):
         logging.error("Failed to send tweet : %s", tweet_text)
         logging.error(e)
         return None
-
