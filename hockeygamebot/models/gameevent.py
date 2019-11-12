@@ -36,7 +36,7 @@ def event_mapper(event: str, event_type: str) -> object:
         "goal": GoalEvent,
         "blocked shot": ShotEvent,
         "penalty": PenaltyEvent,
-        "period ready": PeriodStartEvent,
+        "period ready": PeriodReadyEvent,
         "shot": ShotEvent,
         "period official": PeriodEndEvent,
         "stoppage": StopEvent,
@@ -59,7 +59,7 @@ def event_mapper(event: str, event_type: str) -> object:
 
     event_type_map = {
         "GAME_SCHEDULED": GenericEvent,
-        "PERIOD_READY": PeriodStartEvent,
+        "PERIOD_READY": PeriodReadyEvent,
         "PERIOD_START": PeriodStartEvent,
         "FACEOFF": FaceoffEvent,
         "HIT": HitEvent,
@@ -76,8 +76,8 @@ def event_mapper(event: str, event_type: str) -> object:
         "PERIOD_OFFICIAL": PeriodEndEvent,
         "GAME_END": GameEndEvent,
         "gamecenterGameScheduled": GenericEvent,
-        "gamecenterPeriodReady": PeriodStartEvent,
-        "gamecenterPeroidReady": PeriodStartEvent,
+        "gamecenterPeriodReady": PeriodReadyEvent,
+        "gamecenterPeroidReady": PeriodReadyEvent,
         "gamecenterPeriodStart": PeriodStartEvent,
         "gamecenterFaceoff": FaceoffEvent,
         "gamecenterHit": HitEvent,
@@ -285,8 +285,8 @@ class GenericEvent:
         return dict_obj if withsource else dict_obj_nosource
 
 
-class PeriodStartEvent(GenericEvent):
-    """ A Period Start object contains all start of period-related attributes and extra methods.
+class PeriodReadyEvent(GenericEvent):
+    """ A Period Ready object contains all of period-ready-related attributes and extra methods.
         It is a subclass of the GenericEvent class with the most basic attributes.
     """
 
@@ -297,54 +297,23 @@ class PeriodStartEvent(GenericEvent):
 
         # Now call any functions that should be called when creating a new object
         self.generate_social_msg()
-        ids = socialhandler.send(msg=self.social_msg, event=self, game_hashtag=True)
+        if self.social_msg:
+            ids = socialhandler.send(msg=self.social_msg, event=self, game_hashtag=True)
 
     def generate_social_msg(self):
         """ Used for generating the message that will be logged or sent to social media. """
+        preferred_homeaway = self.game.preferred_team.home_away
+        players = self.livefeed.get("gameData").get("players")
+        on_ice = (
+            self.livefeed.get("liveData")
+            .get("boxscore")
+            .get("teams")
+            .get(preferred_homeaway)
+            .get("onIce")
+        )
+        self.social_msg = self.get_lineup(on_ice, players) if on_ice else None
 
-        # Logic for Period Ready Events (used for lineups)
-        if "ready" in self.event_type.lower():
-            preferred_homeaway = self.game.preferred_team.home_away
-            players = self.livefeed.get("gameData").get("players")
-            on_ice = (
-                self.livefeed.get("liveData")
-                .get("boxscore")
-                .get("teams")
-                .get(preferred_homeaway)
-                .get("onIce")
-            )
-            self.social_msg = self.get_lineup(on_ice, players)
 
-        # Logic for Period Start Events
-        elif "start" in self.event_type.lower():
-            # First period start event
-            if self.period == 1:
-                self.social_msg = (
-                    f"The puck has dropped between the "
-                    f"{self.game.preferred_team.short_name} & "
-                    f"{self.game.other_team.short_name} at {self.game.venue}!"
-                )
-            # Second & Third period start events are same for all game types
-            elif self.period in (2, 3):
-                self.social_msg = (
-                    f"It's time for the {self.period_ordinal} period at " f"{self.game.venue}."
-                )
-            # Non-Playoff Game Period Start (3-on-3 OT)
-            elif self.period == 4 and self.game.game_type in ("PR", "R"):
-                self.social_msg = (
-                    f"Who will be the hero this time? "
-                    f"3-on-3 OT starts now at {self.game.venue}."
-                )
-            # Playoff Game Period Start (5-on-5 OT)
-            elif self.period > 3 and self.game.game_type == "P":
-                ot_period = self.period - 3
-                self.social_msg = (
-                    f"Who will be the hero this time? "
-                    f"OT{ot_period} starts now at {self.game.venue}."
-                )
-            # Start of the Shootout (Period 5 of Non-Playoff Game)
-            elif self.period == 5 and self.game.game_type in ("PR", "R"):
-                self.social_msg = f"The shootout is underway at {self.game.venue}!"
 
     def get_lineup(self, on_ice, players):
         """ Generates a lineup message for a given team.
@@ -420,6 +389,53 @@ class PeriodStartEvent(GenericEvent):
             )
 
         return social_msg
+
+
+class PeriodStartEvent(GenericEvent):
+    """ A Period Start object contains all start of period-related attributes and extra methods.
+        It is a subclass of the GenericEvent class with the most basic attributes.
+    """
+
+    cache = Cache(__name__)
+
+    def __init__(self, data: dict, game: Game):
+        super().__init__(data, game)
+
+        # Now call any functions that should be called when creating a new object
+        self.generate_social_msg()
+        ids = socialhandler.send(msg=self.social_msg, event=self, game_hashtag=True)
+
+    def generate_social_msg(self):
+        """ Used for generating the message that will be logged or sent to social media. """
+
+        # First period start event
+        if self.period == 1:
+            self.social_msg = (
+                f"The puck has dropped between the "
+                f"{self.game.preferred_team.short_name} & "
+                f"{self.game.other_team.short_name} at {self.game.venue}!"
+            )
+        # Second & Third period start events are same for all game types
+        elif self.period in (2, 3):
+            self.social_msg = (
+                f"It's time for the {self.period_ordinal} period at " f"{self.game.venue}."
+            )
+        # Non-Playoff Game Period Start (3-on-3 OT)
+        elif self.period == 4 and self.game.game_type in ("PR", "R"):
+            self.social_msg = (
+                f"Who will be the hero this time? "
+                f"3-on-3 OT starts now at {self.game.venue}."
+            )
+        # Playoff Game Period Start (5-on-5 OT)
+        elif self.period > 3 and self.game.game_type == "P":
+            ot_period = self.period - 3
+            self.social_msg = (
+                f"Who will be the hero this time? "
+                f"OT{ot_period} starts now at {self.game.venue}."
+            )
+        # Start of the Shootout (Period 5 of Non-Playoff Game)
+        elif self.period == 5 and self.game.game_type in ("PR", "R"):
+            self.social_msg = f"The shootout is underway at {self.game.venue}!"
 
 
 class PeriodEndEvent(GenericEvent):
