@@ -7,6 +7,7 @@ import functools
 import logging
 import math
 import os
+import time
 from datetime import datetime, timezone
 
 import dateutil.parser
@@ -338,3 +339,16 @@ def time_remain_converter(time: str) -> str:
 #             live.live_loop(livefeed=data, game=game)
 #             game.update_game(data)
 #             time.sleep(sleep)
+
+
+def from_mmss(time_input):
+    """ Converts a timestamp in MM:SS format to an integer for comparison. """
+    m, s = time_input.split(":")
+    output = int(m) * 60 + int(s)
+    return output
+
+
+def to_mmss(time_input):
+    """ Converts a time based integer (in seconds) to MM:SS format. """
+    return time.strftime("%M:%S", time.gmtime(time_input))
+
