@@ -739,14 +739,6 @@ class GoalEvent(GenericEvent):
         self.event_team = data.get("team").get("name")
         self.tweet = None
 
-        # Add this event to the goals list in the game
-        goals_list = (
-            self.game.pref_goals
-            if self.event_team == self.game.preferred_team.team_name
-            else self.game.other_goals
-        )
-        goals_list.append(self)
-
         # Get the Coordinates Section
         coordinates = data.get("coordinates")
         self.x = coordinates.get("x", 0.0)
@@ -781,15 +773,24 @@ class GoalEvent(GenericEvent):
         print(f"Goal Scorer ({self.scorer_name}) Career Points - {self.scorer_career_points}")
 
         # Goalie isn't recorded for empty net goals
-        if not self.empty_net:
+        try:
             self.goalie_name = goalie[0].get("player").get("fullName")
             self.goalie_id = goalie[0].get("player").get("id")
-        else:
+        except IndexError as e:
+            logging.warning("No goalie was recorded - not needed so just setting to None. %s", e)
             self.goalie_name = None
             self.goalie_id = None
 
         # Assist parsing is contained within a function
         self.parse_assists(assist=assist)
+
+        # Add this event to the goals list in the game
+        goals_list = (
+            self.game.pref_goals
+            if self.event_team == self.game.preferred_team.team_name
+            else self.game.other_goals
+        )
+        goals_list.append(self)
 
         # Now call any functions that should be called when creating a new object
         self.goal_title_text = self.get_goal_title_text()
