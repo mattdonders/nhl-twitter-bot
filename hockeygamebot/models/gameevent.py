@@ -794,7 +794,11 @@ class GoalEvent(GenericEvent):
         # Now call any functions that should be called when creating a new object
         self.goal_title_text = self.get_goal_title_text()
         self.goal_main_text = self.get_goal_main_text()
-        self.social_msg = f"{self.goal_title_text}\n\n{self.goal_main_text}"
+        self.social_msg = (
+            f"{self.goal_title_text}\n\n{self.goal_main_text}\n\n"
+            f"{game.preferred_team.short_name}: {game.preferred_team.score} / "
+            f"{game.other_team.short_name}: {game.other_team.score}"
+        )
         social_ids = socialhandler.send(msg=self.social_msg, event=self, game_hashtag=True)
 
         # Set any social media IDs
