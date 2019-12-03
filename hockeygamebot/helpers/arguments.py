@@ -46,6 +46,9 @@ def _parse_local_arguments(sysargs):
     parser.add_argument("--split", help="split squad game index", action="store_true")
     parser.add_argument("--docker", help="running in a docker container", action="store_true")
     parser.add_argument("--discord", help="Send messages to discord channel", action="store_true")
+    parser.add_argument(
+        "--config", help="Overrides the config.yaml with another filename.", action="store"
+    )
     parser.add_argument("-v", help="Increased verbosity.", action="store_true")
     arguments = parser.parse_args() if sysargs is None else parser.parse_args(sysargs)
     return arguments
