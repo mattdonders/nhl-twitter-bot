@@ -47,6 +47,7 @@ env/
 # Other Files
 .coverage
 config.yaml
+config*.yaml
 
 # V1 Files (Ignoring After V2)
 hockey_twitter_bot.py

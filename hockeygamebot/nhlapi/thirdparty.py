@@ -102,7 +102,7 @@ def nst_abbreviation(team_name: str) -> str:
         "Philadelphia Flyers": "PHI",
         "Pittsburgh Penguins": "PIT",
         "San Jose Sharks": "S.J",
-        "St Louis Blues": "STL",
+        "St. Louis Blues": "STL",
         "Tampa Bay Lightning": "T.B",
         "Toronto Maple Leafs": "TOR",
         "Vancouver Canucks": "VAN",
