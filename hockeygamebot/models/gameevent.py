@@ -1217,6 +1217,8 @@ class PenaltyEvent(GenericEvent):
         secondarty_types = {
             "delaying game - puck over glass": "delay of game (puck over glass)",
             "interference - goalkeeper": "goalie interference",
+            "missing key [pd_151]": "delay of game (unsuccessful challenge)",
+            "hi-sticking": "high sticking"
         }
         return secondarty_types.get(original_type, original_type)
 
