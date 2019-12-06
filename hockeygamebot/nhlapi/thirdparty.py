@@ -315,7 +315,7 @@ def dailyfaceoff_lines(game, team):
     ua = UserAgent()
     ua_header = {"User-Agent": str(ua.chrome)}
 
-    df_team_encoded = team.team_name.replace(" ", "-").replace("é", "e").lower()
+    df_team_encoded = team.team_name.replace(" ", "-").replace("é", "e").replace(".", "").lower()
     df_lines_url = df_linecombos_url.replace("TEAMNAME", df_team_encoded)
 
     logging.info("Requesting & souping the Daily Faceoff lines page.")
