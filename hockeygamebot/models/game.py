@@ -55,6 +55,8 @@ class Game:
             self.preferred_team = away
             self.other_team = home
 
+        self.tz_id = dateutil.tz.gettz(self.preferred_team.tz_id)
+        self.tz_offset = self.tz_id.utcoffset(datetime.now(self.tz_id))
         self.past_start_time = False
         self.last_event_idx = 0
         self.power_play_strength = "Even"
@@ -90,6 +92,7 @@ class Game:
 
         self.preview_socials = StartOfGameSocial()
         self.final_socials = EndOfGameSocial()
+        self.nst_charts = NSTChartSocial()
         self.finaltweets_retry = 0
 
         # Parse Game ID to get attributes
@@ -274,15 +277,12 @@ class Game:
 
         socialhandler.send(msg=goalie_pull_text, force_send=True)
 
-    # Commands used to calculate time related attributes
-    localtz = dateutil.tz.tzlocal()
-    localoffset = localtz.utcoffset(datetime.now(localtz))
 
     @property
     def day_of_game_local(self):
         """Returns the day of date_time in local server time."""
         game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
-        game_date_local = game_date + self.localoffset
+        game_date_local = game_date + self.tz_offset
         game_day_local = game_date_local.strftime("%A")
         return game_day_local
 
@@ -290,7 +290,7 @@ class Game:
     def month_day_local(self):
         """Returns the month & date of date_time in local server time."""
         game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
-        game_date_local = game_date + self.localoffset
+        game_date_local = game_date + self.tz_offset
         game_abbr_month = game_date_local.strftime("%b %d").lstrip("0")
         return game_abbr_month
 
@@ -298,7 +298,7 @@ class Game:
     def game_time_local(self):
         """Returns the game date_time in local server time in AM / PM format."""
         game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
-        game_date_local = game_date + self.localoffset
+        game_date_local = game_date + self.tz_offset
         game_date_local_ampm = game_date_local.strftime("%I:%M %p")
         return game_date_local_ampm
 
@@ -306,7 +306,7 @@ class Game:
     def game_date_local(self):
         """ Returns the game as Y-m-d format in local time zone. """
         game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
-        game_date_local = game_date + self.localoffset
+        game_date_local = game_date + self.tz_offset
         game_date_local_api = game_date_local.strftime("%Y-%m-%d")
         return game_date_local_api
 
@@ -314,7 +314,7 @@ class Game:
     def game_date_mmddyyyy(self):
         """ Returns the game as Y-m-d format in local time zone. """
         game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
-        game_date_local = game_date + self.localoffset
+        game_date_local = game_date + self.tz_offset
         game_date_local_mmddyyyy = game_date_local.strftime("%m/%d/%Y")
         return game_date_local_mmddyyyy
 
@@ -322,7 +322,7 @@ class Game:
     def game_date_short(self):
         """Returns the game date_time in local server time in AM / PM format."""
         game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
-        game_date_local = game_date + self.localoffset
+        game_date_local = game_date + self.tz_offset
         game_date_local_short = game_date_local.strftime("%B %d").replace(" 0", " ").upper()
         return game_date_local_short
 
@@ -330,7 +330,7 @@ class Game:
     def game_time_of_day(self):
         """Returns the time of the day of the game (later today or tonight)."""
         game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
-        game_date_local = game_date + self.localoffset
+        game_date_local = game_date + self.tz_offset
         game_date_hour = game_date_local.strftime("%H")
         return "tonight" if int(game_date_hour) > 17 else "later today"
 
@@ -338,7 +338,7 @@ class Game:
     def game_time_countdown(self):
         """Returns a countdown (in seconds) to the game start time."""
         game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
-        game_date_local = game_date + self.localoffset
+        game_date_local = game_date + self.tz_offset
         countdown = (game_date_local - datetime.now()).total_seconds()
         # value_when_true if condition else value_when_false
         return 0 if countdown < 0 else countdown
@@ -398,6 +398,13 @@ class StartOfGameSocial:
     def retries_exeeded(self):
         """ Returns True if the number of retires (3 = default) has been exceeded. """
         return bool(self.retry_count >= 3)
+
+
+class NSTChartSocial:
+    """ A class that holds the state of all NST chart social media messages & statuses."""
+
+    def __init__(self):
+        pass
 
 
 class EndOfGameSocial:

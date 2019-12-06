@@ -12,7 +12,7 @@ class Team(object):
     """Holds attributes related to a team - usually two created per game."""
 
     def __init__(
-        self, team_id, team_name, short_name, tri_code, home_away, tv_channel, games, record, season
+        self, team_id, team_name, short_name, tri_code, home_away, tv_channel, games, record, season, tz_id
     ):
         self.team_id = team_id
         self.team_name = team_name
@@ -23,6 +23,7 @@ class Team(object):
         self.games = games
         self.record = record
         self.season = season
+        self.tz_id = tz_id
 
         # Not passed in at object creation time
         # self.team_hashtag = team_hashtag(self.team_name)
@@ -129,6 +130,7 @@ class Team(object):
         # The following are not always a 'cherry-pick' from the dictionary
         channel = broadcasts.get(homeaway)
         record = resp["teams"][homeaway]["leagueRecord"]
+        tz_id = resp["teams"][homeaway]["team"]["venue"]["timeZone"]["id"]
 
         if GameType(resp["gameType"]) in (GameType.PLAYOFFS, GameType.PREASEASON):
             games = record["wins"] + record["losses"]
@@ -145,6 +147,7 @@ class Team(object):
             games=games,
             record=record,
             season=resp["season"],
+            tz_id=tz_id
         )
 
     @property
