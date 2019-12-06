@@ -23,7 +23,8 @@ from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.models.game import Game
 from hockeygamebot.models.gamestate import GameState
 from hockeygamebot.models.team import Team
-from hockeygamebot.nhlapi import livefeed, roster, schedule, thirdparty
+from hockeygamebot.nhlapi import livefeed, nst, roster, schedule
+from hockeygamebot.social import socialhandler
 
 
 def start_game_loop(game: Game):
@@ -108,8 +109,28 @@ def start_game_loop(game: Game):
                 logging.error("Uncaught exception in live game loop - see below error.")
                 logging.error(error)
 
-            # Calculate proper sleep time based on intermission status
+            # Perform any intermission score changes, charts & sleep
             if game.period.intermission:
+                # If we are in intermission, check if NST is ready for charts.
+                # Incorporating the check into this loop will be sure we obey the 60s sleep rule.
+                # We use the currentPeriod as the key to lookup if the charts
+                # have been sent for the current period's intermission
+                nst_chart_period_sent = game.nst_charts.charts_by_period.get(game.period.current)
+                if not nst_chart_period_sent:
+                    logging.info("NST Charts not yet sent - check if it's ready for us to scrape.")
+                    nst_ready = nst.is_nst_ready(game.preferred_team.short_name)
+                    if nst_ready:
+                        list_of_charts = nst.generate_all_charts(game=game)
+                        charts_msg = (
+                            f"Individual, on-ice, forward lines & defensive pairs after the "
+                            f"{game.period.current_ordinal} period (via @NatStatTrick)."
+                        )
+                        social_ids = socialhandler.send(
+                            charts_msg, media=list_of_charts, game_hashtag=True
+                        )
+                        nst_chart_period_sent = social_ids.get("twitter")
+
+                # Calculate proper sleep time based on intermission status
                 if game.period.intermission_remaining > config["script"]["intermission_sleep_time"]:
                     live_sleep_time = config["script"]["intermission_sleep_time"]
                     logging.info(
@@ -153,6 +174,18 @@ def start_game_loop(game: Game):
 
             if not game.final_socials.hsc_sent:
                 final.hockeystatcards(game=game)
+
+            if not game.nst_charts.final_charts:
+                logging.info("NST Charts not yet sent - check if it's ready for us to scrape.")
+                nst_ready = nst.is_nst_ready(game.preferred_team.short_name)
+                if nst_ready:
+                    list_of_charts = nst.generate_all_charts(game=game)
+                    charts_msg = (
+                        f"Individual, on-ice, forward lines & defensive pairs at the "
+                        f"end of the game (via @NatStatTrick)."
+                    )
+                    socialhandler.send(charts_msg, media=list_of_charts, game_hashtag=True)
+                    game.nst_charts.final_charts = True
 
             # If we have exceeded the number of retries, stop pinging NST
             if game.final_socials.retries_exeeded:

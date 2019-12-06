@@ -36,7 +36,12 @@ def send(msg, **kwargs):
     if args.notweets:
         logging.info("[SOCIAL] %s", msg)
         if kwargs.get("media"):
-            Image.open(kwargs.get("media")).show()
+            media = kwargs.get("media")
+            if isinstance(media, list):
+                for single_image in media:
+                    Image.open(single_image).show()
+            else:
+                Image.open(media).show()
             # kwargs.get("media").show()
         return return_dict
 

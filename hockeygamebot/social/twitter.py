@@ -37,7 +37,9 @@ def get_api():
     return tweepy_session
 
 
-def send_tweet(tweet_text, media=None, reply=None, hashtags=None, team_hashtag=None, game_hashtag=None):
+def send_tweet(
+    tweet_text, media=None, reply=None, hashtags=None, team_hashtag=None, game_hashtag=None
+):
     """ Generic tweet function that uses logic to call other specific functions.
 
     Args:
@@ -73,13 +75,25 @@ def send_tweet(tweet_text, media=None, reply=None, hashtags=None, team_hashtag=N
         if not reply and not media:
             status = api.update_status(status=tweet_text)
         elif not reply and media:
-            status = api.update_with_media(status=tweet_text, filename=media)
+            if isinstance(media, list):
+                media_ids = [api.media_upload(i).media_id_string for i in media]
+                status = api.update_status(status=tweet_text, media_ids=media_ids)
+            else:
+                status = api.update_with_media(status=tweet_text, filename=media)
         elif reply and not media:
             tweet_text = f"@{twitter_handle} {tweet_text}"
             status = api.update_status(status=tweet_text, in_reply_to_status_id=reply)
         elif reply and media:
             tweet_text = f"@{twitter_handle} {tweet_text}"
-            status = api.update_with_media(status=tweet_text, filename=media, in_reply_to_status_id=reply)
+            if isinstance(media, list):
+                media_ids = [api.media_upload(i).media_id_string for i in media]
+                status = api.update_status(
+                    status=tweet_text, media_ids=media_ids, in_reply_to_status_id=reply
+                )
+            else:
+                status = api.update_with_media(
+                    status=tweet_text, filename=media, in_reply_to_status_id=reply
+                )
 
         return status.id_str
 

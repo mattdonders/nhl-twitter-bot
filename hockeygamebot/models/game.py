@@ -404,7 +404,8 @@ class NSTChartSocial:
     """ A class that holds the state of all NST chart social media messages & statuses."""
 
     def __init__(self):
-        pass
+        self.charts_by_period = dict()
+        self.final_charts = False
 
 
 class EndOfGameSocial:
