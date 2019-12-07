@@ -32,7 +32,13 @@ def send_discord(msg, media=None):
     if not media:
         response = requests.post(webhook_url, json=payload)
     else:
-        files = {"file": open(media, "rb")}
+        if isinstance(media, list):
+            files = dict()
+            for idx, image in enumerate(media):
+                files_key = f"file{idx}"
+                files[files_key] = open(image, "rb")
+        else:
+            files = {"file": open(media, "rb")}
         response = requests.post(webhook_url, files=files, data=payload)
 
     # If we get a non-OK code back from the Discord endpoint, log it.

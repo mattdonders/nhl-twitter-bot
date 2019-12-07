@@ -683,7 +683,8 @@ def generate_all_charts(game: Game):
 
     teams = [game.preferred_team, game.other_team]
     for team in teams:
-        team_abbrev = nst_abbreviation(team.team_name)
+        team_abbrev = nst_abbreviation(team.team_name).replace(".", "")
+        logging.info("%s (%s)", team.team_name, team_abbrev)
 
         # Find Game Title (For Chart Header)
         game_title = soup.find("h1").text
