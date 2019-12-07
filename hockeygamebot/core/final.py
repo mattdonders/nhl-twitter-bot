@@ -38,13 +38,15 @@ def final_score(livefeed: dict, game: Game):
     # Get all nested dictionaries frmo the livefeed response
     all_plays = livefeed["liveData"]["plays"]["allPlays"]
     boxscore = livefeed["liveData"]["boxscore"]
-    boxscore_teams = boxscore["teams"]
-    boxscore_pref = boxscore_teams[game.preferred_team.home_away]
-    boxscore_other = boxscore_teams[game.other_team.home_away]
+    linescore = livefeed["liveData"]["linescore"]
+    
+    linescore_teams = linescore["teams"]
+    linescore_pref = linescore_teams[game.preferred_team.home_away]
+    linescore_other = linescore_teams[game.other_team.home_away]
 
     pref_home_text = "on the road" if game.preferred_team.home_away == "away" else "at home"
-    score_pref = boxscore_pref["teamStats"]["teamSkaterStats"]["goals"]
-    score_other = boxscore_other["teamStats"]["teamSkaterStats"]["goals"]
+    score_pref = linescore_pref["goals"]
+    score_other = linescore_other["goals"]
 
     if score_pref > score_other:
         final_score_text = (
