@@ -51,7 +51,7 @@ def nst_abbreviation(team_name: str) -> str:
         "Edmonton Oilers": "EDM", "Florida Panthers": "FLA", "Los Angeles Kings": "L.A", "Minnesota Wild": "MIN",
         "Montreal Canadiens": "MTL", "New Jersey Devils": "N.J", "Nashville Predators": "NSH", "New York Islanders": "NYI",
         "New York Rangers": "NYR", "Ottawa Senators": "OTT", "Philadelphia Flyers": "PHI", "Pittsburgh Penguins": "PIT",
-        "San Jose Sharks": "S.J", "St Louis Blues": "STL", "Tampa Bay Lightning": "T.B", "Toronto Maple Leafs": "TOR",
+        "San Jose Sharks": "S.J", "St. Louis Blues": "STL", "Tampa Bay Lightning": "T.B", "Toronto Maple Leafs": "TOR",
         "Vancouver Canucks": "VAN", "Vegas Golden Knights": "VGK", "Winnipeg Jets": "WPG", "Washington Capitals": "WSH",
     }
     # fmt: on
