@@ -128,7 +128,7 @@ def is_nst_ready(team_name):
                 "Specified team game found, but not in intermission or Final - sleep & try again"
             )
             logging.info("%s / %s - Period: %s", away_team, home_team, period)
-            return False, 60, None
+            return False
 
     logging.error("The specified team cannot be found or is not playing today.")
     return False

@@ -128,7 +128,8 @@ def start_game_loop(game: Game):
                         social_ids = socialhandler.send(
                             charts_msg, media=list_of_charts, game_hashtag=True
                         )
-                        nst_chart_period_sent = social_ids.get("twitter")
+                        # nst_chart_period_sent = social_ids.get("twitter")
+                        game.nst_charts.charts_by_period[game.period.current] = True
 
                 # Calculate proper sleep time based on intermission status
                 if game.period.intermission_remaining > config["script"]["intermission_sleep_time"]:
