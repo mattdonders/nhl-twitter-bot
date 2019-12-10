@@ -162,6 +162,12 @@ def start_game_loop(game: Game):
             livefeed_resp = livefeed.get_livefeed(game.game_id)
             game.update_game(livefeed_resp)
 
+            # If (for some reason) the bot was started after the end of the game
+            # We need to re-run the live loop once to parse all of the events
+            if not game.events:
+                logging.info("Bot started after game ended, pass livefeed into event factory to fill events.")
+                live.live_loop(livefeed=livefeed_resp, game=game)
+
             # Run all end of game / final functions
             if not game.final_socials.final_score_sent:
                 final.final_score(livefeed=livefeed_resp, game=game)
