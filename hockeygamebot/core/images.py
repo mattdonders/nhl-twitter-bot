@@ -749,8 +749,6 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
 
     for idx, goal in enumerate(game.pref_goals):
         logging.info("Parsing GoalEvent ID: %s, IDX: %s.", goal.event_id, goal.event_idx)
-        #TODO: Remove this if the list add fix actually resolves the issue.
-        logging.info("Goal As Dictionary: %s", goal.asdict())
 
         period = goal.period_ordinal
         time = goal.period_time_remain_str
