@@ -928,7 +928,7 @@ class GoalEvent(GenericEvent):
                 goal_milestone_text = "🚨 FIRST GOAL ALERT! 🚨\n\n"
             elif self.scorer_career_goals % 100 == 0:
                 goal_ordinal = utils.ordinal(self.scorer_career_goals)
-                goal_milestone_text = f"🚨 {goal_ordinal} CAREER GOALS! 🚨\n\n"
+                goal_milestone_text = f"🚨 {goal_ordinal} CAREER GOAL! 🚨\n\n"
             else:
                 goal_milestone_text = ""
 
