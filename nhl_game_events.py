@@ -248,7 +248,7 @@ class Team(object):
 
         # Send request for leading / trailing stats (via other API)
         try:
-            lead_trail_stats_url = ("{}?isAggregate=false"
+            lead_trail_stats_url = ("{}/leadingtrailing?isAggregate=false"
                                     "&reportType=basic&isGame=false&reportName=leadingtrailing"
                                     "&cayenneExp=seasonId={}%20and%20teamId={}"
                                     .format(NHLRPT_BASEURL, self.season, self.team_id))
