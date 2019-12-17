@@ -271,6 +271,15 @@ class GenericEvent:
         self.pref_goals = about.get("goals").get(self.game.preferred_team.home_away)
         self.other_goals = about.get("goals").get(self.game.other_team.home_away)
 
+        # Get On-Ice Players
+        boxscore = self.livefeed.get("liveData").get("boxscore")
+        self.home_onice = boxscore["teams"]["home"]["onIce"]
+        self.home_onice_num = len(self.home_onice)
+        self.away_onice = boxscore["teams"]["away"]["onIce"]
+        self.away_onice_num = len(self.away_onice)
+        self.strength = f"{self.home_onice_num}v{self.away_onice_num}"
+
+
     def asdict(self, withsource=False):
         """ Returns the object as a dictionary with the option of excluding the original
             dictionary used to create the objet.
@@ -928,7 +937,7 @@ class GoalEvent(GenericEvent):
                 goal_milestone_text = "🚨 FIRST GOAL ALERT! 🚨\n\n"
             elif self.scorer_career_goals % 100 == 0:
                 goal_ordinal = utils.ordinal(self.scorer_career_goals)
-                goal_milestone_text = f"🚨 {goal_ordinal} CAREER GOALS! 🚨\n\n"
+                goal_milestone_text = f"🚨 {goal_ordinal} CAREER GOAL! 🚨\n\n"
             else:
                 goal_milestone_text = ""
 
@@ -1106,6 +1115,12 @@ class ShotEvent(GenericEvent):
         # Shots have a secondary type & a team name
         self.secondary_type = data.get("result").get("secondaryType")
         self.event_team = data.get("team").get("name")
+
+        # Mark Shots as Corsi or Fenwick
+        corsi_events = ["MISSED_SHOT", "BLOCKED_SHOT", "SHOT"]
+        fenwick_events = ["MISSED_SHOT", "SHOT"]
+        self.corsi = True if self.event_type in corsi_events else False
+        self.fenwick = True if self.event_type in fenwick_events else False
 
         # Get the Players Section
         players = data.get("players")
