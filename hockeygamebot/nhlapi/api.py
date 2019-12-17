@@ -44,8 +44,8 @@ def nhl_api(endpoint):
 
 
 def nhl_rpt(endpoint):
-    config = utils.load_config()
-    api_base = config["endpoints"]["nhl_rpt_base"]
+    urls = utils.load_urls()
+    api_base = urls["endpoints"]["nhl_rpt_base"]
 
     sf = SessionFactory()
     session = sf.get()
@@ -66,3 +66,5 @@ def nhl_rpt(endpoint):
     except RequestException as re:
         logging.error(re)
         return None
+
+

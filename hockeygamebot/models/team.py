@@ -53,7 +53,7 @@ class Team(object):
         # Send request for leading / trailing stats (via other API)
         try:
             lead_trail_stats_url = (
-                "?isAggregate=false"
+                "/leadingtrailing?isAggregate=false"
                 "&reportType=basic&isGame=false&reportName=leadingtrailing"
                 "&cayenneExp=seasonId={}%20and%20teamId={}".format(self.season, self.team_id)
             )
@@ -61,24 +61,24 @@ class Team(object):
             lead_trail_stats = nhlapi.api.nhl_rpt(lead_trail_stats_url).json()
             lead_trail_stats = lead_trail_stats["data"][0]
             self.lead_trail_lead1P = "{}-{}-{}".format(
-                lead_trail_stats["winsAfterLead1p"],
-                lead_trail_stats["lossAfterLead1p"],
-                lead_trail_stats["otLossAfterLead1p"],
+                lead_trail_stats["winsLeadPeriod1"],
+                lead_trail_stats["lossLeadPeriod1"],
+                lead_trail_stats["otLossLeadPeriod1"],
             )
             self.lead_trail_lead2P = "{}-{}-{}".format(
-                lead_trail_stats["winsAfterLead2p"],
-                lead_trail_stats["lossAfterLead2p"],
-                lead_trail_stats["otLossAfterLead2p"],
+                lead_trail_stats["winsLeadPeriod2"],
+                lead_trail_stats["lossLeadPeriod2"],
+                lead_trail_stats["otLossLeadPeriod2"],
             )
             self.lead_trail_trail1P = "{}-{}-{}".format(
-                lead_trail_stats["winsAfterTrail1p"],
-                lead_trail_stats["lossAfterTrail1p"],
-                lead_trail_stats["otLossAfterTrail1p"],
+                lead_trail_stats["winsTrailPeriod1"],
+                lead_trail_stats["lossTrailPeriod1"],
+                lead_trail_stats["otLossTrailPeriod1"],
             )
             self.lead_trail_trail2P = "{}-{}-{}".format(
-                lead_trail_stats["winsAfterTrail2p"],
-                lead_trail_stats["lossAfterTrail2p"],
-                lead_trail_stats["otLossAfterTrail2p"],
+                lead_trail_stats["winsTrailPeriod2"],
+                lead_trail_stats["lossTrailPeriod2"],
+                lead_trail_stats["otLossTrailPeriod2"],
             )
         except (IndexError, KeyError) as e:
             # Stats not available (for this team or page timeout)

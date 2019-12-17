@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 import dateutil.parser
 import yaml
 
-from hockeygamebot.definitions import CONFIG_PATH, LOGS_PATH
+from hockeygamebot.definitions import CONFIG_PATH, LOGS_PATH, URLS_PATH
 from hockeygamebot.helpers import arguments
 from hockeygamebot.models.gametype import GameType
 
@@ -77,6 +77,22 @@ def load_config():
         config = yaml.load(ymlfile, Loader=yaml.FullLoader)
 
     return config
+
+
+def load_urls():
+    """ Loads the URLs yaml file and returns a yaml object / dictionary..
+
+    Args:
+        None
+
+    Returns:
+        A yaml (dictionary) object.
+    """
+
+    with open(URLS_PATH) as ymlfile:
+        urls = yaml.load(ymlfile, Loader=yaml.FullLoader)
+
+    return urls
 
 
 def setup_logging():

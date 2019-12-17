@@ -10,6 +10,7 @@ TESTS_RESOURCES_PATH = os.path.join(TESTS_ROOT, "resources")
 
 # Define CONFIG_PATH separately in case of override
 args = arguments.get_arguments()
+URLS_PATH = os.path.join(PROJECT_ROOT, "config", "urls.yaml")
 CONFIG_FILE = "config.yaml" if not args.config else args.config
 CONFIG_PATH = os.path.join(PROJECT_ROOT, "config", CONFIG_FILE)
 
