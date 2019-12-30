@@ -12,6 +12,8 @@ import sys
 
 import pytz
 
+# from hockeygamebot.definitions import CONFIG_PATH
+
 # Set global ARGS to None until parsed
 CONSOLE_ARGS = None
 
@@ -96,16 +98,14 @@ def parse_arguments(sysargs=None):
     # If running in Docker, parse environment variables (instead of arguments)
     # And set args.console to True to make `docker logs` easier to use
     if args.docker:
-        # Check to see if Time Zone is set
-        if "TZ" not in os.environ:
+        # Check if a config file exists (needs to be manually copied via docker run command)
+        DOCKER_CONFIG = "/app/hockeygamebot/hockeygamebot/config/config.yaml"
+        if not os.path.exists(DOCKER_CONFIG):
             print(
-                "[ERROR] Timezone environment variable not set, please add to `docker run` commmand."
+                "[ERROR] Docker requires a configuration file to be passed into the `docker run` command."
             )
-            sys.exit()
-
-        if os.environ["TZ"] not in pytz.all_timezones:
             print(
-                f"[ERROR] {os.environ['TZ']} is not a valid time zone, please fix in `docker run` commmand."
+                "[ERROR] Sample: docker run -v /local/path/to/config.yaml:/app/hockeygamebot/config/config.yaml mattdonders/nhl-twitter-bot:latest"
             )
             sys.exit()
 

@@ -24,6 +24,7 @@ from matplotlib import ticker
 from requests.adapters import HTTPAdapter
 
 from hockeygamebot.definitions import IMAGES_PATH
+from hockeygamebot.core import images
 from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.models.game import Game
 from hockeygamebot.models.sessions import SessionFactory
@@ -136,6 +137,40 @@ def is_nst_ready(team_name):
 ###################################################
 # NST SOUP PARSING FUNCTIONS - CREATES DICTS & DF
 ###################################################
+
+def parse_overview(ov_keys, overview):
+    # Initialize the return dictionary
+    overview_stats = { 'home': dict(), 'away': dict() }
+
+    # Find all home team stats in the Overview Section (by column)
+    # And del the team name element off the array
+    ov_home = overview.find_all('tr')[0].find_all('td')
+    del ov_home[0]
+
+    ov_stats_home = list()
+    for col in ov_home:
+        ov_stats_home.append([s for s in col.text.splitlines() if s])
+
+    ov_stats_home = list(zip(*ov_stats_home))
+    ov_stats_home_final = {x.get('Period'):x for x in [dict(zip(ov_keys, values)) for values in ov_stats_home]}
+
+    # Find all home team stats in the Overview Section (by column)
+    # And del the team name element off the array
+    ov_away = overview.find_all('tr')[1].find_all('td')
+    del ov_away[0]
+
+    ov_stats_away = list()
+    for col in ov_away:
+        ov_stats_away.append([s for s in col.text.splitlines() if s])
+
+    ov_stats_away = list(zip(*ov_stats_away))
+    ov_stats_away_final = {x.get('Period'):x for x in [dict(zip(ov_keys, values)) for values in ov_stats_away]}
+
+    overview_stats['home'] = ov_stats_home_final
+    overview_stats['away'] = ov_stats_away_final
+
+    return overview_stats
+
 
 def parse_nst_timeonice(ind_5v5, ind_pp, ind_pk):
     # Calculate Time on Ice Graph
@@ -673,14 +708,72 @@ def charts_fwds_def(game_title, team, fwd_sva_stats, def_sva_stats):
 
     return fwds_def_fig
 
+
+def charts_overview(game, game_title, overview_stats):
+    # Get the Team Colors (for the split / stacked bars)
+    home_colors = images.team_colors(game.home_team.team_name)
+    away_colors = images.team_colors(game.away_team.team_name)
+
+    if home_colors["primary"]["bg"] == away_colors["primary"]["bg"]:
+        home_colors = home_colors["primary"]
+        away_colors = away_colors["secondary"]
+    else:
+        home_colors = home_colors["primary"]
+        away_colors = away_colors["primary"]
+
+    overview_fig, ax1 = plt.subplots(1, 1, figsize=(10,5))
+    df_overview = pd.DataFrame(overview_stats).T
+    df_overview_ltd = df_overview[['CF%', 'SCF%', 'xGF%', 'GF%']]
+    df_overview_ltd = df_overview_ltd.replace({'%':''}, regex=True).apply(pd.to_numeric)
+
+    # Re-Transpose & Reverse
+    df_overview_ltd = df_overview_ltd.T.iloc[::-1]
+    df_overview_ltd.plot(kind="barh", stacked=True, ax=ax1, color=[[x/255 for x in home_colors["bg"]], [x/255 for x in away_colors["bg"]]])
+    ax1.grid(True, which="major", axis="x", color="#cccccc")
+    ax1.set_axisbelow(True)
+    ax1.set(frame_on=False)
+    ax1.legend([game.home_team.short_name, game.away_team.short_name], bbox_to_anchor=(0.5, -0.2), loc="lower center", ncol=2, frameon=False)
+    ax1.title.set_text(f"{game_title}\nTeam Overview Stats - 5v5 (SVA)\nData Courtesy: Natural Stat Trick")
+
+    for i, v in enumerate(df_overview_ltd['home'].values):
+        ax1.text(float(v) - 2, i, str(v), va='center', ha="right", color=[x/255 for x in home_colors["text"]], fontweight="bold")
+
+    for i, v in enumerate(df_overview_ltd['away'].values):
+        ax1.text(100 - 2, i, str(v), va='center', ha="right", color=[x/255 for x in home_colors["text"]], fontweight="bold")
+
+    return overview_fig
+
 def generate_all_charts(game: Game):
     # This is our return value, which is a list of file paths.
     list_of_charts = list()
 
     nst_report_url = get_nst_report_url(game, full=True)
+    logging.info("NST Report URL: %s", nst_report_url)
     resp = thirdparty.thirdparty_request(nst_report_url)
     soup = thirdparty.bs4_parse(resp.content)
 
+    # Find Game Title (For Chart Header)
+    game_title = soup.find("h1").text
+
+    # Section off separate parts of NST for different parsing routins
+    ov_sva = soup.find('table', id=f'tbtssva').find('tbody')
+    ov_header = soup.find('table', id=f'tbtsall').find('thead').find_all('th')
+    ov_keys = [x.text for x in ov_header if x.text]
+
+    ov_sva_stats = parse_overview(ov_keys, ov_sva)
+    ov_sva_final_stats = {'home': ov_sva_stats['home']['Final'], 'away': ov_sva_stats['away']['Final']}
+
+    logging.info("Generating Team Overview Chart.")
+    overview_chart = charts_overview(game, game_title, ov_sva_final_stats)
+    overview_chart_path = os.path.join(IMAGES_PATH, "temp", f"allcharts-overview-{game.game_id_shortid}.png")
+    logging.info("Image Path: %s", overview_chart_path)
+    overview_chart.savefig(overview_chart_path, bbox_inches="tight")
+
+    # Add the overview image path to our list
+    list_of_charts.append(overview_chart_path)
+
+
+    # Generate team specific charts (2x per team)
     teams = [game.preferred_team, game.other_team]
     for team in teams:
         team_abbrev = nst_abbreviation(team.team_name).replace(".", "")
@@ -690,6 +783,10 @@ def generate_all_charts(game: Game):
         game_title = soup.find("h1").text
 
         # Section off separate parts of NST for different parsing routins
+        ov_sva = soup.find('table', id=f'tbtssva').find('tbody')
+        ov_header = soup.find('table', id=f'tbtsall').find('thead').find_all('th')
+        ov_keys = [x.text for x in ov_header if x.text]
+
         ind_5v5 = soup.find(id=f"tb{team_abbrev}st5v5").find("tbody").find_all("tr")
         ind_pp = soup.find(id=f"tb{team_abbrev}stpp").find("tbody").find_all("tr")
         ind_pk = soup.find(id=f"tb{team_abbrev}stpk").find("tbody").find_all("tr")
@@ -733,7 +830,6 @@ def generate_all_charts(game: Game):
         logging.info("Image Path: %s", fwds_def_chart_path)
         fwds_def_chart.savefig(fwds_def_chart_path, bbox_inches="tight")
 
-        # Add the two image paths to our list
         list_of_charts.append(ind_onice_chart_path)
         list_of_charts.append(fwds_def_chart_path)
 

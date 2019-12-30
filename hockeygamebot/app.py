@@ -17,7 +17,7 @@ try:
 except ImportError:
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir))
 
-from hockeygamebot.core import final, live, preview
+from hockeygamebot.core import final, live, preview, shotmaps
 from hockeygamebot.definitions import VERSION
 from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.models.game import Game
@@ -118,15 +118,33 @@ def start_game_loop(game: Game):
                 nst_chart_period_sent = game.nst_charts.charts_by_period.get(game.period.current)
                 if not nst_chart_period_sent:
                     logging.info("NST Charts not yet sent - check if it's ready for us to scrape.")
-                    nst_ready = nst.is_nst_ready(game.preferred_team.short_name)
+                    nst_ready = (
+                        nst.is_nst_ready(game.preferred_team.short_name) if not args.date else True
+                    )
                     if nst_ready:
                         list_of_charts = nst.generate_all_charts(game=game)
+                        # Chart at Position 0 is the Overview Chart & 1-4 are the existing charts
+                        overview_chart = list_of_charts[0]
+                        team_charts = list_of_charts[1:]
+
+                        overview_chart_msg = (
+                            f"Team Overview stat percentages - 5v5 (SVA) after the "
+                            f"{game.period.current_ordinal} period (via @NatStatTrick)."
+                        )
+
+                        ov_social_ids = socialhandler.send(
+                            overview_chart_msg, media=overview_chart, game_hashtag=True
+                        )
+
                         charts_msg = (
                             f"Individual, on-ice, forward lines & defensive pairs after the "
                             f"{game.period.current_ordinal} period (via @NatStatTrick)."
                         )
                         social_ids = socialhandler.send(
-                            charts_msg, media=list_of_charts, game_hashtag=True
+                            charts_msg,
+                            media=team_charts,
+                            game_hashtag=True,
+                            reply=ov_social_ids["twitter"],
                         )
                         # nst_chart_period_sent = social_ids.get("twitter")
                         game.nst_charts.charts_by_period[game.period.current] = True
@@ -165,8 +183,12 @@ def start_game_loop(game: Game):
             # If (for some reason) the bot was started after the end of the game
             # We need to re-run the live loop once to parse all of the events
             if not game.events:
-                logging.info("Bot started after game ended, pass livefeed into event factory to fill events.")
+                logging.info(
+                    "Bot started after game ended, pass livefeed into event factory to fill events."
+                )
                 live.live_loop(livefeed=livefeed_resp, game=game)
+
+            # shotmaps.generate_shotmaps(game=game)
 
             # Run all end of game / final functions
             if not game.final_socials.final_score_sent:
@@ -184,14 +206,34 @@ def start_game_loop(game: Game):
 
             if not game.nst_charts.final_charts:
                 logging.info("NST Charts not yet sent - check if it's ready for us to scrape.")
-                nst_ready = nst.is_nst_ready(game.preferred_team.short_name)
+                nst_ready = (
+                    nst.is_nst_ready(game.preferred_team.short_name) if not args.date else True
+                )
                 if nst_ready:
                     list_of_charts = nst.generate_all_charts(game=game)
+                    # Chart at Position 0 is the Overview Chart & 1-4 are the existing charts
+                    overview_chart = list_of_charts[0]
+                    team_charts = list_of_charts[1:]
+
+                    overview_chart_msg = (
+                        f"Team Overview stat percentages - 5v5 (SVA) at the "
+                        f"end of the game (via @NatStatTrick)."
+                    )
+
+                    ov_social_ids = socialhandler.send(
+                        overview_chart_msg, media=overview_chart, game_hashtag=True
+                    )
+
                     charts_msg = (
                         f"Individual, on-ice, forward lines & defensive pairs at the "
                         f"end of the game (via @NatStatTrick)."
                     )
-                    socialhandler.send(charts_msg, media=list_of_charts, game_hashtag=True)
+                    social_ids = socialhandler.send(
+                        charts_msg,
+                        media=team_charts,
+                        game_hashtag=True,
+                        reply=ov_social_ids["twitter"],
+                    )
                     game.nst_charts.final_charts = True
 
             # If we have exceeded the number of retries, stop pinging NST
