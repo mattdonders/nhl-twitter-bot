@@ -346,7 +346,7 @@ class Game:
     @property
     def live_feed(self):
         """Returns a full URL to the livefeed API endpoint."""
-        base_url = utils.load_config().get("endpoints").get("nhl_base")
+        base_url = utils.load_urls().get("endpoints").get("nhl_base")
         full_url = "{}{}".format(base_url, self.live_feed_endpoint)
         return full_url
 

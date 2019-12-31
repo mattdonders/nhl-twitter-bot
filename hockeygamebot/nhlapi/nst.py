@@ -77,8 +77,8 @@ def get_nst_report_url(game: Game, full=False):
         nst_rpt_url: The URL for the Natural Stat Trick game report.
     """
 
-    config = utils.load_config()
-    nst_base = config["endpoints"]["nst"]
+    urls = utils.load_urls()
+    nst_base = urls["endpoints"]["nst"]
 
     full_limited = "" if full else "&view=limited"
 
@@ -101,8 +101,8 @@ def is_nst_ready(team_name):
         boolean: If the period or game has been tracked to completion.
     """
 
-    config = utils.load_config()
-    nst_base = config["endpoints"]["nst"]
+    urls = utils.load_urls()
+    nst_base = urls["endpoints"]["nst"]
 
     resp = thirdparty.thirdparty_request(nst_base)
     soup = thirdparty.bs4_parse(resp.content)

@@ -8,7 +8,7 @@ import requests
 from hockeygamebot.helpers import utils
 
 # Load configuration file in global scope
-config = utils.load_config()
+urls = utils.load_urls()
 
 
 def get_player_career_stats(player_id):
@@ -22,7 +22,7 @@ def get_player_career_stats(player_id):
     """
     try:
         PERSON_API = "{api}/people/{id}?expand=person.stats&stats=careerRegularSeason".format(
-            api=config["endpoints"]["nhl_endpoint"], id=player_id
+            api=urls["endpoints"]["nhl_endpoint"], id=player_id
         )
         response = requests.get(PERSON_API).json()
         person = response.get("people")[0]

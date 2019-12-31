@@ -18,8 +18,8 @@ from hockeygamebot.models.sessions import SessionFactory
 
 
 def nhl_api(endpoint):
-    config = utils.load_config()
-    api_base = config["endpoints"]["nhl_endpoint"]
+    urls = utils.load_urls()
+    api_base = urls["endpoints"]["nhl_endpoint"]
 
     sf = SessionFactory()
     session = sf.get()
@@ -66,5 +66,3 @@ def nhl_rpt(endpoint):
     except RequestException as re:
         logging.error(re)
         return None
-
-

@@ -135,8 +135,8 @@ def nst_linetool(game: Game, team: Team):
         TBD
     """
 
-    config = utils.load_config()
-    nst_base = config["endpoints"]["nst"]
+    urls = utils.load_urls()
+    nst_base = urls["endpoints"]["nst"]
 
     nst_rpt_url = (
         f"{nst_base}/game.php?season={game.season}&view=limited"
@@ -201,8 +201,8 @@ def hockeyref_goalie_against_team(goalie, opponent):
         goalie_stats_split: A string of goalie stats split versus opponent
     """
 
-    config = utils.load_config()
-    hockeyref_base = config["endpoints"]["hockeyref_base"]
+    urls = utils.load_urls()
+    hockeyref_base = urls["endpoints"]["hockeyref_base"]
 
     # Form the Hockey Reference specific player name format
     goalie_name_orig = goalie
@@ -308,8 +308,8 @@ def dailyfaceoff_lines(game, team):
     def_lines = dict()
     lines = dict()
 
-    config = utils.load_config()
-    df_linecombos_url = config["endpoints"]["df_line_combos"]
+    urls = utils.load_urls()
+    df_linecombos_url = urls["endpoints"]["df_line_combos"]
 
     # Setup a Fake User Agent (simulates a real visit)
     ua = UserAgent()
@@ -406,8 +406,8 @@ def scouting_the_refs(game, pref_team):
     return_dict = dict()
     return_dict["confirmed"] = False
 
-    config = utils.load_config()
-    refs_url = config["endpoints"]["scouting_refs"]
+    urls = utils.load_urls()
+    refs_url = urls["endpoints"]["scouting_refs"]
     logging.info("Getting officials information from Scouting the Refs!")
     response = thirdparty_request(refs_url).json()
 
@@ -501,16 +501,16 @@ def dailyfaceoff_goalies(pref_team, other_team, pref_homeaway):
         Tuple: dictionary {goalie string, goalie confirmed}
     """
     return_dict = {}
-    config = utils.load_config()
+    urls = utils.load_urls()
     args = arguments.get_arguments()
 
-    df_goalies_url = config["endpoints"]["df_starting_goalies"]
+    df_goalies_url = urls["endpoints"]["df_starting_goalies"]
     if args.date:
         logging.info("Date was passed - append to the end of Daily Faceoff URL.")
         game_date = datetime.strptime(args.date, "%Y-%m-%d")
         game_date_mmddyyyy = game_date.strftime("%m-%d-%Y")
         df_goalies_url = f"{df_goalies_url}{game_date_mmddyyyy}"
-    df_linecombos_url = config["endpoints"]["df_line_combos"]
+    df_linecombos_url = urls["endpoints"]["df_line_combos"]
 
     logging.info("Trying to get starting goalie information via Daily Faceoff.")
     resp = thirdparty_request(df_goalies_url)
@@ -622,8 +622,8 @@ def hockeystatcard_gamescores(game: Game):
         gamescores (tuple):  (home_gs, away_gs)
     """
 
-    config = utils.load_config()
-    hsc_base = config["endpoints"]["hockey_stat_cards"]
+    urls = utils.load_urls()
+    hsc_base = urls["endpoints"]["hockey_stat_cards"]
 
     hsc_season = f"{game.season[2:4]}{game.season[6:8]}"
     hsc_gametype = "ps" if game.game_id_gametype_shortid == '1' else "rs"

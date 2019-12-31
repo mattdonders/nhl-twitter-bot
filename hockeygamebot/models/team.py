@@ -90,7 +90,7 @@ class Team(object):
 
         # Send request to get stats
         try:
-            api = utils.load_config()["endpoints"]["nhl_endpoint"]
+            api = utils.load_urls()["endpoints"]["nhl_endpoint"]
             stats_url = "/teams/{team}/stats".format(team=self.team_id)
             logging.info("Getting team stats for %s via NHL API.", self.short_name)
             stats = nhlapi.api.nhl_api(stats_url).json()
@@ -104,7 +104,7 @@ class Team(object):
 
         # Send request to get current roster
         try:
-            api = utils.load_config()["endpoints"]["nhl_endpoint"]
+            api = utils.load_urls()["endpoints"]["nhl_endpoint"]
             roster_url = "/teams/{team}/roster".format(team=self.team_id)
             logging.info("Getting roster for %s via NHL API.", self.short_name)
             roster = nhlapi.api.nhl_api(roster_url).json()
