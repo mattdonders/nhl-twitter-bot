@@ -17,7 +17,7 @@ try:
 except ImportError:
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir))
 
-from hockeygamebot.core import final, live, preview, shotmaps
+from hockeygamebot.core import final, live, preview
 from hockeygamebot.definitions import VERSION
 from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.models.game import Game
