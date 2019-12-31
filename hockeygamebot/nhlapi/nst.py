@@ -138,6 +138,9 @@ def is_nst_ready(team_name):
 # NST SOUP PARSING FUNCTIONS - CREATES DICTS & DF
 ###################################################
 
+def parse_team_table(team_keys, teamtable):
+    pass
+
 def parse_overview(ov_keys, overview):
     # Initialize the return dictionary
     overview_stats = { 'home': dict(), 'away': dict() }
@@ -724,7 +727,7 @@ def charts_overview(game, game_title, overview_stats):
     overview_fig, ax1 = plt.subplots(1, 1, figsize=(10,5))
     df_overview = pd.DataFrame(overview_stats).T
     df_overview_ltd = df_overview[['CF%', 'SCF%', 'xGF%', 'GF%']]
-    df_overview_ltd = df_overview_ltd.replace({'%':''}, regex=True).apply(pd.to_numeric)
+    df_overview_ltd = df_overview_ltd.replace({'%':''}, regex=True).replace({'-':'0'}, regex=True).apply(pd.to_numeric)
 
     # Re-Transpose & Reverse
     df_overview_ltd = df_overview_ltd.T.iloc[::-1]
@@ -736,12 +739,15 @@ def charts_overview(game, game_title, overview_stats):
     ax1.title.set_text(f"{game_title}\nTeam Overview Stats - 5v5 (SVA)\nData Courtesy: Natural Stat Trick")
 
     for i, v in enumerate(df_overview_ltd['home'].values):
-        ax1.text(float(v) - 2, i, str(v), va='center', ha="right", color=[x/255 for x in home_colors["text"]], fontweight="bold")
+        if v > 0:
+            ax1.text(float(v) - 2, i, str(v), va='center', ha="right", color=[x/255 for x in home_colors["text"]], fontweight="bold")
 
     for i, v in enumerate(df_overview_ltd['away'].values):
-        ax1.text(100 - 2, i, str(v), va='center', ha="right", color=[x/255 for x in home_colors["text"]], fontweight="bold")
+        if v > 0:
+            ax1.text(100 - 2, i, str(v), va='center', ha="right", color=[x/255 for x in home_colors["text"]], fontweight="bold")
 
     return overview_fig
+
 
 def generate_all_charts(game: Game):
     # This is our return value, which is a list of file paths.
@@ -834,3 +840,17 @@ def generate_all_charts(game: Game):
         list_of_charts.append(fwds_def_chart_path)
 
     return list_of_charts
+
+
+def generate_team_season_charts(game: Game):
+    urls = utils.load_urls()
+    nst_base = urls["endpoints"]["nst"]
+    nst_team_url = f"{nst_base}/teamtable.php?sit=sva"
+
+    resp = thirdparty.thirdparty_request(nst_team_url)
+    soup = thirdparty.bs4_parse(resp.content)
+
+    # Get the team table information & convert to a Dataframe
+    teams = soup.find('table', id=f'teams')
+    teams_df = pd.read_html(str(teams), index_col=0)[0]
+    pref_df = teams_df.loc[teams_df['Team'] == game.preferred_team.team_name]
