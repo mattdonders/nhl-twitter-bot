@@ -112,24 +112,27 @@ def is_nst_ready(team_name):
 
     # Iterate over today's games to find our team game & then determine if we can scrape it yet.
     for game in games:
-        game_title = game.find_all("tr")[0]
-        game_details = game_title.find_all("td")
-        away_team = game_details[0].text
-        home_team = game_details[4].text
-        period = game_details[2].text
+        try:
+            game_title = game.find_all("tr")[0]
+            game_details = game_title.find_all("td")
+            away_team = game_details[0].text
+            home_team = game_details[4].text
+            period = game_details[2].text
 
-        if team_name in (away_team, home_team):
-            if "End" in period or "Final" in period:
-                logging.info("Specified team game is either in intermission or has ended.")
+            if team_name in (away_team, home_team):
+                if "End" in period or "Final" in period:
+                    logging.info("Specified team game is either in intermission or has ended.")
+                    logging.info("%s / %s - Period: %s", away_team, home_team, period)
+                    return True
+
+                # Game detected, but not in intermission, we can sleep for now
+                logging.warning(
+                    "Specified team game found, but not in intermission or Final - sleep & try again"
+                )
                 logging.info("%s / %s - Period: %s", away_team, home_team, period)
-                return True
-
-            # Game detected, but not in intermission, we can sleep for now
-            logging.warning(
-                "Specified team game found, but not in intermission or Final - sleep & try again"
-            )
-            logging.info("%s / %s - Period: %s", away_team, home_team, period)
-            return False
+                return False
+        except:
+            logging.warning("Error reading this NST row - skipping.")
 
     logging.error("The specified team cannot be found or is not playing today.")
     return False
