@@ -1193,7 +1193,7 @@ class PenaltyEvent(GenericEvent):
 
         # Penalties have some extra result attributes
         results = data.get("result")
-        self.secondary_type = self.penalty_type_fixer(results.get("secondaryType")).lower()
+        self.secondary_type = self.penalty_type_fixer(results.get("secondaryType").lower())
         self.severity = results.get("penaltySeverity").lower()
         self.minutes = results.get("penaltyMinutes")
         self.penalty_team = data.get("team").get("name")
@@ -1215,6 +1215,15 @@ class PenaltyEvent(GenericEvent):
             game_event_total(__class__, self.penalty_on_name, "penalty_on_name") + 1
         )
 
+        # Penalty Shot Fixes
+        if self.minutes == 0 and not self.drew_by_name:
+            raise ValueError("A 0-minute penalty (usually a penalty shot) requires a drewBy attribute for the shooter.")
+        elif self.minutes == 0 and self.drew_by_name:
+            self.secondary_type = self.secondary_type.replace("ps - ", "")
+            self.penalty_shot = True
+        else:
+            self.penalty_shot = False
+
         # Get the Coordinates Section
         coordinates = data.get("coordinates")
         self.x = coordinates.get("x", 0.0)
@@ -1224,8 +1233,8 @@ class PenaltyEvent(GenericEvent):
         # TODO: Figure out if theres a way to check for offsetting penalties
         self.penalty_main_text = self.get_skaters()
         self.penalty_rankstat_text = self.get_penalty_stats()
-        self.generate_social_msg()
-        ids = socialhandler.send(msg=self.social_msg, event=self, game_hashtag=True)
+        self.generate_social_msg(self.penalty_shot)
+        ids = socialhandler.send(msg=self.social_msg, event=self, game_hashtag=True, force_send=True)
 
     def penalty_type_fixer(self, original_type):
         """ A function that converts some poorly named penalty types. """
@@ -1321,9 +1330,15 @@ class PenaltyEvent(GenericEvent):
         penalty_rankstat_text = f"{penalty_on_rankstat_text}\n{penalty_draw_rankstat_text}"
         return penalty_rankstat_text
 
-    def generate_social_msg(self):
+    def generate_social_msg(self, penaltyshot=False):
         """ Used for generating the message that will be logged or sent to social media. """
-        if self.game.power_play_strength != "Even":
+        if penaltyshot:
+            self.social_msg = (
+                f"⚠️ PENALTY SHOT!\n\n{self.penalty_on_name} is called for {self.secondary_type} with "
+                f"{self.period_time_remain} remaining in the {self.period_ordinal} period. "
+                f"{self.drew_by_name} has been awarded a penalty shot!"
+            )
+        elif self.game.power_play_strength != "Even":
             self.social_msg = f"{self.penalty_main_text}\n\n{self.penalty_rankstat_text}"
         else:
             self.social_msg = f"{self.penalty_main_text}"
