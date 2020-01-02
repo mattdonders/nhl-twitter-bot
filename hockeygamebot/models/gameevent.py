@@ -1202,13 +1202,13 @@ class PenaltyEvent(GenericEvent):
         players = data.get("players")
         drew_by = [x for x in players if x.get("playerType").lower() == "drewby"]
         penalty_on = [x for x in players if x.get("playerType").lower() == "penaltyon"]
+        served_by = [x for x in players if x.get("playerType").lower() == "servedby"]
         # Sometimes the drew_by fields are not populated immediately
-        if drew_by:
-            self.drew_by_name = drew_by[0].get("player").get("fullName")
-            self.drew_by_id = drew_by[0].get("player").get("id")
-        else:
-            self.drew_by_name = None
-            self.drew_by_id = None
+        self.drew_by_name = drew_by[0].get("player").get("fullName") if drew_by else None
+        self.drew_by_id = drew_by[0].get("player").get("id") if drew_by else None
+        self.served_by_name = served_by[0].get("player").get("fullName") if served_by else None
+        self.served_by_id = served_by[0].get("player").get("id") if served_by else None
+
         self.penalty_on_name = penalty_on[0].get("player").get("fullName")
         self.penalty_on_id = penalty_on[0].get("player").get("id")
         self.penalty_on_game_ttl = (
@@ -1299,13 +1299,30 @@ class PenaltyEvent(GenericEvent):
             logging.info("Unkown penalty skater combination")
             penalty_text_skaters = ""
 
-        penalty_text_players = (
-            f"{self.penalty_on_name} takes a {self.minutes}-minute {self.severity} "
-            f"penalty for {self.secondary_type} and heads to the penalty box with "
-            f"{self.period_time_remain} remaining in the {self.period_ordinal} period. "
-            # f"That's his {utils.ordinal(self.penalty_on_game_ttl)} penalty of the game. "
-            f"{penalty_text_skaters}"
-        )
+        if self.served_by_name is not None:
+            penalty_text_players = (
+                f"{self.penalty_on_name} takes a {self.minutes}-minute {self.severity} "
+                f"penalty for {self.secondary_type} (served by {self.served_by_name}) with "
+                f"{self.period_time_remain} remaining in the {self.period_ordinal} period. "
+                # f"That's his {utils.ordinal(self.penalty_on_game_ttl)} penalty of the game. "
+                f"{penalty_text_skaters}"
+            )
+        elif self.severity == "game misconduct":
+            penalty_text_players = (
+                f"{self.penalty_on_name} takes a {self.minutes}-minute {self.severity} "
+                f"penalty and won't return to the game. The penalty occurred with "
+                f"{self.period_time_remain} remaining in the {self.period_ordinal} period. "
+                # f"That's his {utils.ordinal(self.penalty_on_game_ttl)} penalty of the game. "
+                f"{penalty_text_skaters}"
+            )
+        else:
+            penalty_text_players = (
+                f"{self.penalty_on_name} takes a {self.minutes}-minute {self.severity} "
+                f"penalty for {self.secondary_type} and heads to the penalty box with "
+                f"{self.period_time_remain} remaining in the {self.period_ordinal} period. "
+                # f"That's his {utils.ordinal(self.penalty_on_game_ttl)} penalty of the game. "
+                f"{penalty_text_skaters}"
+            )
 
         return penalty_text_players
 
