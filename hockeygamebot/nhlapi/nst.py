@@ -730,7 +730,7 @@ def charts_overview(game, game_title, overview_stats):
 
     overview_fig, ax1 = plt.subplots(1, 1, figsize=(10,5))
     df_overview = pd.DataFrame(overview_stats).T
-    df_overview_ltd = df_overview[['CF%', 'SCF%', 'xGF%', 'GF%']]
+    df_overview_ltd = df_overview[['CF%', 'SCF%', 'HDCF%', 'xGF%', 'GF%']]
     df_overview_ltd = df_overview_ltd.replace({'%':''}, regex=True).replace({'-':'0'}, regex=True).apply(pd.to_numeric)
 
     # Re-Transpose & Reverse
