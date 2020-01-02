@@ -364,14 +364,9 @@ def season_series(game_id, pref_team, other_team, last_season=False):
         player_goals = pref_goals[leader]
         player_assists = pref_assists[leader]
         if not roster_player:
-            points_leader_str = "{} lead the {} with {} points ({}G, {}A) against the {} this season.".format(
-                player_name,
-                pref_team.short_name,
-                leader_points,
-                player_goals,
-                player_assists,
-                other_team.short_name,
-            )
+            points_leader_str = (
+                f"Points Leader - {player_name} with {leader_points} points "
+                f"({player_goals}G, {player_assists}A) ")
         else:
             points_leader_str = "Points Leader - {} with {} ({}G, {}A).".format(
                 player_name, leader_points, player_goals, player_assists
@@ -385,7 +380,8 @@ def season_series(game_id, pref_team, other_team, last_season=False):
                 player_name = roster.nonroster_player_attr_by_id(player_id_only, "fullName")
             player_goals = pref_goals[leader]
             player_assists = pref_assists[leader]
-            player_str = "{} ({}G, {}A)".format(player_name, player_goals, player_assists)
+            player_short_name = f"{player_name[0]}. {' '.join(player_name.split()[1:])}"
+            player_str = f"{player_short_name} ({player_goals}G, {player_assists}A)"
             point_leaders_with_attrs.append(player_str)
 
         point_leaders_joined = " & ".join(point_leaders_with_attrs)
