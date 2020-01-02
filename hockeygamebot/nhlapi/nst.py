@@ -144,6 +144,7 @@ def is_nst_ready(team_name):
 def parse_team_table(team_keys, teamtable):
     pass
 
+
 def parse_overview(ov_keys, overview):
     # Initialize the return dictionary
     overview_stats = { 'home': dict(), 'away': dict() }
@@ -845,7 +846,7 @@ def generate_all_charts(game: Game):
     return list_of_charts
 
 
-def generate_team_season_charts(game: Game):
+def generate_team_season_charts(team_name):
     urls = utils.load_urls()
     nst_base = urls["endpoints"]["nst"]
     nst_team_url = f"{nst_base}/teamtable.php?sit=sva"
@@ -853,7 +854,97 @@ def generate_team_season_charts(game: Game):
     resp = thirdparty.thirdparty_request(nst_team_url)
     soup = thirdparty.bs4_parse(resp.content)
 
-    # Get the team table information & convert to a Dataframe
-    teams = soup.find('table', id=f'teams')
+    # Get the team table information, convert to a Dataframe
+    # And add the league average as an extra row
+    teams = soup.find("table", id=f"teams")
     teams_df = pd.read_html(str(teams), index_col=0)[0]
-    pref_df = teams_df.loc[teams_df['Team'] == game.preferred_team.team_name]
+    teams_df.loc["avg"] = teams_df.mean()
+    teams_df.reset_index(drop=True)
+    teams_df.iloc[31, teams_df.columns.get_loc("Team")] = "Average"
+
+    # Create two dataframes (for the two halves) of the report card
+    pref_df = teams_df.loc[teams_df["Team"].isin([team_name, "Average"])]
+    pref_df_no_against = pref_df[["Point %", "xGF", "GF", "SH%", "SV%", "PDO", "HDSH%", "HDSV%"]]
+    pref_df = pref_df[["CF%", "SCF%", "HDCF%", "xGF%", "GF%"]]
+
+    # Transpose them to make them easier to work with in the correct form
+    pref_df_T = pref_df.T
+    pref_df_no_against = pref_df_no_against.T
+
+    # Manipulate the data frames to drop & rename columns for named access
+    pref_df_T["FOR"] = pref_df_T.iloc[:, 0]
+    pref_df_T.drop(pref_df_T.columns[0], axis=1, inplace=True)
+    pref_df_T.drop("avg", axis=1, inplace=True)
+    pref_df_no_against["FOR"] = pref_df_no_against.iloc[:, 0]
+    pref_df_no_against.drop(pref_df_no_against.columns[0], axis=1, inplace=True)
+
+    # Perform DataFrame data clean up
+    # Convert the "Against Column to 100-value" to make sure each row totals 100
+    # Convert PDO & Point % to full percentage values
+    pref_df_T["AGAINST"] = pref_df_T.apply(lambda row: 100 - row.FOR, axis=1)
+    pref_df_no_against["FOR"]["Point %"] = pref_df_no_against["FOR"]["Point %"] * 100
+    pref_df_no_against["FOR"]["PDO"] = pref_df_no_against["FOR"]["PDO"] * 100
+    pref_df_no_against["avg"]["Point %"] = pref_df_no_against["avg"]["Point %"] * 100
+    pref_df_no_against["avg"]["PDO"] = pref_df_no_against["avg"]["PDO"] * 100
+
+    # Reverse the Order of the DataFrame rows to make the graph look cleaner
+    pref_df_T = pref_df_T.iloc[::-1]
+    pref_df_no_against = pref_df_no_against.iloc[::-1]
+
+    # Get the team primary bg & text color
+    team_colors = images.team_colors(team_name)
+    team_colors = team_colors["primary"]
+    team_color_bg = images.rgb_to_hex(team_colors["bg"])
+    team_color_text = images.rgb_to_hex(team_colors["text"])
+
+    # Create the figure that we will plot the two separate graphs on
+    overview_fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(11, 10))
+
+    # Plot the top (no against) bar graph & the leage average line graph
+    pref_df_no_against[["FOR"]].plot.barh(ax=ax1, color=team_color_bg)
+
+    ax1.plot(
+        pref_df_no_against[["avg"]].avg.values,
+        pref_df_no_against[["avg"]].index.values,
+        # marker="H",
+        marker="X",
+        linestyle="",
+        color="#AAAAAA",
+    )
+
+    # Plot the bottom (split bar graph) in the team & a gray color for the opposition
+    pref_df_T.plot(kind="barh", stacked=True, ax=ax2, color=[team_color_bg, "#AAAAAA"])
+
+    # Clean up the plots (fixes axes, legends, etc)
+    ax1.legend().remove()
+    ax1.legend(
+        ["League Average"], bbox_to_anchor=(0.5, -0.2), loc="lower center", ncol=1, frameon=False
+    )
+
+    ax2.legend(
+        [team_name, "Opponents"], bbox_to_anchor=(0.5, -0.2), loc="lower center", ncol=2, frameon=False
+    )
+
+    for ax in [ax1, ax2]:
+        ax.grid(True, which="major", axis="x", color="#cccccc")
+        ax.set_axisbelow(True)
+        ax.set(frame_on=False)
+
+    overview_fig.suptitle(
+        f"{team_name} Season Stats - 5v5 (SVA)\nData Courtesy: Natural Stat Trick"
+    )
+
+    # Draw the text labels on each of the corresponding bars
+    # The top graph values are centered in the bar so it doesn't conflict with the average marker
+    for i, v in enumerate(pref_df_no_against["FOR"].values):
+        ax1.text(float(v) / 2, i, str(round(v, 2)), va="center", ha="center", color=team_color_text, fontweight="bold")
+
+    for i, v in enumerate(pref_df_T["FOR"].values):
+        ax2.text(float(v) - 2, i, str(v), va="center", ha="right", color=team_color_text, fontweight="bold")
+
+    for i, v in enumerate(pref_df_T["AGAINST"].values):
+        ax2.text(100 - 2, i, str(v), va="center", ha="right", color=team_color_text, fontweight="bold")
+
+    overview_fig_path = os.path.join(IMAGES_PATH, "temp", f"allcharts-yesterday-team-season.png")
+    overview_fig.savefig(overview_fig_path, bbox_inches="tight")
+    return overview_fig_path

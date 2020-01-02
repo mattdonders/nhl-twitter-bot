@@ -223,7 +223,7 @@ def clock_emoji(time):
     return clock
 
 
-def team_hashtag(team, game_type):
+def team_hashtag(team, game_type=None):
     """Generates a team hashtag from a team name & game type.
 
     UPDATED: 2019-09-30 (NHL Updated Hashtags)

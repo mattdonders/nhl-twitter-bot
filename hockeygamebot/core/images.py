@@ -225,6 +225,23 @@ def team_colors(team_name):
 
     return team_colors_dict[team_name]
 
+def rgb_to_hex(value1, value2=None, value3=None):
+    """
+    Convert RGB value (as three numbers each ranges from 0 to 255) to hex format.
+    """
+
+    if isinstance(value1, (list, tuple)):
+        rgb = value1
+        value1 = rgb[0]
+        value2 = rgb[1]
+        value3 = rgb[2]
+
+    for value in (value1, value2, value3):
+        if not 0 <= value <= 255:
+            raise ValueError('Value each slider must be ranges from 0 to 255')
+    return '#{0:02X}{1:02X}{2:02X}'.format(value1, value2, value3)
+
+
 
 def center_text(draw, left, top, width, text, color, font, vertical=False, height=None):
     """ Draws text (at least) horizontally centered in a specified width. Can also

@@ -39,7 +39,7 @@ def final_score(livefeed: dict, game: Game):
     all_plays = livefeed["liveData"]["plays"]["allPlays"]
     boxscore = livefeed["liveData"]["boxscore"]
     linescore = livefeed["liveData"]["linescore"]
-    
+
     linescore_teams = linescore["teams"]
     linescore_pref = linescore_teams[game.preferred_team.home_away]
     linescore_other = linescore_teams[game.other_team.home_away]

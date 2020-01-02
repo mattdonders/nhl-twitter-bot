@@ -7,6 +7,7 @@ Functions pertaining to the NHL schedule (via API).
 import logging
 import time
 from datetime import datetime, timedelta
+from dateutil.parser import parse
 
 from hockeygamebot.helpers import arguments, process
 from hockeygamebot.nhlapi import api, roster
@@ -96,6 +97,26 @@ def is_game_today(team_id, date):
     return False, schedule
 
 
+def was_game_yesterday(team_id, date):
+    """Determines if there was a game yesterday.
+
+    Args:
+        team_id (int) - The unique identifier of the team (from get_team function).
+
+    Returns:
+        (bool, games_info)
+        bool - True if game today, False if not.
+        games_info (dict) - A dictionary from the Schedule API that describes game information.
+    """
+
+    prev_game_date, prev_game = get_previous_game(team_id)
+    yesterday = date - timedelta(days=1)
+    prev_game_date_dt = parse(prev_game_date)
+
+    prev_game_yesterday = bool(prev_game_date_dt.date() == yesterday.date())
+    return prev_game_yesterday, prev_game
+
+
 def get_broadcasts(resp):
     """Parses an NHL schedule response to get broadcast information.
 
@@ -153,6 +174,31 @@ def get_next_game(team_id: int) -> dict:
 
     return next_game
 
+
+def get_previous_game(team_id: int) -> dict:
+    """ Takes a team ID & gets the previous game from the schedule API modified endpoint.
+
+    Args:
+        team_id (int) - The unique identifier of the team (from get_team function).
+
+    Returns:
+        date (string) - Date of last game
+        next_game (dict) - Dictionary of previous game attributes.
+    """
+
+    logging.info("Checking the schedule API endpoint for the previous game.")
+    url = f"teams/{team_id}?expand=team.schedule.previous"
+
+    response = api.nhl_api(url)
+    if not response:
+        return None
+
+    prev_game_json = response.json()
+    prev_game_sched = prev_game_json.get("teams")[0].get("previousGameSchedule")
+    prev_game_date = prev_game_sched.get("dates")[0].get("date")
+    prev_game = prev_game_sched.get("dates")[0].get("games")[0]
+
+    return prev_game_date, prev_game
 
 def season_series(game_id, pref_team, other_team, last_season=False):
     """Generates season series, points leader & TOI leader.

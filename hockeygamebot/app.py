@@ -326,6 +326,32 @@ def run():
     team_id = schedule.get_team_id(team_name)
     game_today, game_info = schedule.is_game_today(team_id, date)
     if not game_today:
+        game_yesterday, prev_game = schedule.was_game_yesterday(team_id, date)
+        if game_yesterday:
+            logging.info("There was a game yesterday - generate new season overview stats chart, tweet it & exit.")
+            home_team = prev_game['teams']['home']
+            away_team = prev_game['teams']['away']
+
+            pref_team = home_team if home_team['team']['name'] == team_name else away_team
+            other_team = away_team if home_team['team']['name'] == team_name else home_team
+
+            pref_team_name = pref_team['team']['name']
+            pref_score = pref_team['score']
+            pref_hashtag = utils.team_hashtag(pref_team_name)
+            other_team_name = other_team['team']['name']
+            other_score = other_team['score']
+
+            game_result_str = "defeat" if pref_score > other_score else "lose to"
+
+            team_season_msg = (
+                f"Updated season overview stats after the {pref_team_name} {game_result_str} "
+                f"the {other_team_name} by a score of {pref_score} to {other_score}."
+                f"\n\n{pref_hashtag}"
+            )
+
+            team_season_fig = nst.generate_team_season_charts(team_name)
+            socialhandler.send(team_season_msg, media=team_season_fig)
+
         sys.exit()
 
     # For debugging purposes, print all game_info
