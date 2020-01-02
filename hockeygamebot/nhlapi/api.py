@@ -33,7 +33,7 @@ def nhl_api(endpoint):
 
     try:
         logging.info("Sending Stats API Request - %s", url)
-        response = session.get(url)
+        response = session.get(url, timeout=5)
         return response
     except ConnectionError as ce:
         logging.error(ce)
@@ -58,7 +58,7 @@ def nhl_rpt(endpoint):
 
     try:
         logging.info("Sending Report API Request - %s", url)
-        response = session.get(url)
+        response = session.get(url, timeout=5)
         return response
     except ConnectionError as ce:
         logging.error(ce)

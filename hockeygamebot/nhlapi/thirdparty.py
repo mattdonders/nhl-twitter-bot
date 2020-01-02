@@ -112,6 +112,7 @@ def nst_abbreviation(team_name: str) -> str:
     }
     return nss_teams[team_name]
 
+
 def get_nst_stat(list, index):
     if list[index].text == '-':
         return 'N/A'
@@ -119,6 +120,7 @@ def get_nst_stat(list, index):
         return list[index].text
     except ValueError:
         return 'N/A'
+
 
 def nst_linetool(game: Game, team: Team):
     """ Scrapes Natural Stat Trick's Limited Report to get advanced stats for forward lines
@@ -187,7 +189,6 @@ def nst_linetool(game: Game, team: Team):
 
     # print(f"{line_players} ({line_toi_mmss}) \t CF% {line_cf_pct} \t CF% REL {line_cfpct_rel} \t "
     #         f"GF% {line_gf_pct} \t SCF% {line_scf_pct} \t HDCF% {line_hdcf_pct}")
-
 
 
 def hockeyref_goalie_against_team(goalie, opponent):
