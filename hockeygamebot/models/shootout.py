@@ -6,3 +6,4 @@ class Shootout(object):
         self.other_score = []
         self.shots = 0
         self.round = 1
+        self.last_tweet = None

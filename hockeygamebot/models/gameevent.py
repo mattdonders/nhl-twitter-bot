@@ -128,7 +128,7 @@ def event_factory(game: Game, play: dict, livefeed: dict, new_plays: bool):
     obj = object_type.cache.get(event_id)
 
     # Check whether this is a shootout event & re-assigned the object_type accordingly
-    shootout = bool(play.get("about").get("periodType") == "SHOOTOUT")
+    shootout = bool(play.get("about").get("periodType") == "SHOOTOUT" and object_type != GameEndEvent)
     object_type = ShootoutEvent if shootout else object_type
 
     # Add the game object & livefeed to our response
@@ -1376,6 +1376,100 @@ class ShootoutEvent(GenericEvent):
     """
 
     cache = Cache(__name__)
+
+    def __init__(self, data: dict, game: Game):
+        super().__init__(data, game)
+
+        # Check if the event is actual shootout event
+        non_shootout_events = ["PERIOD_START", "SHOOTOUT_COMPLETE", "PERIOD_END", "PERIOD_OFFICIAL", "GAME_OFFICIAL"]
+        if self.event_type in non_shootout_events:
+            logging.info("A non-tracking shootout event (%s) detected - just return & skip this.", self.event_type)
+            return
+
+        if self.event_type == "PERIOD_READY":
+            self.social_msg = f"The shootout is underway at {self.game.venue}!"
+            social_ids = socialhandler.send(msg=self.social_msg, event=self, game_hashtag=True)
+            self.game.shootout.last_tweet = social_ids.get("twitter")
+            return
+
+        # Grab the event team from the Results section
+        results = data.get("result")
+        self.event_team = data.get("team").get("name")
+
+        # Get the Players Section
+        players = data.get("players")
+        shooter = [x for x in players if x.get("playerType").lower() in ("scorer", "shooter")]
+        goalie = [x for x in players if x.get("playerType").lower() == "goalie"]
+
+        # Handle Scorer name, id & totals
+        self.shooter_name = shooter[0].get("player").get("fullName")
+        self.shooter_id = shooter[0].get("player").get("id")
+        self.goalie_name = goalie[0].get("player").get("fullName") if goalie else None
+        self.goalie_id = goalie[0].get("player").get("id") if goalie else None
+
+        shootout_tracking_emoji = "✅" if self.event_type == "GOAL" else "❌"
+        logging.info(
+            "Shootout event (%s) detected for %s.",
+            self.event_type, self.event_team
+        )
+
+        # Preferred Team Shoots
+        if self.event_team == game.preferred_team.team_name:
+            game.shootout.preferred_score.append(shootout_tracking_emoji)
+            hit_crossbar_post = self.crossbar_or_post()
+            if self.event_type == "GOAL":
+                self.shootout_event_text = f"{self.shooter_name} shoots & scores! 🚨"
+            elif self.event_type == "SHOT":
+                self.shootout_event_text = f"{self.shooter_name}'s shot saved by {self.goalie_name}. 😠"
+            elif hit_crossbar_post:
+                self.shootout_event_text = f"{self.shooter_name} shoots & hits the {hit_crossbar_post}. 😠"
+            else:
+                self.shootout_event_text = f"{self.shooter_name} shoots & misses the net. 😠"
+
+        # Other Team Shoots
+        if self.event_team == game.other_team.team_name:
+            game.shootout.other_score.append(shootout_tracking_emoji)
+            hit_crossbar_post = self.crossbar_or_post()
+            if self.event_type == "GOAL":
+                self.shootout_event_text = f"{self.shooter_name} shoots & scores. 👎🏻"
+            elif self.event_type == "SHOT":
+                self.shootout_event_text = f"{self.shooter_name}'s shot saved by {self.goalie_name}! 🛑"
+            elif hit_crossbar_post:
+                self.shootout_event_text = f"{self.shooter_name} shoots & hits the {hit_crossbar_post}! 🛎"
+            else:
+                self.shootout_event_text = f"{self.shooter_name} shoots & misses the net! 🛑"
+
+        # Now that all parsing is done, generate the social media message
+        self.generate_social_msg()
+        last_tweet = self.game.shootout.last_tweet
+        social_ids = socialhandler.send(msg=self.social_msg, event=self, game_hashtag=True, reply=last_tweet)
+        self.game.shootout.last_tweet = social_ids.get("twitter")
+        self.game.shootout.shots += 1
+
+    def crossbar_or_post(self):
+        """ Checks shot text to determine if the shootout shot hit the crossbar or post. """
+        hit_keywords = ["crossbar", "goalpost"]
+
+        # If any of the hit keywords appear in the description of the event
+        if any(x in self.description.lower() for x in hit_keywords):
+            if "crossbar" in self.description.lower():
+                return "crossbar"
+            elif "goalpost" in self.description.lower():
+                return "post"
+            else:
+                return False
+        else:
+            return False
+
+    def generate_social_msg(self):
+        shootout_preferred_score = " - ".join(self.game.shootout.preferred_score)
+        shootout_other_score = " - ".join(self.game.shootout.other_score)
+        self.social_msg = (
+            f"{self.shootout_event_text}\n\n"
+            f"{self.game.preferred_team.short_name}: {shootout_preferred_score}\n"
+            f"{self.game.other_team.short_name}: {shootout_other_score}"
+        )
+
 
 
 class GameEndEvent(GenericEvent):
