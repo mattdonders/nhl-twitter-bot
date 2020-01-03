@@ -846,10 +846,11 @@ def generate_all_charts(game: Game):
     return list_of_charts
 
 
-def generate_team_season_charts(team_name):
+def generate_team_season_charts(team_name, lastgames=False):
     urls = utils.load_urls()
     nst_base = urls["endpoints"]["nst"]
-    nst_team_url = f"{nst_base}/teamtable.php?sit=sva"
+    last_games_mod = "" if not lastgames else f"&gp={lastgames}&gpf=c"
+    nst_team_url = f"{nst_base}/teamtable.php?sit=sva{last_games_mod}"
 
     resp = thirdparty.thirdparty_request(nst_team_url)
     soup = thirdparty.bs4_parse(resp.content)
@@ -930,8 +931,11 @@ def generate_team_season_charts(team_name):
         ax.set_axisbelow(True)
         ax.set(frame_on=False)
 
+    # Add the Figure Title
+    last_games_title = "Season Stats" if not lastgames else f"Last {lastgames} Games"
+    print(last_games_title)
     overview_fig.suptitle(
-        f"{team_name} Season Stats - 5v5 (SVA)\nData Courtesy: Natural Stat Trick"
+        f"{team_name} {last_games_title} - 5v5 (SVA)\nData Courtesy: Natural Stat Trick"
     )
 
     # Draw the text labels on each of the corresponding bars
@@ -945,6 +949,7 @@ def generate_team_season_charts(team_name):
     for i, v in enumerate(pref_df_T["AGAINST"].values):
         ax2.text(100 - 2, i, str(v), va="center", ha="right", color=team_color_text, fontweight="bold")
 
-    overview_fig_path = os.path.join(IMAGES_PATH, "temp", f"allcharts-yesterday-team-season.png")
+    last_games_file = "" if not lastgames else f"-last{lastgames}-"
+    overview_fig_path = os.path.join(IMAGES_PATH, "temp", f"allcharts-yesterday-team-season{last_games_file}.png")
     overview_fig.savefig(overview_fig_path, bbox_inches="tight")
     return overview_fig_path

@@ -350,13 +350,15 @@ def run():
             game_result_str = "defeat" if pref_score > other_score else "lose to"
 
             team_season_msg = (
-                f"Updated season overview stats after the {pref_team_name} {game_result_str} "
-                f"the {other_team_name} by a score of {pref_score} to {other_score}."
+                f"Updated season overview & last 10 game stats after the {pref_team_name} "
+                f"{game_result_str} the {other_team_name} by a score of {pref_score} to {other_score}."
                 f"\n\n{pref_hashtag}"
             )
 
             team_season_fig = nst.generate_team_season_charts(team_name)
-            socialhandler.send(team_season_msg, media=team_season_fig)
+            team_season_fig_last10 = nst.generate_team_season_charts(team_name, lastgames=10)
+            team_season_charts = [team_season_fig, team_season_fig_last10]
+            socialhandler.send(team_season_msg, media=team_season_charts)
 
         sys.exit()
 
