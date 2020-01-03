@@ -109,7 +109,7 @@ def setup_logging():
             root.removeHandler(handler)
 
     log_file_name = datetime.now().strftime(
-        load_config()["script"]["log_file_name"] + "-%Y%m%d%H%M%s.log"
+        load_config()["script"]["log_file_name"] + "-%Y%m%d%H%M%S.log"
     )
     log_file = os.path.join(LOGS_PATH, log_file_name)
     if args.console and args.debug:

@@ -1,6 +1,6 @@
 FROM python:3.6-slim-buster
 
-COPY hockeygamebot/requirements.txt /app/hockeygamebot/requirements.txt
+COPY requirements.txt /app/hockeygamebot/requirements.txt
 RUN pip install --no-cache-dir -r /app/hockeygamebot/requirements.txt
 
 COPY . /app

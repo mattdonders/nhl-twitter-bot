@@ -1212,7 +1212,7 @@ class PenaltyEvent(GenericEvent):
         self.penalty_on_name = penalty_on[0].get("player").get("fullName")
         self.penalty_on_id = penalty_on[0].get("player").get("id")
         self.penalty_on_game_ttl = (
-            game_event_total(__class__, self.penalty_on_name, "penalty_on_name") + 1
+            game_event_total(PenaltyEvent, self.penalty_on_name, "penalty_on_name") + 1
         )
 
         # Penalty Shot Fixes
