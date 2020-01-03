@@ -10,21 +10,6 @@ script:
 default:
     team_name: New Jersey Devils
 
-endpoints:
-    nhl_base: https://statsapi.web.nhl.com
-    nhl_endpoint: https://statsapi.web.nhl.com/api/v1
-    nhl_rpt_base: https://api.nhle.com/stats/rest/en/team
-    twitter_url: https://twitter.com/NJDevilsGameBot/status/
-    twitter_handle: NJDevilsGameBot
-    debug_twitter_handle: DevilsBotDebug
-    df_starting_goalies: https://www.dailyfaceoff.com/starting-goalies/
-    # df_starting_goalies: https://www.dailyfaceoff.com/starting-goalies/09-17-2019/
-    df_line_combos: https://www.dailyfaceoff.com/teams/TEAMNAME/line-combinations/
-    hockeyref_base: https://www.hockey-reference.com/players
-    scouting_refs: http://scoutingtherefs.com/wp-json/wp/v2/posts
-    nst: https://www.naturalstattrick.com
-    hockey_stat_cards: https://api.hockeystatcards.com/webapi
-
 socials:
     twitter: True
     discord: True
@@ -35,7 +20,7 @@ twitter:
         consumer_key: XXX
         consumer_secret: XXX
         access_token: XXX
-        access_key: XXX
+        access_secret: XXX
         handle: XXX
     debug:
         consumer_key: XXX

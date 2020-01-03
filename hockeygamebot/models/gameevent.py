@@ -1234,7 +1234,7 @@ class PenaltyEvent(GenericEvent):
         self.penalty_main_text = self.get_skaters()
         self.penalty_rankstat_text = self.get_penalty_stats()
         self.generate_social_msg(self.penalty_shot)
-        ids = socialhandler.send(msg=self.social_msg, event=self, game_hashtag=True, force_send=True)
+        ids = socialhandler.send(msg=self.social_msg, event=self, game_hashtag=True)
 
     def penalty_type_fixer(self, original_type):
         """ A function that converts some poorly named penalty types. """
