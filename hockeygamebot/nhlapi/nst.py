@@ -933,10 +933,7 @@ def generate_team_season_charts(team_name, lastgames=False):
 
     # Add the Figure Title
     last_games_title = "Season Stats" if not lastgames else f"Last {lastgames} Games"
-    print(last_games_title)
-    overview_fig.suptitle(
-        f"{team_name} {last_games_title} - 5v5 (SVA)\nData Courtesy: Natural Stat Trick"
-    )
+    ax1.title.set_text(f"{team_name} {last_games_title} - 5v5 (SVA)\nData Courtesy: Natural Stat Trick")
 
     # Draw the text labels on each of the corresponding bars
     # The top graph values are centered in the bar so it doesn't conflict with the average marker
