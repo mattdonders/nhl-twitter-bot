@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 import dateutil.parser
 import yaml
 
-from hockeygamebot.definitions import CONFIG_PATH, LOGS_PATH, URLS_PATH
+from hockeygamebot.definitions import CONFIG_PATH, IMAGES_PATH, LOGS_PATH, URLS_PATH
 from hockeygamebot.helpers import arguments
 from hockeygamebot.models.gametype import GameType
 
@@ -368,3 +368,13 @@ def to_mmss(time_input):
     """ Converts a time based integer (in seconds) to MM:SS format. """
     return time.strftime("%M:%S", time.gmtime(time_input))
 
+
+def empty_images_temp():
+    """ Empties the temporary image directory after the bot is done running."""
+    temp_path = os.path.join(IMAGES_PATH, "temp")
+    temp_images = os.listdir(temp_path)
+    logging.info("Emptying the TEMP images directory - %s.", temp_path)
+
+    for item in temp_images:
+        if item.endswith(".png"):
+            os.remove(os.path.join(temp_path, item))

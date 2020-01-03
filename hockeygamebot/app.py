@@ -267,6 +267,12 @@ def end_game_loop(game: Game):
     pref_team = game.preferred_team
     other_team = game.other_team
 
+    # Empty the temporary (in-game) images directory.
+    try:
+        utils.empty_images_temp()
+    except Exception as e:
+        logging.warning("Unable to empty temporary images directory. %s", e)
+
     logging.info("#" * 80)
     logging.info("End of the %s Hockey Twitter Bot game.", pref_team.short_name)
     logging.info(
