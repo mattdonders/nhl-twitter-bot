@@ -1229,6 +1229,14 @@ class PenaltyEvent(GenericEvent):
         self.x = coordinates.get("x", 0.0)
         self.y = coordinates.get("y", 0.0)
 
+        # Determine the Penalty Zone
+        pref_team = self.game.preferred_team
+        other_team = self.game.other_team
+        penalty_team_obj = pref_team if pref_team.team_name == self.penalty_team else other_team
+        penalty_zone_info = utils.determine_event_zone(self.x, self.y, self.period, penalty_team_obj.home_away)
+        penalty_zone = penalty_zone_info[1]
+        self.penalty_zone_text = f" in the {penalty_zone} zone" if penalty_zone else ""
+
         # Now call any functions that should be called when creating a new object
         # TODO: Figure out if theres a way to check for offsetting penalties
         self.penalty_main_text = self.get_skaters()
@@ -1317,9 +1325,9 @@ class PenaltyEvent(GenericEvent):
             )
         else:
             penalty_text_players = (
-                f"{self.penalty_on_name} takes a {self.minutes}-minute {self.severity} "
-                f"penalty for {self.secondary_type} and heads to the penalty box with "
-                f"{self.period_time_remain} remaining in the {self.period_ordinal} period. "
+                f"{self.penalty_on_name} takes a {self.minutes}-minute {self.severity} penalty"
+                f"{self.penalty_zone_text} for {self.secondary_type} and heads to the "
+                f"penalty box with  {self.period_time_remain} remaining in the {self.period_ordinal} period. "
                 # f"That's his {utils.ordinal(self.penalty_on_game_ttl)} penalty of the game. "
                 f"{penalty_text_skaters}"
             )

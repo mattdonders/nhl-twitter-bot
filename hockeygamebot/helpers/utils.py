@@ -317,6 +317,26 @@ def calculate_shot_distance(x: int, y: int) -> str:
     return shot_text
 
 
+def determine_event_zone(x: int, y: int, period: int, homeaway: str) -> str:
+    # Neutral Zone is 50 feet wide (from -25 to 25)
+    if abs(x) < 25:
+        return ("N", "neutral")
+
+    # Even numbered periods, need their coordinates flipped
+    if period % 2 == 0:
+        x *= -1
+        y *= -1
+
+    if homeaway == "home":
+        zone = ("O", "offensive") if x > 25 else ("D", "defensive")
+    elif homeaway == "away":
+        zone = ("O", "offensive") if x < -25 else ("D", "defensive")
+    else:
+        zone = (None, None)
+
+    return zone
+
+
 def time_remain_converter(time: str) -> str:
     """ Takes a time remaining string and determines if its less than 1 minute.
 
