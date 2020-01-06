@@ -69,7 +69,8 @@ def start_game_loop(game: Game):
             try:
                 logging.info("-" * 80)
                 logging.info(
-                    "Game is LIVE - checking events after event Idx %s.", game.last_event_idx
+                    "Game is LIVE (%s - %s) - checking events after event Idx %s.",
+                    game.period.current_ordinal, game.period.time_remaining, game.last_event_idx
                 )
 
                 # On my development machine, this command starts the files for this game
