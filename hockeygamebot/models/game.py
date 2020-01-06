@@ -9,6 +9,7 @@ import dateutil.tz
 
 from hockeygamebot import models
 from hockeygamebot.helpers import utils
+from hockeygamebot.models.gamestate import GameState
 from hockeygamebot.models.period import Period
 from hockeygamebot.models.shootout import Shootout
 from hockeygamebot.models.team import Team
@@ -170,7 +171,12 @@ class Game:
         linescore = response.get("liveData").get("linescore")
 
         # Update Game State & Period related attributes
-        self.game_state = response.get("gameData").get("status").get("abstractGameState")
+        # Don't update the game state if its final since we might have manually set it this way.
+        if GameState(self.game_state) != GameState.FINAL:
+            self.game_state = response.get("gameData").get("status").get("abstractGameState")
+        else:
+            logging.warning("Game State is FINAL - do not update in case we manually set this via GameEndEvent.")
+
         self.period.current = linescore.get("currentPeriod")
         self.period.current_ordinal = linescore.get("currentPeriodOrdinal")
         self.period.time_remaining = linescore.get("currentPeriodTimeRemaining")

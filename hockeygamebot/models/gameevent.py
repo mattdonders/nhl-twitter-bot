@@ -124,12 +124,12 @@ def event_factory(game: Game, play: dict, livefeed: dict, new_plays: bool):
     event_id = play.get("about").get("eventId")
     event_idx = play.get("about").get("eventIdx")
 
-    # Check whether this event is in our Cache
-    obj = object_type.cache.get(event_id)
-
     # Check whether this is a shootout event & re-assigned the object_type accordingly
     shootout = bool(play.get("about").get("periodType") == "SHOOTOUT" and object_type != GameEndEvent)
     object_type = ShootoutEvent if shootout else object_type
+
+    # Check whether this event is in our Cache
+    obj = object_type.cache.get(event_id)
 
     # Add the game object & livefeed to our response
     # event["game"] = game
