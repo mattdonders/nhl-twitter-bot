@@ -66,11 +66,11 @@ def final_score(livefeed: dict, game: Game):
         next_game = schedule.get_next_game(game.preferred_team.team_id)
 
         # Caclulate the game in the team's local time zone
-        localtz = dateutil.tz.tzlocal()
-        localoffset = localtz.utcoffset(datetime.now(localtz))
+        tz_id = dateutil.tz.gettz(game.preferred_team.tz_id)
+        tz_offset = tz_id.utcoffset(datetime.now(tz_id))
         next_game_date = next_game["gameDate"]
         next_game_dt = parse(next_game_date)
-        next_game_dt_local = next_game_dt + localoffset
+        next_game_dt_local = next_game_dt + tz_offset
         next_game_string = datetime.strftime(next_game_dt_local, "%A %B %d @ %I:%M%p")
 
         # Get next game's opponent
