@@ -298,11 +298,15 @@ def game_preview_others(game: Game):
             logging.error(e)
 
     # Process the pre-game information for the preferred team lines
-    if not game.preview_socials.pref_lines_sent:
+    if not game.preview_socials.pref_lines_sent or game.preview_socials.check_for_changed_lines(
+        "preferred"
+    ):
         try:
             pref_lines = thirdparty.dailyfaceoff_lines(game, pref_team)
             if not pref_lines.get("confirmed"):
-                raise AttributeError("Preferred team lines are not yet confirmed yet - try again next loop.")
+                raise AttributeError(
+                    "Preferred team lines are not yet confirmed yet - try again next loop."
+                )
 
             fwd_string = pref_lines.get("fwd_string")
             def_string = pref_lines.get("def_string")
@@ -314,12 +318,29 @@ def game_preview_others(game: Game):
                 f"Defense:\n{def_string}"
             )
 
-            social_dict = socialhandler.send(
-                msg=lines_tweet_text, reply=game.pregame_lasttweet, force_send=True
-            )
-
-            game.pregame_lasttweet = social_dict["twitter"]
-            game.preview_socials.pref_lines_sent = True
+            # If we have not sent the lines out at all, force send them
+            if not game.preview_socials.pref_lines_sent:
+                social_dict = socialhandler.send(
+                    msg=lines_tweet_text, reply=game.pregame_lasttweet, force_send=True
+                )
+                game.pregame_lasttweet = social_dict["twitter"]
+                game.preview_socials.pref_lines_msg = lines_tweet_text
+                game.preview_socials.pref_lines_sent = True
+            else:
+                lines_changed, lines_tweet_text = game.preview_socials.did_lines_change(
+                    "preferred", lines_tweet_text
+                )
+                if lines_changed:
+                    social_dict = socialhandler.send(
+                        msg=lines_tweet_text, reply=game.pregame_lasttweet, force_send=True
+                    )
+                    game.pregame_lasttweet = social_dict["twitter"]
+                    game.preview_socials.pref_lines_msg = lines_tweet_text
+                    game.preview_socials.pref_lines_resent = True
+                else:
+                    logging.info(
+                        "The preferred team lines have not changed - check again in an hour."
+                    )
 
         except AttributeError as e:
             logging.info(e)
@@ -330,11 +351,15 @@ def game_preview_others(game: Game):
             logging.error(e)
 
     # Process the pre-game information for the preferred team lines
-    if not game.preview_socials.other_lines_sent:
+    if not game.preview_socials.other_lines_sent or game.preview_socials.check_for_changed_lines(
+        "other"
+    ):
         try:
             other_lines = thirdparty.dailyfaceoff_lines(game, other_team)
             if not other_lines.get("confirmed"):
-                raise AttributeError("Other team lines are not yet confirmed yet - try again next loop.")
+                raise AttributeError(
+                    "Other team lines are not yet confirmed yet - try again next loop."
+                )
 
             fwd_string = other_lines.get("fwd_string")
             def_string = other_lines.get("def_string")
@@ -346,12 +371,29 @@ def game_preview_others(game: Game):
                 f"Defense:\n{def_string}"
             )
 
-            social_dict = socialhandler.send(
-                msg=lines_tweet_text, reply=game.pregame_lasttweet, force_send=True
-            )
-
-            game.pregame_lasttweet = social_dict["twitter"]
-            game.preview_socials.other_lines_sent = True
+            # If we have not sent the lines out at all, force send them
+            if not game.preview_socials.other_lines_sent:
+                social_dict = socialhandler.send(
+                    msg=lines_tweet_text, reply=game.pregame_lasttweet, force_send=True
+                )
+                game.pregame_lasttweet = social_dict["twitter"]
+                game.preview_socials.other_lines_msg = lines_tweet_text
+                game.preview_socials.other_lines_sent = True
+            else:
+                lines_changed, lines_tweet_text = game.preview_socials.did_lines_change(
+                    "other", lines_tweet_text
+                )
+                if lines_changed:
+                    social_dict = socialhandler.send(
+                        msg=lines_tweet_text, reply=game.pregame_lasttweet, force_send=True
+                    )
+                    game.pregame_lasttweet = social_dict["twitter"]
+                    game.preview_socials.other_lines_msg = lines_tweet_text
+                    game.preview_socials.other_lines_resent = True
+                else:
+                    logging.info(
+                        "The preferred team lines have not changed - check again in an hour."
+                    )
 
         except AttributeError as e:
             logging.info(e)

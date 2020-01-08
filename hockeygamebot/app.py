@@ -46,6 +46,9 @@ def start_game_loop(game: Game):
 
     while True:
         if GameState(game.game_state) == GameState.PREVIEW:
+            livefeed_resp = livefeed.get_livefeed(game.game_id)
+            game.update_game(livefeed_resp)
+
             if game.game_time_countdown > 0:
                 logging.info("Game is in Preview state - send out all pregame information.")
                 # The core game preview function should run only once
@@ -55,14 +58,13 @@ def start_game_loop(game: Game):
                 # The other game preview function should run every xxx minutes
                 # until all pregame tweets are sent or its too close to game time
                 sleep_time = preview.game_preview_others(game)
+                game.preview_socials.increment_counter()
                 time.sleep(sleep_time)
             else:
                 logging.info(
                     "Game is in Preview state, but past game start time - sleep for a bit "
                     "& update game attributes so we detect when game goes live."
                 )
-                livefeed_resp = livefeed.get_livefeed(game.game_id)
-                game.update_game(livefeed_resp)
                 time.sleep(config["script"]["pregame_sleep_time"])
 
         elif GameState(game.game_state) == GameState.LIVE:
@@ -70,7 +72,9 @@ def start_game_loop(game: Game):
                 logging.info("-" * 80)
                 logging.info(
                     "Game is LIVE (%s - %s) - checking events after event Idx %s.",
-                    game.period.current_ordinal, game.period.time_remaining, game.last_event_idx
+                    game.period.current_ordinal,
+                    game.period.time_remaining,
+                    game.last_event_idx,
                 )
 
                 # On my development machine, this command starts the files for this game
@@ -335,18 +339,20 @@ def run():
     if not game_today:
         game_yesterday, prev_game = schedule.was_game_yesterday(team_id, date)
         if game_yesterday:
-            logging.info("There was a game yesterday - generate new season overview stats chart, tweet it & exit.")
-            home_team = prev_game['teams']['home']
-            away_team = prev_game['teams']['away']
+            logging.info(
+                "There was a game yesterday - generate new season overview stats chart, tweet it & exit."
+            )
+            home_team = prev_game["teams"]["home"]
+            away_team = prev_game["teams"]["away"]
 
-            pref_team = home_team if home_team['team']['name'] == team_name else away_team
-            other_team = away_team if home_team['team']['name'] == team_name else home_team
+            pref_team = home_team if home_team["team"]["name"] == team_name else away_team
+            other_team = away_team if home_team["team"]["name"] == team_name else home_team
 
-            pref_team_name = pref_team['team']['name']
-            pref_score = pref_team['score']
+            pref_team_name = pref_team["team"]["name"]
+            pref_score = pref_team["score"]
             pref_hashtag = utils.team_hashtag(pref_team_name)
-            other_team_name = other_team['team']['name']
-            other_score = other_team['score']
+            other_team_name = other_team["team"]["name"]
+            other_score = other_team["score"]
 
             game_result_str = "defeat" if pref_score > other_score else "lose to"
 

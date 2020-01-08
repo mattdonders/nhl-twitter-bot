@@ -374,7 +374,7 @@ class StartOfGameSocial:
     """ A class that holds all end of game social media messages & statuses."""
 
     def __init__(self):
-        self.retry_count = 0
+        self.counter = 0
         self.lasttweet = None
 
         self.core_msg = None
@@ -389,8 +389,13 @@ class StartOfGameSocial:
         self.officials_sent = False
         self.pref_lines_msg = None
         self.pref_lines_sent = False
+        self.pref_lines_resent = False
         self.other_lines_msg = None
         self.other_lines_sent = False
+        self.other_lines_resent = False
+
+    def increment_counter(self):
+        self.counter += 1
 
     @property
     def all_social_sent(self):
@@ -400,10 +405,34 @@ class StartOfGameSocial:
         all_final_social_sent = all(all_final_social)
         return all_final_social_sent
 
-    @property
-    def retries_exeeded(self):
-        """ Returns True if the number of retires (3 = default) has been exceeded. """
-        return bool(self.retry_count >= 3)
+    def check_for_changed_lines(self, prefother):
+        """ Returns True every hour after the game bot starts to check for changed lines. """
+
+        resent = self.pref_lines_resent if prefother == "preferred" else self.other_lines_resent
+        if not resent:
+            return True if self.counter % 2 == 0 else False
+
+        return False
+
+    def did_lines_change(self, prefother, lines):
+        """ Checks if the lines changed for the indicated team & updates the message if so. """
+
+        original_lines = self.pref_lines_msg if prefother == "preferred" else self.other_lines_msg
+        lines_sent = self.pref_lines_sent if prefother == "preferred" else self.other_lines_sent
+
+        logging.debug("Original Lines: %s", original_lines)
+        logging.debug("New Lines: %s", lines)
+
+        lines_changed = bool(lines != original_lines)
+        if lines_sent and lines_changed:
+            logging.info("The lines for the %s team have changed - update them and send updated socials!", prefother)
+            lines = f"❗️ Updated {lines}"
+            return (True, lines)
+
+        return (False, lines)
+
+
+
 
 
 class NSTChartSocial:
