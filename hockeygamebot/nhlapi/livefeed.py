@@ -3,15 +3,8 @@ Functions pertaining to the NHL schedule (via API).
 """
 
 import logging
-import os
-import sys
-import time
-from datetime import datetime, timedelta
-from subprocess import Popen
+import random
 
-import requests
-
-from hockeygamebot.helpers import arguments, process, utils
 from hockeygamebot.nhlapi import api
 
 
@@ -24,8 +17,8 @@ def get_livefeed(game_id):
     Returns:
         response - JSON object of live feed results
     """
-
-    logging.info("Live Feed requested!")
-    api_endpoint = f"game/{game_id}/feed/live"
+    randomnum = random.randint(1000, 9999)
+    logging.info("Live Feed requested (random cache - %s)!", randomnum)
+    api_endpoint = f"game/{game_id}/feed/live?{randomnum}"
     response = api.nhl_api(api_endpoint).json()
     return response

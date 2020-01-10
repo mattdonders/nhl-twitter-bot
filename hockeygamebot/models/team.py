@@ -28,6 +28,7 @@ class Team(object):
         # Not passed in at object creation time
         # self.team_hashtag = team_hashtag(self.team_name)
         self.skaters = 5
+        self.onice = []
         self.score = 0
         self.shots = 0
         self.power_play = False

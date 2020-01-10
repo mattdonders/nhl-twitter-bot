@@ -71,9 +71,8 @@ def start_game_loop(game: Game):
             try:
                 logging.info("-" * 80)
                 logging.info(
-                    "Game is LIVE (%s - %s) - checking events after event Idx %s.",
-                    game.period.current_ordinal,
-                    game.period.time_remaining,
+                    "Game is LIVE (loop #%s) - checking events after event Idx %s.",
+                    game.live_loop_counter,
                     game.last_event_idx,
                 )
 
@@ -105,6 +104,24 @@ def start_game_loop(game: Game):
                 game.update_game(livefeed_resp)
                 game.goalie_pull_updater(livefeed_resp)
 
+                # Logging (Temporarily) for Penalty Killed Tweets
+                logging.info(
+                    "Current Period Info: %s - %s",
+                    game.period.current_ordinal,
+                    game.period.time_remaining,
+                )
+                logging.info(
+                    "Pref On Ice: %s - %s",
+                    len(game.preferred_team.onice),
+                    game.preferred_team.onice,
+                )
+                logging.info(
+                    "Other On Ice: %s - %s", len(game.other_team.onice), game.other_team.onice
+                )
+
+                if not game.period.current_oneminute_sent:
+                    live.minute_remaining_check(game)
+
                 # Pass the live feed response to the live loop (to parse events)
                 live.live_loop(livefeed=livefeed_resp, game=game)
                 # game_events = get_game_events(game_obj)
@@ -116,57 +133,9 @@ def start_game_loop(game: Game):
 
             # Perform any intermission score changes, charts & sleep
             if game.period.intermission:
-                # If we are in intermission, check if NST is ready for charts.
-                # Incorporating the check into this loop will be sure we obey the 60s sleep rule.
-                # We use the currentPeriod as the key to lookup if the charts
-                # have been sent for the current period's intermission
-                nst_chart_period_sent = game.nst_charts.charts_by_period.get(game.period.current)
-                if not nst_chart_period_sent:
-                    logging.info("NST Charts not yet sent - check if it's ready for us to scrape.")
-                    nst_ready = (
-                        nst.is_nst_ready(game.preferred_team.short_name) if not args.date else True
-                    )
-                    if nst_ready:
-                        list_of_charts = nst.generate_all_charts(game=game)
-                        # Chart at Position 0 is the Overview Chart & 1-4 are the existing charts
-                        overview_chart = list_of_charts[0]
-                        team_charts = list_of_charts[1:]
+                # Uncomment this tomorrow to test the function relocation
+                live_sleep_time = live.intermission_loop(game)
 
-                        overview_chart_msg = (
-                            f"Team Overview stat percentages - 5v5 (SVA) after the "
-                            f"{game.period.current_ordinal} period (via @NatStatTrick)."
-                        )
-
-                        ov_social_ids = socialhandler.send(
-                            overview_chart_msg, media=overview_chart, game_hashtag=True
-                        )
-
-                        charts_msg = (
-                            f"Individual, on-ice, forward lines & defensive pairs after the "
-                            f"{game.period.current_ordinal} period (via @NatStatTrick)."
-                        )
-                        social_ids = socialhandler.send(
-                            charts_msg,
-                            media=team_charts,
-                            game_hashtag=True,
-                            reply=ov_social_ids["twitter"],
-                        )
-                        # nst_chart_period_sent = social_ids.get("twitter")
-                        game.nst_charts.charts_by_period[game.period.current] = True
-
-                # Calculate proper sleep time based on intermission status
-                if game.period.intermission_remaining > config["script"]["intermission_sleep_time"]:
-                    live_sleep_time = config["script"]["intermission_sleep_time"]
-                    logging.info(
-                        "Sleeping for configured intermission time (%ss).",
-                        config["script"]["intermission_sleep_time"],
-                    )
-                else:
-                    live_sleep_time = game.period.intermission_remaining
-                    logging.info(
-                        "Sleeping for remaining intermission time (%ss).",
-                        game.period.intermission_remaining,
-                    )
             else:
                 live_sleep_time = config["script"]["live_sleep_time"]
                 logging.info(
@@ -174,7 +143,8 @@ def start_game_loop(game: Game):
                     config["script"]["live_sleep_time"],
                 )
 
-            # Now sleep for the calculated time above
+            # Now increment the counter sleep for the calculated time above
+            game.live_loop_counter += 1
             time.sleep(live_sleep_time)
 
         elif GameState(game.game_state) == GameState.FINAL:

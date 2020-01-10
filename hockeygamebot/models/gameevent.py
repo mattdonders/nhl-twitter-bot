@@ -10,7 +10,7 @@ from hockeygamebot.definitions import IMAGES_PATH
 from hockeygamebot.helpers import utils
 from hockeygamebot.models.game import Game
 from hockeygamebot.models.gametype import GameType
-from hockeygamebot.nhlapi import stats
+from hockeygamebot.nhlapi import contentfeed, stats
 from hockeygamebot.social import socialhandler
 from hockeygamebot.core import images
 
@@ -136,8 +136,9 @@ def event_factory(game: Game, play: dict, livefeed: dict, new_plays: bool):
     play["livefeed"] = livefeed
 
     # These methods are called when we want to act on existing objects
-    # Check for scoring changes on GoalEvents
+    # Check for scoring changes and NHL Video IDs on GoalEvents
     # We also use the new_plays variable to only check for scoring changes on no new events
+
     if object_type == GoalEvent and obj is not None and not new_plays:
         score_change_msg = obj.check_for_scoring_changes(play)
         if score_change_msg is not None:
@@ -145,6 +146,25 @@ def event_factory(game: Game, play: dict, livefeed: dict, new_plays: bool):
                 msg=score_change_msg, reply=obj.tweet, force_send=True, game_hashtag=True
             )
             obj.tweet = social_ids.get("twitter")
+
+        # Content Feed Checks
+        # all_goals_have_content = all(goal.video_url is not None for idx, goal in GoalEvent.cache.entries.items())
+        should_check_content = True if game.live_loop_counter % 10 == 0 else False
+
+        # If the object has no video_url, all goals don't have content and we should be checking content (via counter)
+        if not obj.video_url and should_check_content:
+            logging.info("A Goal without a video has been found - check the content feed for it.")
+            milestones = contentfeed.get_content_feed(game_id=game.game_id, milestones=True)
+            content_exists, highlight, video_url = contentfeed.search_milestones_for_id(milestones, event_id)
+            if content_exists:
+                # blurb = highlight.get('blurb')
+                description = highlight.get('description')
+                content_msg = f"NHL Video Highlight - {description}. \n\n{video_url}"
+                social_ids = socialhandler.send(
+                    msg=content_msg, reply=obj.tweet, force_send=True, game_hashtag=True
+                )
+                obj.tweet = social_ids.get("twitter")
+                obj.video_url = video_url
 
     # If object doesn't exist, create it & add to Cache
     if obj is None:
@@ -413,6 +433,9 @@ class PeriodStartEvent(GenericEvent):
 
     def __init__(self, data: dict, game: Game):
         super().__init__(data, game)
+
+        # Reset the 1-minute remaining property for this period
+        self.game.period.current_oneminute_sent = False
 
         # Now call any functions that should be called when creating a new object
         self.generate_social_msg()
@@ -747,6 +770,7 @@ class GoalEvent(GenericEvent):
         self.empty_net = results.get("emptyNet")
         self.event_team = data.get("team").get("name")
         self.tweet = None
+        self.video_url = None
 
         # Get the Coordinates Section
         coordinates = data.get("coordinates")
@@ -1036,7 +1060,8 @@ class GoalEvent(GenericEvent):
         # Check for Changes in Player IDs
         scorer_change = bool(scorer[0].get("player").get("id") != self.scorer_id)
         assist_change = bool(assist != self.assists)
-        logging.info("Scoring Change - %s / Assists Change - %s", scorer_change, assist_change)
+        if scorer_change or assist_change:
+            logging.info("Scoring Change - %s / Assists Change - %s", scorer_change, assist_change)
 
         if scorer_change:
             print("Old Scorer -", self.scorer_name)

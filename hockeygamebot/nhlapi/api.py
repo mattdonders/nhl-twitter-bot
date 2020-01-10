@@ -3,11 +3,6 @@ Single module to call the NHL API.
 """
 
 import logging
-import os
-import sys
-import time
-from datetime import datetime, timedelta
-from subprocess import Popen
 
 import requests
 from requests.adapters import HTTPAdapter

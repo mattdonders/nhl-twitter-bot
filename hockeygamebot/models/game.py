@@ -71,6 +71,7 @@ class Game:
         self.events = []
         self.pref_goals = []
         self.other_goals = []
+        self.live_loop_counter = 0
 
         # Initialize Pregame Tweets dictionary
         self.pregame_lasttweet = None
@@ -169,6 +170,7 @@ class Game:
 
         logging.info("Updating all Game object attributes.")
         linescore = response.get("liveData").get("linescore")
+        boxscore = response.get("liveData").get("boxscore")
 
         # Update Game State & Period related attributes
         # Don't update the game state if its final since we might have manually set it this way.
@@ -186,18 +188,22 @@ class Game:
         self.period.intermission_remaining = intermission.get("intermissionTimeRemaining")
 
         linescore_home = linescore.get("teams").get("home")
+        boxscore_home = boxscore.get("teams").get("home")
         self.home_team.score = linescore_home.get("goals")
         self.home_team.shots = linescore_home.get("shots")
 
         linescore_away = linescore.get("teams").get("away")
+        boxscore_away = boxscore.get("teams").get("away")
         self.away_team.score = linescore_away.get("goals")
         self.away_team.shots = linescore_away.get("shots")
 
         self.power_play_strength = linescore.get("powerPlayStrength")
         self.home_team.power_play = linescore_home.get("powerPlay")
         self.home_team.skaters = linescore_home.get("numSkaters")
+        self.home_team.onice = boxscore_home.get("onIce")
         self.away_team.power_play = linescore_away.get("powerPlay")
         self.away_team.skaters = linescore_away.get("numSkaters")
+        self.away_team.onice = boxscore_away.get("onIce")
 
         # self.last_event_idx = (
         #     response.get("liveData").get("plays").get("currentPlay").get("about").get("eventIdx")
@@ -430,9 +436,6 @@ class StartOfGameSocial:
             return (True, lines)
 
         return (False, lines)
-
-
-
 
 
 class NSTChartSocial:
