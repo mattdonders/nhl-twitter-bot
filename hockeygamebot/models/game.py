@@ -41,6 +41,7 @@ class Game:
         self.game_id = game_id
         self.game_type = game_type
         self.date_time = date_time
+        self.date_time_dt = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
         self.game_state = game_state
         self.venue = venue
         self.live_feed_endpoint = live_feed
