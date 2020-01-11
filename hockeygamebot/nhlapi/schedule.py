@@ -151,26 +151,29 @@ def get_broadcasts(resp):
     return broadcasts
 
 
-def get_next_game(team_id: int) -> dict:
-    """ Takes a team ID & gets the next game from the schedule API modified endpoint.
+def get_next_game(today_game_date: datetime, team_id: int) -> dict:
+    """ Takes today's game date & the team ID to get the next game from the NHL API endpoint.
 
     Args:
+        today_game_date (datetime) - The date of today's game.
         team_id (int) - The unique identifier of the team (from get_team function).
 
     Returns:
         next_game (dict) - Dictionary of next game attributes.
     """
 
+    tomorrow = (today_game_date + timedelta(days=1)).strftime("%Y-%m-%d")
+    end_date = (today_game_date + timedelta(days=365)).strftime("%Y-%m-%d")
+
     logging.info("Checking the schedule API endpoint for the next game.")
-    url = f"teams/{team_id}?expand=team.schedule.next"
+    url = f"schedule?teamId={team_id}&startDate={tomorrow}&endDate={end_date}"
 
     response = api.nhl_api(url)
     if not response:
         return None
 
     next_game_json = response.json()
-    next_game_sched = next_game_json.get("teams")[0].get("nextGameSchedule")
-    next_game = next_game_sched.get("dates")[0].get("games")[0]
+    next_game = next_game_json.get('dates')[0].get('games')[0]
 
     return next_game
 

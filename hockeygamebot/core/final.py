@@ -63,7 +63,7 @@ def final_score(livefeed: dict, game: Game):
 
     # Using the NHL Schedule API, get the next game which goes at the bottom of this core tweet
     try:
-        next_game = schedule.get_next_game(game.preferred_team.team_id)
+        next_game = schedule.get_next_game(game.date_time_dt, game.preferred_team.team_id)
 
         # Caclulate the game in the team's local time zone
         tz_id = dateutil.tz.gettz(game.preferred_team.tz_id)
