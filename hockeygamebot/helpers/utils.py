@@ -323,13 +323,12 @@ def determine_event_zone(x: int, y: int, period: int, homeaway: str) -> str:
         return ("N", "neutral")
 
     # Even numbered periods, need their coordinates flipped
-    if period % 2 == 0:
-        x *= -1
-        y *= -1
+    x = x * -1 if period % 2 == 0 else x
+    y = y * -1 if period % 2 == 0 else y
 
-    if homeaway == "home":
+    if homeaway == "away":
         zone = ("O", "offensive") if x > 25 else ("D", "defensive")
-    elif homeaway == "away":
+    elif homeaway == "home":
         zone = ("O", "offensive") if x < -25 else ("D", "defensive")
     else:
         zone = (None, None)
