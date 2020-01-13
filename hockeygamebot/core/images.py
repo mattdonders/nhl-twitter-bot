@@ -1,18 +1,21 @@
+"""
+Functions that create images or non-NST charts (via Matplotlib).
+"""
+
 import logging
 import os
 from enum import Enum
 
-# import numpy as np
-# import pandas as pd
-# import matplotlib
-# matplotlib.use('TkAgg')
-# import matplotlib.pyplot as plt
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 
 from hockeygamebot.definitions import IMAGES_PATH, PROJECT_ROOT
 from hockeygamebot.helpers import utils
-from hockeygamebot.models.gameevent import GoalEvent
 from hockeygamebot.models.game import Game
+from hockeygamebot.models.gameevent import GoalEvent
 from hockeygamebot.nhlapi import thirdparty
 
 
@@ -804,8 +807,9 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
     # bg.show()
     return bg
 
-def hockeystatcards_image(game: Game, home_gs: dict, away_gs: dict):
-    """ Generates a leaderboard image of the top 5 players from each team according to their Game Score.
+
+def hockeystatcards_charts(game: Game, home_gs: dict, away_gs: dict):
+    """ Generates two charts of each team's GameScore (with their average & breakout status).
         This is sent to social media platforms at the end of each game.
 
     Args:
@@ -814,139 +818,79 @@ def hockeystatcards_image(game: Game, home_gs: dict, away_gs: dict):
         away_gs: Away Team Game Score dictionary
 
     Returns:
-        bg: Finished Image instance
+        gs_charts: Two file paths to GameScore charts
     """
 
-    # home_gs = game.final_socials.hsc_homegs
-    # away_gs = game.final_socials.hsc_awaygs
-    # if not home_gs and not away_gs:
-    #         home_gs, away_gs = thirdparty.hockeystatcard_gamescores(game=game)
+    # Intialize an empty list to hold our completed file paths
+    gs_charts = list()
 
-    # # Check if gamescore results are still empty & return False
-    # if not home_gs and not away_gs:
-    #     return False
+    # Loop over both the home & away gamescore dictionaries to plot the charts
+    for idx, gs in enumerate((home_gs, away_gs)):
+        # Setup Team Name & Proper Colors
+        team_name = game.home_team.team_name if idx == 0 else game.away_team.team_name
+        color = rgb_to_hex(team_colors(team_name).get('primary').get('bg'))
 
-    # # If not empty, set the values in the Game Object
-    # game.final_socials.hsc_homegs = home_gs
-    # game.final_socials.hsc_awaygs = away_gs
+        logging.info("Generating the %s Game Score Chart.", team_name)
 
-    # print([[x['Player'],x['GameScore'],x['hero']] for x in home_gs])
-    # print([[x['Player'],x['GameScore'],x['hero']] for x in away_gs])
+        gs_df = pd.DataFrame(gs)
+        gs_df.columns = map(str.lower, gs_df.columns)
+        gs_df = gs_df[["player", "toi", "gamescore", "hero", "gsavg"]]
+        gs_df.set_index("player", drop=True, inplace=True)
+        gs_df = gs_df.iloc[::-1]
 
-    FONT_TITLE = ImageFont.truetype(FontFiles.BITTER_BOLD, FontSizes.TITLE)
-    FONT_PLAYER = ImageFont.truetype(FontFiles.BITTER_BOLD, FontSizes.GS_VALUES)
-    FONT_GS = ImageFont.truetype(FontFiles.BITTER_REGULAR, FontSizes.GS_VALUES)
-    FONT_HEADER = ImageFont.truetype(FontFiles.BITTER_BOLD, FontSizes.GS_TABLE_HEADERS)
-    FONT_BO = ImageFont.truetype(FontFiles.BITTER_REGULAR, 14)
+        gs_fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+        bars = gs_df[["gamescore"]].astype(float).plot.barh(ax=ax, color=color)
+        bars = bars.patches
+        heros = gs_df["hero"]
+        for bar, hero in zip(bars, heros):
+            if hero:
+                bar.set_hatch("///")
 
+        ax.plot(
+            gs_df[["gsavg"]].astype(float).gsavg.values,
+            gs_df[["gsavg"]].astype(float).index.values,
+            # marker="H",
+            marker="X",
+            linestyle="",
+            color="#AAAAAA",
+        )
 
-    TABLE_DISTANCE = 600
-    TABLE_START_Y = 175
-    TABLE_CELL_SEPARATOR = 15
-    TABLE_CELL_H = 35
+        ax.grid(True, which="major", axis="x", color="#cccccc")
+        ax.grid(True, which="major", axis="y", color="#cccccc", linestyle="dotted")
+        ax.set_axisbelow(True)
+        ax.set(frame_on=False)
+        ax.set_ylabel("")
+        ax.set_xlabel("")
+        ax.legend().remove()
+        ax.legend(
+            ["Player's Season Average GameScore"],
+            bbox_to_anchor=(0.5, -0.15),
+            loc="lower center",
+            ncol=1,
+            frameon=False,
+        )
 
-    HOME_TABLE_HERO_START_X = 35
-    HOME_TABLE_HERO_W = 50
-    HOME_TABLE_HERO_END_X = HOME_TABLE_HERO_START_X + HOME_TABLE_HERO_W
+        ax.title.set_text(
+            f"{team_name} GameScore - {game.game_date_short}\n"
+            f"Data Courtesy: Cole Palmer (@cepvi0) & Natural Stat Trick\n"
+            f"GameScore Formula: Dom Luszczyszyn (@domluszczyszyn)\n"
+        )
 
-    HOME_TABLE_TOI_START_X = HOME_TABLE_HERO_END_X + TABLE_CELL_SEPARATOR
-    HOME_TABLE_TOI_W = 70
-    HOME_TABLE_TOI_END_X = HOME_TABLE_TOI_START_X + HOME_TABLE_TOI_W
+        gs_fig.text(
+            0.5,
+            -0.04,
+            "Hatched (///) Pattern Indicates Breakout Game.\n"
+            "A breakout game is ~1.5X the standard deviation from the player's mean GameScore.",
+            horizontalalignment="center",
+            fontsize=8
+        )
 
-    HOME_TABLE_NAME_START_X = HOME_TABLE_TOI_END_X + TABLE_CELL_SEPARATOR
-    HOME_TABLE_NAME_W = 215
-    HOME_TABLE_NAME_END_X = HOME_TABLE_NAME_START_X + HOME_TABLE_NAME_W
+        gs_chart_path = os.path.join(IMAGES_PATH, "temp", f"hsc_gamescore-{game.game_id_shortid}-{idx}.png")
+        logging.info("Image Path: %s", gs_chart_path)
+        gs_fig.savefig(gs_chart_path, bbox_inches="tight")
 
-    HOME_TABLE_GS_START_X = HOME_TABLE_NAME_END_X + TABLE_CELL_SEPARATOR
-    HOME_TABLE_GS_W = 70
-    HOME_TABLE_GS_END_X = HOME_TABLE_GS_START_X + HOME_TABLE_GS_W
+        # Add the overview image path to our list
+        gs_charts.append(gs_chart_path)
 
-    HOME_TABLE_AVG_START_X = HOME_TABLE_GS_END_X + TABLE_CELL_SEPARATOR
-    HOME_TABLE_AVG_W = 70
-    HOME_TABLE_AVG_END_X = HOME_TABLE_AVG_START_X + HOME_TABLE_AVG_W
+    return gs_charts
 
-    TABLE_LIST = [
-        (HOME_TABLE_HERO_START_X, HOME_TABLE_HERO_END_X),
-        (HOME_TABLE_TOI_START_X, HOME_TABLE_TOI_END_X),
-        (HOME_TABLE_NAME_START_X, HOME_TABLE_NAME_END_X),
-        (HOME_TABLE_GS_START_X, HOME_TABLE_GS_END_X),
-        (HOME_TABLE_AVG_START_X, HOME_TABLE_AVG_END_X)
-    ]
-
-    # Load background & pasted resized logos
-    bg = Image.open(Backgrounds.STATS)
-    bg_w, bg_h = bg.size
-
-    away_team = game.away_team.team_name.replace(" ", "")
-    home_team = game.home_team.team_name.replace(" ", "")
-    away_logo = Image.open(os.path.join(PROJECT_ROOT, f"resources/logos/{away_team}.png"))
-    home_logo = Image.open(os.path.join(PROJECT_ROOT, f"resources/logos/{home_team}.png"))
-
-    # Generates a 'draw' object that we use to draw on top of the image
-    draw = ImageDraw.Draw(bg)
-
-    center_text(draw=draw, left=0, top=0, width=bg_w, text="GAME SCORE LEADERBOARD", color=Colors.WHITE, font=FONT_TITLE)
-
-    center_text(draw, HOME_TABLE_HERO_START_X, TABLE_START_Y - 30, HOME_TABLE_HERO_W, "BO *", Colors.WHITE, FONT_HEADER)
-    center_text(draw, HOME_TABLE_TOI_START_X, TABLE_START_Y - 30, HOME_TABLE_TOI_W, "TOI", Colors.WHITE, FONT_HEADER)
-    draw.text((HOME_TABLE_NAME_START_X, TABLE_START_Y - 30), "Player Name", Colors.WHITE, FONT_HEADER)
-    center_text(draw, HOME_TABLE_GS_START_X, TABLE_START_Y - 30, HOME_TABLE_GS_W, "GS", Colors.WHITE, FONT_HEADER)
-    center_text(draw, HOME_TABLE_AVG_START_X, TABLE_START_Y - 30, HOME_TABLE_AVG_W, "AVG", Colors.WHITE, FONT_HEADER)
-
-    center_text(draw, TABLE_DISTANCE + HOME_TABLE_HERO_START_X, TABLE_START_Y - 30, HOME_TABLE_HERO_W, "BO *", Colors.WHITE, FONT_HEADER)
-    center_text(draw, TABLE_DISTANCE + HOME_TABLE_TOI_START_X, TABLE_START_Y - 30, HOME_TABLE_TOI_W, "TOI", Colors.WHITE, FONT_HEADER)
-    draw.text((TABLE_DISTANCE + HOME_TABLE_NAME_START_X, TABLE_START_Y - 30), "Player Name", Colors.WHITE, FONT_HEADER)
-    center_text(draw, TABLE_DISTANCE + HOME_TABLE_GS_START_X, TABLE_START_Y - 30, HOME_TABLE_GS_W, "GS", Colors.WHITE, FONT_HEADER)
-    center_text(draw, TABLE_DISTANCE + HOME_TABLE_AVG_START_X, TABLE_START_Y - 30, HOME_TABLE_AVG_W, "AVG", Colors.WHITE, FONT_HEADER)
-
-
-    table_looper = [(0, home_gs), (TABLE_DISTANCE, away_gs)]
-    for i in range(10):
-        for k in table_looper:
-            dist = k[0]
-            gs = k[1]
-
-            CHART_HOME_TOP_Y = TABLE_START_Y + (i * TABLE_CELL_H) + (i * TABLE_CELL_SEPARATOR)
-            CHART_HOME_BOTTOM_Y = TABLE_START_Y + ((i + 1) * TABLE_CELL_H) + (i * TABLE_CELL_SEPARATOR)
-            draw.rectangle(
-                ((dist + HOME_TABLE_HERO_START_X, CHART_HOME_TOP_Y), (dist + HOME_TABLE_HERO_END_X, CHART_HOME_BOTTOM_Y)), fill=Colors.WHITE
-            )
-            draw.rectangle(
-                ((dist + HOME_TABLE_TOI_START_X, CHART_HOME_TOP_Y), (dist + HOME_TABLE_TOI_END_X, CHART_HOME_BOTTOM_Y)), fill=Colors.WHITE
-            )
-            draw.rectangle(
-                ((dist + HOME_TABLE_NAME_START_X, CHART_HOME_TOP_Y), (dist + HOME_TABLE_NAME_END_X, CHART_HOME_BOTTOM_Y)), fill=Colors.WHITE
-            )
-            draw.rectangle(
-                ((dist + HOME_TABLE_GS_START_X, CHART_HOME_TOP_Y), (dist + HOME_TABLE_GS_END_X, CHART_HOME_BOTTOM_Y)), fill=Colors.WHITE
-            )
-            draw.rectangle(
-                ((dist + HOME_TABLE_AVG_START_X, CHART_HOME_TOP_Y), (dist + HOME_TABLE_AVG_END_X, CHART_HOME_BOTTOM_Y)), fill=Colors.WHITE
-            )
-
-
-            if gs[i]['hero']:
-                center_text(draw, dist + HOME_TABLE_HERO_START_X, CHART_HOME_TOP_Y, HOME_TABLE_HERO_W, "X", Colors.BLACK, FONT_PLAYER, vertical=True, height=TABLE_CELL_H)
-
-            try:
-                toi = float(gs[i]['TOI'])
-                mm_toi = int(toi)
-                ss_toi = (toi * 60) % 60
-                mmss_toi = f"{mm_toi}:{ss_toi:02.00f}"
-            except KeyError:
-                mmss_toi = "N/A"
-
-            center_text(draw, dist + HOME_TABLE_TOI_START_X, CHART_HOME_TOP_Y, HOME_TABLE_TOI_W, mmss_toi, Colors.BLACK, FONT_GS, vertical=True, height=TABLE_CELL_H)
-            valign_center_text(draw, dist + 5 + HOME_TABLE_NAME_START_X, CHART_HOME_TOP_Y, TABLE_CELL_H, gs[i]['Player'], color=Colors.BLACK, font=FONT_PLAYER)
-            center_text(draw, dist + HOME_TABLE_GS_START_X, CHART_HOME_TOP_Y, HOME_TABLE_GS_W, gs[i]['GameScore'], Colors.BLACK, FONT_GS, vertical=True, height=TABLE_CELL_H)
-            center_text(draw, dist + HOME_TABLE_AVG_START_X, CHART_HOME_TOP_Y, HOME_TABLE_AVG_W, gs[i]['gsAvg'], Colors.BLACK, FONT_GS, vertical=True, height=TABLE_CELL_H)
-
-            bo_text = (
-                "* A breakout game is defined as the measure of how a player performed relative to themselves.\n"
-                "Given a normal distribution of GameScores, a breakout game is 1.5X the standard deviation \n"
-                "from the player's mean GameScore. This theoretically equates to the top ~8% of games \n"
-                "played by that player in a season."
-            )
-            # draw.text((10, 600), bo_text, Colors.WHITE, FONT_BO)
-
-    return bg

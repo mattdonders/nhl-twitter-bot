@@ -180,16 +180,14 @@ def hockeystatcards(game: Game):
     home_gs = game_scores[0]
     away_gs = game_scores[1]
 
-    hsc_image = images.hockeystatcards_image(game=game, home_gs=home_gs, away_gs=away_gs)
-    img_filename = os.path.join(IMAGES_PATH, "temp", f"Final-HSC-{game.game_id}.png")
-    hsc_image.save(img_filename)
+    hsc_charts = images.hockeystatcards_charts(game=game, home_gs=home_gs, away_gs=away_gs)
 
     hsc_social_text = (
         f"{game.preferred_team.short_name} & {game.other_team.short_name} Game Score leaderboard."
         f"\n\n(via @cepvi0 @NatStatTrick @domluszczyszyn)"
     )
 
-    socialhandler.send(msg=hsc_social_text, media=img_filename)
+    socialhandler.send(msg=hsc_social_text, media=hsc_charts)
 
     # Set the end of game social attributes
     game.final_socials.hsc_msg = hsc_social_text
