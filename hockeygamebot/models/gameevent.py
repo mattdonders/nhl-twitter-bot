@@ -266,6 +266,7 @@ class GenericEvent:
         self.livefeed = data.get("livefeed")
         self.social_msg = None
         self.game.events.append(self)
+        self.event_removal_counter = 0
 
         # Get the Result Section
         results = data.get("result")
@@ -824,6 +825,7 @@ class GoalEvent(GenericEvent):
             else self.game.other_goals
         )
         goals_list.append(self)
+        self.game.all_goals.append(self)
 
         # Now call any functions that should be called when creating a new object
         self.goal_title_text = self.get_goal_title_text()
@@ -1125,6 +1127,22 @@ class GoalEvent(GenericEvent):
             return goal_scorechange_text
         else:
             return f"{goal_scorechange_title}\n\n{goal_scorechange_text}"
+
+
+    def was_goal_removed(self, all_plays: dict):
+        """ This function checks if the goal was removed from the livefeed (usually for a Challenge). """
+        goal_still_exists = next((play for play in all_plays if play['about']['eventId'] == self.event_id), None)
+
+        # If the goal doesn't exist, check the event removal counter & then delete the event
+        if not goal_still_exists and self.event_removal_counter < 5:
+            logging.warning("A GoalEvent (event ID: %s) is missing (loop #%s) - will check again.", self.event_id, self.event_removal_counter)
+            self.event_removal_counter += 1
+            return False
+        elif not goal_still_exists and self.event_removal_counter == 5:
+            logging.warning("A GoalEvent (event ID: %s) has been missing for 5 checks - deleting.", self.event_id)
+            return True
+        else:
+            return False
 
 
 class ShotEvent(GenericEvent):

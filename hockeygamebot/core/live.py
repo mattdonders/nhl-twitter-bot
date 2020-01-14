@@ -15,7 +15,7 @@ from hockeygamebot.nhlapi import nst
 from hockeygamebot.social import socialhandler
 
 
-def live_loop(livefeed, game):
+def live_loop(livefeed: dict, game: Game):
     """ The master live-game loop. All logic spawns from here.
 
     Args:
@@ -62,6 +62,19 @@ def live_loop(livefeed, game):
     # it will be created because it doesn't exist in the Cache.
     for play in all_plays:
         gameevent.event_factory(game=game, play=play, livefeed=livefeed, new_plays=new_plays)
+
+    # Check if any goals were removed
+    try:
+        for goal in game.all_goals[:]:
+            was_goal_removed = goal.was_goal_removed(all_plays)
+            if was_goal_removed:
+                game.all_goals.remove(goal)
+                del goal
+    except Exception as e:
+        logging.error(
+            "Encounted an exception trying to detect if a goal is no longer in the livefeed."
+        )
+        logging.error(e)
 
     # Check here for goal object changes
     # if not new_plays:

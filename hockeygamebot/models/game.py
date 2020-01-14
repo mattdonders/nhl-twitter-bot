@@ -73,6 +73,7 @@ class Game:
         self.events = []
         self.pref_goals = []
         self.other_goals = []
+        self.all_goals = []
         self.live_loop_counter = 0
 
         # Initialize Pregame Tweets dictionary
