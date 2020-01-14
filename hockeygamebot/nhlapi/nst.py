@@ -718,15 +718,9 @@ def charts_fwds_def(game_title, team, fwd_sva_stats, def_sva_stats):
 
 def charts_overview(game, game_title, overview_stats):
     # Get the Team Colors (for the split / stacked bars)
-    home_colors = images.team_colors(game.home_team.team_name)
-    away_colors = images.team_colors(game.away_team.team_name)
-
-    if home_colors["primary"]["bg"] == away_colors["primary"]["bg"]:
-        home_colors = home_colors["primary"]
-        away_colors = away_colors["secondary"]
-    else:
-        home_colors = home_colors["primary"]
-        away_colors = away_colors["primary"]
+    colors_dict = images.both_team_colors_compared(game.home_team.team_name, game.away_team.team_name)
+    home_colors = colors_dict['first']
+    away_colors = colors_dict['second']
 
     overview_fig, ax1 = plt.subplots(1, 1, figsize=(10,5))
     df_overview = pd.DataFrame(overview_stats).T

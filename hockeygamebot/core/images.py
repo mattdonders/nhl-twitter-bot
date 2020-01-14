@@ -6,9 +6,7 @@ import logging
 import os
 from enum import Enum
 
-import matplotlib as mpl
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 
@@ -64,6 +62,7 @@ class FontSizes:
 class Constants:
     """ Constant chart-based values. """
 
+    SIMILAR_THRESHOLD = 18
     CHART_START_X = 35
     CHART_WIDTH = 690
     # CHART_END_X = 725
@@ -87,6 +86,42 @@ class StatTypes(Enum):
     POWER_PLAYS = 3
     PENALTY_MINS = 4
     FACEOFF_PCT = 5
+
+
+def luminance(pixel):
+    """ Calculates the luminance of an (R,G,B) color."""
+    return (0.299 * pixel[0] + 0.587 * pixel[1] + 0.114 * pixel[2])
+
+
+def is_similar(pixel_a, pixel_b, threshold):
+    """ Takes two (R, G, B) colors and determines if they are similar. """
+    return abs(luminance(pixel_a) - luminance(pixel_b)) < threshold
+
+
+def both_team_colors_compared(first_team_name, second_team_name):
+    """ Takes two team names and determins if the colors are the same or similar.
+        Retruns a dictionary of pref_team & other_team colors.
+
+    Args:
+        pref_team_name: Preferred Team Name
+        other_team_name: Other Team Name
+
+    Returns:
+        colors_dict: Dictionary of final team colors
+    """
+    first_colors = team_colors(first_team_name)
+    second_colors = team_colors(second_team_name)
+
+    first_primary_bg = first_colors['primary']['bg']
+    second_primary_bg = second_colors['primary']['bg']
+
+    # Check if the primary team colors are the same or similar
+    similar_colors = is_similar(first_primary_bg, second_primary_bg, Constants.SIMILAR_THRESHOLD)
+
+    # Build the returning dictionary
+    colors_dict = {'first': first_colors['primary']}
+    colors_dict['second'] = second_colors['secondary'] if similar_colors else second_colors['primary']
+    return colors_dict
 
 
 def team_colors(team_name):
@@ -228,6 +263,7 @@ def team_colors(team_name):
 
     return team_colors_dict[team_name]
 
+
 def rgb_to_hex(value1, value2=None, value3=None):
     """
     Convert RGB value (as three numbers each ranges from 0 to 255) to hex format.
@@ -243,7 +279,6 @@ def rgb_to_hex(value1, value2=None, value3=None):
         if not 0 <= value <= 255:
             raise ValueError('Value each slider must be ranges from 0 to 255')
     return '#{0:02X}{1:02X}{2:02X}'.format(value1, value2, value3)
-
 
 
 def center_text(draw, left, top, width, text, color, font, vertical=False, height=None):
@@ -610,18 +645,11 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
     GOAL_SCORER_BOX_SEPARATOR = 15
 
     # Setup Colors (via functions)
-    pref_colors = team_colors(game.preferred_team.team_name)
-    other_colors = team_colors(game.other_team.team_name)
+    colors_dict = both_team_colors_compared(game.preferred_team.team_name, game.other_team.team_name)
+    pref_colors = colors_dict['first']
+    other_colors = colors_dict['second']
 
     logging.debug("Pref Colors - %s // Other Colors - %s", pref_colors, other_colors)
-
-    if pref_colors["primary"]["bg"] == other_colors["primary"]["bg"]:
-        logging.info("Primary team colors are the same - swap other to secondary!")
-        pref_colors = pref_colors["primary"]
-        other_colors = other_colors["secondary"]
-    else:
-        pref_colors = pref_colors["primary"]
-        other_colors = other_colors["primary"]
 
     # Load background & pasted resized logos
     bg = Image.open(Backgrounds.STATS)

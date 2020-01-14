@@ -15,7 +15,7 @@ from hockeygamebot.models.shootout import Shootout
 from hockeygamebot.models.team import Team
 from hockeygamebot.models.hashtag import Hashtag
 from hockeygamebot.social import socialhandler
-from hockeygamebot.models.gameevent import GameEndEvent
+# from hockeygamebot.models.gameevent import GameEndEvent
 
 class Game:
     """Holds all game related attributes - usually one instance created per game."""
@@ -178,7 +178,7 @@ class Game:
         # Don't update the game state if its final since we might have manually set it this way.
         lf_game_state = response.get("gameData").get("status").get("abstractGameState")
 
-        if GameState(lf_game_state) == GameState.FINAL and not GameEndEvent.cache.entries:
+        if GameState(lf_game_state) == GameState.FINAL and not models.gameevent.GameEndEvent.cache.entries:
             logging.warning("Game State is FINAL, but no GameEndEvent recorded - don't update thie game state yet.")
         elif GameState(self.game_state) != GameState.FINAL:
             self.game_state = lf_game_state
