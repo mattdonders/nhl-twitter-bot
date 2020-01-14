@@ -863,6 +863,9 @@ def hockeystatcards_charts(game: Game, home_gs: dict, away_gs: dict):
         gs_df = pd.DataFrame(gs)
         gs_df.columns = map(str.lower, gs_df.columns)
         gs_df = gs_df[["player", "toi", "gamescore", "hero", "gsavg"]]
+        gs_df["gamescore"] = pd.to_numeric(gs_df["gamescore"])
+        gs_df["gsavg"] = pd.to_numeric(gs_df["gsavg"])
+        gs_df = gs_df.sort_values(by=['gamescore'], ascending=False)
         gs_df.set_index("player", drop=True, inplace=True)
         gs_df = gs_df.iloc[::-1]
 

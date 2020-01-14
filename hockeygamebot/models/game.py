@@ -341,7 +341,7 @@ class Game:
         """Returns the game date_time in local server time in AM / PM format."""
         game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
         game_date_local = game_date + self.tz_offset
-        game_date_local_short = game_date_local.strftime("%B %d").replace(" 0", " ").upper()
+        game_date_local_short = game_date_local.strftime("%B %d").replace(" 0", " ")
         return game_date_local_short
 
     @property
