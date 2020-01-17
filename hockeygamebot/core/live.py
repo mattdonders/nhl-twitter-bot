@@ -68,24 +68,19 @@ def live_loop(livefeed: dict, game: Game):
         for goal in game.all_goals[:]:
             was_goal_removed = goal.was_goal_removed(all_plays)
             if was_goal_removed:
+                pref_team = game.preferred_team.team_name
+                goals_list = game.pref_goals if goal.event_team == pref_team else game.other_goals
+
+                # Remove the Goal from all lists, caches & then finallydelete the object
                 game.all_goals.remove(goal)
+                goals_list.remove(goal)
+                goal.cache.remove(goal)
                 del goal
     except Exception as e:
         logging.error(
             "Encounted an exception trying to detect if a goal is no longer in the livefeed."
         )
         logging.error(e)
-
-    # Check here for goal object changes
-    # if not new_plays:
-    #     for k, v in GoalEvent.cache.entries:
-    #         print(k, v)
-
-    # all_plays_objs = [
-    #     gameevent.event_factory(game, play, livefeed, new_plays) for play in all_plays
-    # ]
-    # return all_plays_objs
-    # print(all_plays_objs)
 
 
 def intermission_loop(game):

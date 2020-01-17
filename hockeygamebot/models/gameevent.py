@@ -252,6 +252,10 @@ class Cache:
         entry = self.entries.get(id)
         return entry
 
+    def remove(self, entry: object):
+        """ Removes an entry from its Object cache. """
+        del self.entries[entry.event_id]
+
 
 class GenericEvent:
     """ A Generic Game event where we just store the attributes and don't
@@ -826,6 +830,7 @@ class GoalEvent(GenericEvent):
         )
         goals_list.append(self)
         self.game.all_goals.append(self)
+
 
         # Now call any functions that should be called when creating a new object
         self.goal_title_text = self.get_goal_title_text()
