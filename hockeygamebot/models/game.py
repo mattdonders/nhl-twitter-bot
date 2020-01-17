@@ -10,7 +10,6 @@ import dateutil.tz
 from hockeygamebot import models
 from hockeygamebot.helpers import utils
 from hockeygamebot.models.gamestate import GameState
-from hockeygamebot.models.globalgame import GlobalGame
 from hockeygamebot.models.period import Period
 from hockeygamebot.models.shootout import Shootout
 from hockeygamebot.models.team import Team

@@ -28,7 +28,7 @@ def send(msg, **kwargs):
     if not msg:
         return
 
-    if GlobalGame.game.other_team.team_name == "Washington Capitals":
+    if GlobalGame.game and GlobalGame.game.other_team.team_name == "Washington Capitals":
         msg = msg.lower()
 
     args = arguments.get_arguments()
