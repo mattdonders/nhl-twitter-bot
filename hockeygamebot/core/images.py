@@ -62,7 +62,7 @@ class FontSizes:
 class Constants:
     """ Constant chart-based values. """
 
-    SIMILAR_THRESHOLD = 18
+    SIMILAR_THRESHOLD = 6
     CHART_START_X = 35
     CHART_WIDTH = 690
     # CHART_END_X = 725
@@ -95,10 +95,11 @@ def luminance(pixel):
 
 def is_similar(pixel_a, pixel_b, threshold):
     """ Takes two (R, G, B) colors and determines if they are similar. """
-    return abs(luminance(pixel_a) - luminance(pixel_b)) < threshold
+    difference = abs(luminance(pixel_a) - luminance(pixel_b))
+    return difference < threshold
 
 
-def both_team_colors_compared(first_team_name, second_team_name):
+def both_team_colors_compared(first_team_name, second_team_name, threshold=None):
     """ Takes two team names and determins if the colors are the same or similar.
         Retruns a dictionary of pref_team & other_team colors.
 
@@ -116,7 +117,8 @@ def both_team_colors_compared(first_team_name, second_team_name):
     second_primary_bg = second_colors['primary']['bg']
 
     # Check if the primary team colors are the same or similar
-    similar_colors = is_similar(first_primary_bg, second_primary_bg, Constants.SIMILAR_THRESHOLD)
+    threshold = threshold if threshold else Constants.SIMILAR_THRESHOLD
+    similar_colors = is_similar(first_primary_bg, second_primary_bg, threshold)
 
     # Build the returning dictionary
     colors_dict = {'first': first_colors['primary']}
@@ -145,7 +147,7 @@ def team_colors(team_name):
         },
         "Boston Bruins": {
             "primary": {"bg": (255, 184, 28), "text": (255, 255, 255)},
-            "secondary": {"bg": (255, 255, 255), "text": (0, 0, 0)},
+            "secondary": {"bg": (0, 0, 0), "text": (255, 255, 255)},
         },
         "Buffalo Sabres": {
             "primary": {"bg": (4, 30, 66), "text": (255, 255, 255)},
@@ -177,7 +179,7 @@ def team_colors(team_name):
         },
         "Detroit Red Wings": {
             "primary": {"bg": (200, 16, 46), "text": (255, 255, 255)},
-            "secondary": {"bg": (255, 255, 255), "text": (0, 0, 0)},
+            "secondary": {"bg": (0, 0, 0), "text": (255, 255, 255)},
         },
         "Edmonton Oilers": {
             "primary": {"bg": (207, 69, 32), "text": (255, 255, 255)},
@@ -189,7 +191,7 @@ def team_colors(team_name):
         },
         "Los Angeles Kings": {
             "primary": {"bg": (162, 170, 173), "text": (255, 255, 255)},
-            "secondary": {"bg": (255, 255, 255), "text": (0, 0, 0)},
+            "secondary": {"bg": (0, 0, 0), "text": (255, 255, 255)},
         },
         "Minnesota Wild": {
             "primary": {"bg": (21, 71, 52), "text": (255, 255, 255)},
@@ -205,7 +207,7 @@ def team_colors(team_name):
         },
         "New Jersey Devils": {
             "primary": {"bg": (200, 16, 46), "text": (255, 255, 255)},
-            "secondary": {"bg": (255, 255, 255), "text": (0, 0, 0)},
+            "secondary": {"bg": (0, 0, 0), "text": (255, 255, 255)},
         },
         "New York Islanders": {
             "primary": {"bg": (252, 76, 2), "text": (255, 255, 255)},
@@ -221,11 +223,11 @@ def team_colors(team_name):
         },
         "Philadelphia Flyers": {
             "primary": {"bg": (250, 70, 22), "text": (255, 255, 255)},
-            "secondary": {"bg": (255, 255, 255), "text": (0, 0, 0)},
+            "secondary": {"bg": (0, 0, 0), "text": (255, 255, 255)},
         },
         "Pittsburgh Penguins": {
             "primary": {"bg": (255, 184, 28), "text": (255, 255, 255)},
-            "secondary": {"bg": (255, 255, 255), "text": (0, 0, 0)},
+            "secondary": {"bg": (0, 0, 0), "text": (255, 255, 255)},
         },
         "San Jose Sharks": {
             "primary": {"bg": (0, 98, 114), "text": (255, 255, 255)},
@@ -237,11 +239,11 @@ def team_colors(team_name):
         },
         "Tampa Bay Lightning": {
             "primary": {"bg": (0, 32, 91), "text": (255, 255, 255)},
-            "secondary": {"bg": (255, 255, 255), "text": (0, 0, 0)},
+            "secondary": {"bg": (0, 0, 0), "text": (255, 255, 255)},
         },
         "Toronto Maple Leafs": {
             "primary": {"bg": (0, 32, 91), "text": (255, 255, 255)},
-            "secondary": {"bg": (255, 255, 255), "text": (0, 0, 0)},
+            "secondary": {"bg": (0, 0, 0), "text": (255, 255, 255)},
         },
         "Vancouver Canucks": {
             "primary": {"bg": (0, 32, 91), "text": (255, 255, 255)},
