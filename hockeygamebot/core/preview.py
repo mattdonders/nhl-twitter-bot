@@ -5,14 +5,16 @@ This module contains all functions pertaining to a game in Preview State.
 """
 
 import logging
+import time
 import os
 
-from hockeygamebot.definitions import IMAGES_PATH
 from hockeygamebot.core import images
+from hockeygamebot.definitions import IMAGES_PATH
 from hockeygamebot.helpers import utils
-from hockeygamebot.models.gametype import GameType
 from hockeygamebot.models.game import Game
-from hockeygamebot.nhlapi import schedule, thirdparty
+from hockeygamebot.models.gamestate import GameState
+from hockeygamebot.models.gametype import GameType
+from hockeygamebot.nhlapi import api, livefeed, schedule, thirdparty
 from hockeygamebot.social import socialhandler
 
 
@@ -427,3 +429,61 @@ def game_preview_others(game: Game):
             game.game_time_countdown,
         )
         return game.game_time_countdown
+
+
+def get_starters(game: Game):
+    """ Uses the NHL Roster Report to get the starting lineup. """
+
+    def get_players_name(score_rpt_row):
+        """ Very specific function to only return the player's last name from the roster report. """
+        player_name = score_rpt_row.find_all("td")[2].text
+        return " ".join(player_name.replace(" (A)", "").replace(" (C)", "").title().split()[1:])
+
+
+    while not game.preview_socials.starters_sent:
+        livefeed_resp = livefeed.get_livefeed(game.game_id)
+        game.update_game(livefeed_resp)
+        if GameState(game.game_state) == GameState.LIVE:
+            return
+
+        roster_endpoint = f"/{game.season}/RO{game.game_id_html}.HTM"
+        r = api.nhl_score_rpt(roster_endpoint)
+
+        if not r:
+            logging.warning("Roster report is not available, something is wrong.")
+            return
+
+        soup = thirdparty.bs4_parse(r.content)
+        team_headings = soup.find("td", class_="teamHeading + border").find_parent("tr")
+        data = team_headings.find_next("tr")
+
+        rosters = data.find("tr").find_all("td", recursive=False)
+        roster = rosters[0] if game.preferred_team.home_away == "away" else rosters[1]
+
+        players = [x for x in roster.find_all("tr")]
+
+        starters = list()
+        for pos in [('L', 'R', 'C'), 'D', 'G']:
+            pos_all = [x for x in players if x.find_all("td")[1].text in pos]
+            pos_start = [get_players_name(x) for x in pos_all if 'bold' in x.find_all("td")[0]['class']]
+            pos_start_str = " - ".join(pos_start)
+            starters.append(pos_start_str)
+
+        if not starters:
+            logging.info("Starters not yet avialble from the roster report - sleep & try again.")
+            time.sleep(20)
+            continue
+
+        starters_string = "\n".join(starters)
+        starters_msg = (
+            f"{utils.team_hashtag(game.preferred_team.team_name)} Starters:"
+            f"\n\n{starters_string}"
+        )
+        socialhandler.send(starters_msg, force_send=True, game_hashtag=True)
+        game.preview_socials.starters_msg = starters_msg
+        game.preview_socials.starters_sent = True
+
+
+
+
+

@@ -407,16 +407,20 @@ class StartOfGameSocial:
         self.other_lines_sent = False
         self.other_lines_resent = False
 
+        # This is for starting lineups
+        self.starters_sent = False
+        self.starters_msg = None
+
     def increment_counter(self):
         self.counter += 1
 
     @property
     def all_social_sent(self):
         """ Returns True / False depending on if all final socials were sent. """
-
-        all_final_social = [v for k, v in self.__dict__.items() if "sent" in k]
-        all_final_social_sent = all(all_final_social)
-        return all_final_social_sent
+        pregame_kv = self.__dict__.items()
+        all_pregame_social = [v for k, v in pregame_kv if "sent" in k and k != "starters_sent"]
+        all_pregame_social_sent = all(all_pregame_social)
+        return all_pregame_social_sent
 
     def check_for_changed_lines(self, prefother):
         """ Returns True every hour after the game bot starts to check for changed lines. """
