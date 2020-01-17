@@ -4,11 +4,12 @@ social networks in our configuration file.
 """
 import logging
 
+from PIL import Image  # Used for debugging images (notweets)
+
 from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.helpers.config import config
+from hockeygamebot.models.globalgame import GlobalGame
 from hockeygamebot.social import discord, slack, twitter
-
-from PIL import Image  # Used for debugging images (notweets)
 
 
 @utils.check_social_timeout
@@ -26,6 +27,9 @@ def send(msg, **kwargs):
     # If for some reason, message is None (or False), just exit the function.
     if not msg:
         return
+
+    if GlobalGame.game.other_team.team_name == "Washington Capitals":
+        msg = msg.lower()
 
     args = arguments.get_arguments()
     social_config = config.socials

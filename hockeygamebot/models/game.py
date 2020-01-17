@@ -10,6 +10,7 @@ import dateutil.tz
 from hockeygamebot import models
 from hockeygamebot.helpers import utils
 from hockeygamebot.models.gamestate import GameState
+from hockeygamebot.models.globalgame import GlobalGame
 from hockeygamebot.models.period import Period
 from hockeygamebot.models.shootout import Shootout
 from hockeygamebot.models.team import Team
@@ -128,6 +129,13 @@ class Game:
         Hashtag.other_hashtag = utils.team_hashtag(self.other_team.team_name, self.game_type)
         Hashtag.home_hashtag = utils.team_hashtag(self.home_team.team_name, self.game_type)
         Hashtag.away_hashtag = utils.team_hashtag(self.away_team.team_name, self.game_type)
+
+        if self.other_team.team_name == "Washington Capitals":
+            Hashtag.game_hashtag = Hashtag.game_hashtag.lower()
+            Hashtag.pref_hashtag = Hashtag.pref_hashtag.lower()
+            Hashtag.other_hashtag = Hashtag.other_hashtag.lower()
+            Hashtag.home_hashtag = Hashtag.home_hashtag.lower()
+            Hashtag.away_hashtag = Hashtag.away_hashtag.lower()
 
     @classmethod
     def from_json_and_teams(cls, resp: dict, home_team: Team, away_team: Team) -> "Game":

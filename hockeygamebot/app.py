@@ -22,6 +22,7 @@ from hockeygamebot.definitions import VERSION
 from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.models.game import Game
 from hockeygamebot.models.gamestate import GameState
+from hockeygamebot.models.globalgame import GlobalGame
 from hockeygamebot.models.team import Team
 from hockeygamebot.nhlapi import livefeed, nst, roster, schedule
 from hockeygamebot.social import socialhandler
@@ -101,7 +102,7 @@ def start_game_loop(game: Game):
 
                             live.live_loop(livefeed=data, game=game)
                             game.update_game(data)
-                            time.sleep(1)
+                            time.sleep(0.1)
 
                 livefeed_resp = livefeed.get_livefeed(game.game_id)
                 # all_events = live.live_loop(livefeed=livefeed_resp, game=game)
@@ -365,6 +366,7 @@ def run():
 
     # Create the Game Object!
     game = Game.from_json_and_teams(game_info, home_team, away_team)
+    GlobalGame.game = game
 
     # Override Game State for localdata testing
     game.game_state = "Live" if args.localdata else game.game_state
