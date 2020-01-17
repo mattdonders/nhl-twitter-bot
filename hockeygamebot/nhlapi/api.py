@@ -61,3 +61,28 @@ def nhl_rpt(endpoint):
     except RequestException as re:
         logging.error(re)
         return None
+
+
+def nhl_score_rpt(endpoint):
+    urls = utils.load_urls()
+    api_base = urls["endpoints"]["nhl_score_rpt_base"]
+
+    sf = SessionFactory()
+    session = sf.get()
+
+    retries = HTTPAdapter(max_retries=3)
+    session.mount("https://", retries)
+    session.mount("http://", retries)
+
+    url = f"{api_base}{endpoint}"
+
+    try:
+        logging.info("Sending Score Report Request - %s", url)
+        response = session.get(url, timeout=5)
+        return response if response.status_code == 200 else None
+    except ConnectionError as ce:
+        logging.error(ce)
+        return None
+    except RequestException as re:
+        logging.error(re)
+        return None

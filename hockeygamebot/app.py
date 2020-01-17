@@ -65,7 +65,13 @@ def start_game_loop(game: Game):
                     "Game is in Preview state, but past game start time - sleep for a bit "
                     "& update game attributes so we detect when game goes live."
                 )
-                time.sleep(config["script"]["pregame_sleep_time"])
+                # Starting Lineups are posted ~5 minutes before game time.
+                sleep_time = config["script"]["pregame_sleep_time"] - 300
+                time.sleep(sleep_time)
+
+                # Try to get the starters from the score report
+                preview.get_starters(game)
+
 
         elif GameState(game.game_state) == GameState.LIVE:
             try:
