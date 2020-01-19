@@ -414,7 +414,7 @@ def game_preview_others(game: Game):
             "Game State is Preview & all pre-game tweets are not sent. "
             "Sleep for 30 minutes & check again."
         )
-        return preview_sleep_time
+        return preview_sleep_time, False
     elif not all_pregametweets and game.game_time_countdown < preview_sleep_time:
         logging.warning(
             "Game State is Preview & all pre-game tweets are not sent. "
@@ -422,13 +422,15 @@ def game_preview_others(game: Game):
             "If needed, we try to get lines at the end of the game for advanced stats.",
             preview_sleep_mins,
         )
-        return game.game_time_countdown
+        return game.game_time_countdown, True
     else:
         logging.info(
             "Game State is Preview & all tweets are sent. Sleep for %s seconds until game time.",
-            game.game_time_countdown,
+            game.game_time_countdown
         )
-        return game.game_time_countdown
+
+        # We need to subtract 5-minutes from this
+        return game.game_time_countdown, True
 
 
 def get_starters(game: Game):
@@ -453,21 +455,26 @@ def get_starters(game: Game):
             logging.warning("Roster report is not available, something is wrong.")
             return
 
-        soup = thirdparty.bs4_parse(r.content)
-        team_headings = soup.find("td", class_="teamHeading + border").find_parent("tr")
-        data = team_headings.find_next("tr")
+        try:
+            soup = thirdparty.bs4_parse(r.content)
+            team_headings = soup.find("td", class_="teamHeading + border").find_parent("tr")
+            data = team_headings.find_next("tr")
 
-        rosters = data.find("tr").find_all("td", recursive=False)
-        roster = rosters[0] if game.preferred_team.home_away == "away" else rosters[1]
+            rosters = data.find("tr").find_all("td", recursive=False)
+            roster = rosters[0] if game.preferred_team.home_away == "away" else rosters[1]
 
-        players = [x for x in roster.find_all("tr")]
+            players = [x for x in roster.find_all("tr")]
 
-        starters = list()
-        for pos in [('L', 'R', 'C'), 'D', 'G']:
-            pos_all = [x for x in players if x.find_all("td")[1].text in pos]
-            pos_start = [get_players_name(x) for x in pos_all if 'bold' in x.find_all("td")[0]['class']]
-            pos_start_str = " - ".join(pos_start)
-            starters.append(pos_start_str)
+            starters = list()
+            for pos in [('L', 'R', 'C'), 'D', 'G']:
+                pos_all = [x for x in players if x.find_all("td")[1].text in pos]
+                pos_start = [get_players_name(x) for x in pos_all if 'bold' in x.find_all("td")[0]['class']]
+                pos_start_str = " - ".join(pos_start)
+                starters.append(pos_start_str)
+        except Exception as e:
+            logging.error("Something happened while trying to get the starters - sleep for 20s & try again. %s", e)
+            time.sleep(20)
+            continue
 
         if not starters:
             logging.info("Starters not yet avialble from the roster report - sleep & try again.")

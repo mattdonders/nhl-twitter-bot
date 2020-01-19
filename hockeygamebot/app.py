@@ -49,6 +49,8 @@ def start_game_loop(game: Game):
         if GameState(game.game_state) == GameState.PREVIEW:
             livefeed_resp = livefeed.get_livefeed(game.game_id)
             game.update_game(livefeed_resp)
+            print(game.game_date_local)
+            print(game.game_time_countdown)
 
             if game.game_time_countdown > 0:
                 logging.info("Game is in Preview state - send out all pregame information.")
@@ -58,20 +60,30 @@ def start_game_loop(game: Game):
 
                 # The other game preview function should run every xxx minutes
                 # until all pregame tweets are sent or its too close to game time
-                sleep_time = preview.game_preview_others(game)
+                sleep_time, last_sleep_before_live = preview.game_preview_others(game)
                 game.preview_socials.increment_counter()
-                time.sleep(sleep_time)
+
+                # If this is the last sleep before the game goes live, cut it by 5 minutes for starters function.
+                if last_sleep_before_live:
+                    logging.info("This is the last sleep before the game goes live - 5 minutes less & starters.")
+                    sleep_time = 0 if (sleep_time - 300) < 0 else sleep_time
+                    time.sleep(sleep_time)
+                    preview.get_starters(game)
+                else:
+                    time.sleep(sleep_time)
+
             else:
                 logging.info(
                     "Game is in Preview state, but past game start time - sleep for a bit "
                     "& update game attributes so we detect when game goes live."
                 )
-                # Starting Lineups are posted ~5 minutes before game time.
-                sleep_time = config["script"]["pregame_sleep_time"] - 300
-                time.sleep(sleep_time)
+                
+                # Somehow we got here without the starting lineup - try again
+                if not game.preview_socials.starters_sent:
+                    preview.get_starters(game)
 
-                # Try to get the starters from the score report
-                preview.get_starters(game)
+                sleep_time = config["script"]["pregame_sleep_time"]
+                time.sleep(sleep_time)
 
 
         elif GameState(game.game_state) == GameState.LIVE:

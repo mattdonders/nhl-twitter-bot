@@ -365,7 +365,8 @@ class Game:
         """Returns a countdown (in seconds) to the game start time."""
         game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
         game_date_local = game_date + self.tz_offset
-        countdown = (game_date_local - datetime.now()).total_seconds()
+        now = datetime.utcnow() + self.tz_offset
+        countdown = (game_date_local - now).total_seconds()
         # value_when_true if condition else value_when_false
         return 0 if countdown < 0 else countdown
 
