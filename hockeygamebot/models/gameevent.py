@@ -8,7 +8,7 @@ import traceback
 
 from hockeygamebot.definitions import IMAGES_PATH
 from hockeygamebot.helpers import utils
-from hockeygamebot.models.game import Game
+from hockeygamebot.models.game import Game, PenaltySituation
 from hockeygamebot.models.gametype import GameType
 from hockeygamebot.nhlapi import contentfeed, stats
 from hockeygamebot.social import socialhandler
@@ -289,6 +289,7 @@ class GenericEvent:
         self.period_time = about.get("periodTime")
         self.period_time_remain = about.get("periodTimeRemaining")
         self.period_time_remain_str = utils.time_remain_converter(self.period_time_remain)
+        self.period_time_remain_ss = utils.from_mmss(self.period_time_remain)
         # self.date_time = dateutil.parser.parse(about.get("dateTime"))
         self.date_time = about.get("dateTime")
         self.away_goals = about.get("goals").get("away")
@@ -777,6 +778,11 @@ class GoalEvent(GenericEvent):
         self.tweet = None
         self.video_url = None
 
+        # Determine if we need to reset the Penalty Situation (PP Team Scores)
+        penalty_situation = self.game.penalty_situation
+        if penalty_situation.pp_team.team_name == self.event_team:
+            self.game.penalty_situation = PenaltySituation()
+
         # Get the Coordinates Section
         coordinates = data.get("coordinates")
         self.x = coordinates.get("x", 0.0)
@@ -1244,7 +1250,24 @@ class PenaltyEvent(GenericEvent):
         self.secondary_type = self.penalty_type_fixer(results.get("secondaryType").lower())
         self.severity = results.get("penaltySeverity").lower()
         self.minutes = results.get("penaltyMinutes")
+        self.penalty_length_ss = 60 * self.minutes
+
+        # Assign Penalty Team
         self.penalty_team = data.get("team").get("name")
+        if self.penalty_team == self.game.preferred_team.team_name:
+            self.penalty_team_obj = self.game.preferred_team
+            self.powerplay_team_obj = self.game.other_team
+        else:
+            self.penalty_team_obj = self.game.other_team
+            self.powerplay_team_obj = self.game.preferred_team
+
+        # Setup the Penalty Situation Object
+        penalty_situation = self.game.penalty_situation
+        penalty_situation.new_penalty(
+            penalty_ss=self.period_time_remain_ss,
+            penalty_length=self.penalty_length_ss,
+            pp_team=self.powerplay_team_obj,
+        )
 
         # Get the Players Section
         players = data.get("players")

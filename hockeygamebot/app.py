@@ -20,7 +20,7 @@ except ImportError:
 from hockeygamebot.core import final, live, preview
 from hockeygamebot.definitions import VERSION
 from hockeygamebot.helpers import arguments, utils
-from hockeygamebot.models.game import Game
+from hockeygamebot.models.game import Game, PenaltySituation
 from hockeygamebot.models.gamestate import GameState
 from hockeygamebot.models.globalgame import GlobalGame
 from hockeygamebot.models.team import Team
@@ -49,8 +49,6 @@ def start_game_loop(game: Game):
         if GameState(game.game_state) == GameState.PREVIEW:
             livefeed_resp = livefeed.get_livefeed(game.game_id)
             game.update_game(livefeed_resp)
-            print(game.game_date_local)
-            print(game.game_time_countdown)
 
             if game.game_time_countdown > 0:
                 logging.info("Game is in Preview state - send out all pregame information.")
@@ -77,7 +75,7 @@ def start_game_loop(game: Game):
                     "Game is in Preview state, but past game start time - sleep for a bit "
                     "& update game attributes so we detect when game goes live."
                 )
-                
+
                 # Somehow we got here without the starting lineup - try again
                 if not game.preview_socials.starters_sent:
                     preview.get_starters(game)
@@ -137,6 +135,17 @@ def start_game_loop(game: Game):
                 logging.info(
                     "Other On Ice: %s - %s", len(game.other_team.onice), game.other_team.onice
                 )
+
+                # Penalty Killed Status
+                penalty_situation = game.penalty_situation
+                if penalty_situation.penalty_killed:
+                    shots_taken = penalty_situation.pp_team.shots - penalty_situation.pp_team_shots_start
+                    logging.info("***** PENALTY KILLED NOTIFICATION *****")
+                    logging.info("PP Shots Taken: %s", shots_taken)
+                    game.penalty_situation = PenaltySituation()
+
+                if game.penalty_situation.in_situation:
+                    logging.info("Current Penalty (In Situation): %s", vars(game.penalty_situation))
 
                 if not game.period.current_oneminute_sent:
                     live.minute_remaining_check(game)

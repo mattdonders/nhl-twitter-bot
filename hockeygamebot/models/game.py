@@ -64,6 +64,7 @@ class Game:
         self.last_event_idx = 0
         self.power_play_strength = "Even"
         self.penalty_killed_flag = False
+        self.penalty_situation = PenaltySituation()
         self.req_session = None
         self.assists_check = 0
 
@@ -196,6 +197,8 @@ class Game:
         self.period.current = linescore.get("currentPeriod")
         self.period.current_ordinal = linescore.get("currentPeriodOrdinal")
         self.period.time_remaining = linescore.get("currentPeriodTimeRemaining")
+        self.period.time_remaining_ss = utils.from_mmss(self.period.time_remaining)
+        self.penalty_situation.current_ss = self.period.time_remaining_ss
 
         intermission = linescore.get("intermissionInfo")
         self.period.intermission = intermission.get("inIntermission")
@@ -204,12 +207,12 @@ class Game:
         linescore_home = linescore.get("teams").get("home")
         boxscore_home = boxscore.get("teams").get("home")
         self.home_team.score = linescore_home.get("goals")
-        self.home_team.shots = linescore_home.get("shots")
+        self.home_team.shots = linescore_home.get("shotsOnGoal")
 
         linescore_away = linescore.get("teams").get("away")
         boxscore_away = boxscore.get("teams").get("away")
         self.away_team.score = linescore_away.get("goals")
-        self.away_team.shots = linescore_away.get("shots")
+        self.away_team.shots = linescore_away.get("shotsOnGoal")
 
         self.power_play_strength = linescore.get("powerPlayStrength")
         self.home_team.power_play = linescore_home.get("powerPlay")
@@ -389,6 +392,63 @@ class Game:
             return (self.home_team, self.away_team)
 
         return (self.away_team, self.home_team)
+
+
+class PenaltySituation:
+    """ A class used to track in-game penalty situations. """
+
+    def __init__(self):
+        self.in_situation = False
+        self.penalty_killed = False
+        self.penalty_ss = 0
+        self._current_ss = 0
+        self.penalty_length_ss = 0
+        self.penalty_end = 0
+        self.pp_team = None
+        self.pp_team_shots_start = 0
+        # self._pp_team_shots_now = 0
+        # self.pp_team_shots_total = 0
+
+    def new_penalty(self, penalty_ss, penalty_length, pp_team: Team):
+        logging.info("***** NEW PENALTY SITUATION OBJECT *****")
+        pp_team_dict = dict(pp_team.__dict__)
+        pp_team_dict.pop("gameday_roster")
+        pp_team_dict.pop("roster")
+        logging.info(pp_team_dict)
+        self.in_situation = True
+        self.penalty_killed = False
+        self.current_ss = penalty_ss
+        self.penalty_ss = penalty_ss
+        self.penalty_length_ss = penalty_length
+        self.penalty_end = self.penalty_ss - self.penalty_length_ss
+        self.pp_team = pp_team
+        self.pp_team_shots_start = pp_team.shots
+
+    @property
+    def current_ss(self):
+        return self._current_ss
+
+    @current_ss.setter
+    def current_ss(self, ss):
+        # Convert a MM:SS to pure seconds if passed into the setter
+        if isinstance(ss, str) and ":" in ss:
+            ss = utils.from_mmss(ss)
+
+        if self.penalty_end >= ss:
+            self._current_ss = ss
+            self.penalty_killed = True
+        else:
+            self._current_ss = ss
+
+
+    # @property
+    # def pp_team_shots_now(self):
+    #     return self._pp_team_shots_now
+
+    # @pp_team_shots_now.setter
+    # def pp_team_shots_now(self, shots):
+    #     self.pp_team_shots_total = shots - self.pp_team_shots_start
+    #     self._pp_team_shots_now = shots
 
 
 class StartOfGameSocial:
