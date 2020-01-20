@@ -170,8 +170,8 @@ def team_colors(team_name):
             "secondary": {"bg": (35, 97, 146), "text": (0, 0, 0)},
         },
         "Columbus Blue Jackets": {
-            "primary": {"bg": (200, 16, 46), "text": (255, 255, 255)},
-            "secondary": {"bg": (4, 30, 66), "text": (0, 0, 0)},
+            "primary": {"bg": (4, 30, 66), "text": (255, 255, 255)},
+            "secondary": {"bg": (200, 16, 46), "text": (255, 255, 255)},
         },
         "Dallas Stars": {
             "primary": {"bg": (0, 99, 65), "text": (255, 255, 255)},

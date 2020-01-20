@@ -252,7 +252,7 @@ class Game:
                 home_goalie_pulled = self.home_team.goalie_pulled_setter(home_goalie_current)
             elif self.home_team.goalie_pulled and isinstance(last_tracked_event, event_filter_list):
                 logging.info(
-                    "Home goalie previously pulled, but important event detected - update & check."
+                    "Home goalie previously pulled, but important event detected (%s) - update & check.", last_tracked_event
                 )
                 home_goalie_pulled = self.home_team.goalie_pulled_setter(home_goalie_current)
             else:

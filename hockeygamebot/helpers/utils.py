@@ -123,7 +123,7 @@ def setup_logging():
         logging.basicConfig(
             level=logging.INFO,
             datefmt="%Y-%m-%d %H:%M:%S",
-            format="%(asctime)s - %(module)s.%(funcName)s - %(levelname)s - %(message)s",
+            format="%(asctime)s - %(module)s.%(funcName)s (%(lineno)d) - %(levelname)s - %(message)s",
         )
     else:
         logging.basicConfig(
@@ -378,9 +378,13 @@ def time_remain_converter(time: str) -> str:
 
 def from_mmss(time_input):
     """ Converts a timestamp in MM:SS format to an integer for comparison. """
-    m, s = time_input.split(":")
-    output = int(m) * 60 + int(s)
-    return output
+    try:
+        m, s = time_input.split(":")
+        output = int(m) * 60 + int(s)
+        return output
+    except Exception as e:
+        logging.error("The value %s cannot be converted to seconds. %s", time_input, e)
+        return 0
 
 
 def to_mmss(time_input):

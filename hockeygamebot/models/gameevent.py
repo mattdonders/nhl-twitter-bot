@@ -508,7 +508,7 @@ class PeriodEndEvent(GenericEvent):
             social_ids = socialhandler.send(
                 msg=self.social_msg, media=img_filename, event=self, game_hashtag=True
             )
-            last_tweet = social_ids.get("twitter")
+            last_tweet = social_ids.get("twitter") if social_ids else None
 
             stat_leaders_social = self.get_stat_leaders()
             social_ids = socialhandler.send(
@@ -780,7 +780,7 @@ class GoalEvent(GenericEvent):
 
         # Determine if we need to reset the Penalty Situation (PP Team Scores)
         penalty_situation = self.game.penalty_situation
-        if penalty_situation.pp_team.team_name == self.event_team:
+        if penalty_situation.in_situation and penalty_situation.pp_team.team_name == self.event_team:
             self.game.penalty_situation = PenaltySituation()
 
         # Get the Coordinates Section
@@ -971,10 +971,10 @@ class GoalEvent(GenericEvent):
             goal_emoji = "🚨" * self.pref_goals
 
             if self.scorer_career_goals == 1:
-                goal_milestone_text = "🚨 FIRST GOAL ALERT! 🚨\n\n"
+                goal_milestone_text = "🎉 FIRST GOAL ALERT!\n\n"
             elif self.scorer_career_goals % 100 == 0:
                 goal_ordinal = utils.ordinal(self.scorer_career_goals)
-                goal_milestone_text = f"🚨 {goal_ordinal} CAREER GOAL! 🚨\n\n"
+                goal_milestone_text = f"🎉 {goal_ordinal} CAREER GOAL!\n\n"
             else:
                 goal_milestone_text = ""
 
