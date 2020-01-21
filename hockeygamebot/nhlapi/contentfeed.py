@@ -1,0 +1,65 @@
+"""
+Functions pertaining to the NHL schedule (via API).
+"""
+
+import logging
+import random
+
+from hockeygamebot.nhlapi import api
+
+
+def get_content_feed(game_id, milestones=False):
+    """ Queries the NHL Content Feed API to get media items (photos, videos, etc)
+
+    Args:
+        game_id (int) - The unique identifier of the Game.
+        milestones (bool) - Returns only the milestones section
+
+    Returns:
+        response - JSON object of live feed results
+    """
+
+    logging.info("Content Feed requested (milestones: %s)!", milestones)
+    api_endpoint = f"game/{game_id}/content"
+    response = api.nhl_api(api_endpoint).json()
+
+    # Calculate milestones if argument is True
+    response = response if not milestones else response["media"]["milestones"]["items"]
+    return response
+
+
+def search_milestones_for_id(milestones, event_id):
+    """ Searches the milestones list for an item that matches the statsEventID passed in.
+
+    Args:
+        event_id (int): NHL Game Event ID
+
+    Returns:
+        event_exists (bool): Does the event exist
+        highlight (dict): Dictionary of the highlight itself
+        nhl_video_url (string): URL pointing to the NHL Video Highlight of the event
+    """
+    # If mile
+    if not milestones:
+        return False, None, None
+    event = next(filter(lambda obj: obj.get("statsEventId") == str(event_id), milestones), None)
+
+    if not event:
+        return False, None, None
+
+    try:
+        highlight = event.get("highlight")
+        video_id = highlight.get("id")
+
+        if not video_id:
+            logging.warning(
+                "The highlight for %s exists, but there is no Video ID - try again next loop.",
+                event_id,
+            )
+            return False, None, None
+
+        nhl_video_url = f"https://www.nhl.com/video/c-{video_id}?tcid=tw_video_content_id"
+        return True, highlight, nhl_video_url
+    except AttributeError:
+        logging.error("Error getting video ID and / or NHL Video URL.")
+        return False, None, None
