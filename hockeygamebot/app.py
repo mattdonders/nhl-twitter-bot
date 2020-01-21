@@ -63,7 +63,9 @@ def start_game_loop(game: Game):
 
                 # If this is the last sleep before the game goes live, cut it by 5 minutes for starters function.
                 if last_sleep_before_live:
-                    logging.info("This is the last sleep before the game goes live - 5 minutes less & starters.")
+                    logging.info(
+                        "This is the last sleep before the game goes live - 5 minutes less & starters."
+                    )
                     sleep_time = 0 if (sleep_time - 300) < 0 else sleep_time
                     time.sleep(sleep_time)
                     preview.get_starters(game)
@@ -82,7 +84,6 @@ def start_game_loop(game: Game):
 
                 sleep_time = config["script"]["pregame_sleep_time"]
                 time.sleep(sleep_time)
-
 
         elif GameState(game.game_state) == GameState.LIVE:
             try:
@@ -139,7 +140,9 @@ def start_game_loop(game: Game):
                 # Penalty Killed Status
                 penalty_situation = game.penalty_situation
                 if penalty_situation.penalty_killed:
-                    shots_taken = penalty_situation.pp_team.shots - penalty_situation.pp_team_shots_start
+                    shots_taken = (
+                        penalty_situation.pp_team.shots - penalty_situation.pp_team_shots_start
+                    )
                     logging.info("***** PENALTY KILLED NOTIFICATION *****")
                     logging.info("PP Shots Taken: %s", shots_taken)
                     game.penalty_situation = PenaltySituation()
@@ -364,6 +367,8 @@ def run():
             team_season_fig_last10 = nst.generate_team_season_charts(team_name, lastgames=10)
             team_season_charts = [team_season_fig, team_season_fig_last10]
             socialhandler.send(team_season_msg, media=team_season_charts)
+        else:
+            logging.info("There was no game yesterday - exiting!")
 
         sys.exit()
 
