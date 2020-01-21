@@ -854,18 +854,23 @@ class GoalEvent(GenericEvent):
         # Now that the main goal text is sent, check for milestones
         if hasattr(self, "scorer_career_points") and self.scorer_career_points % 100 == 0:
             logging.info("Goal Scorer - Career Point Milestone - %s", self.scorer_career_points)
+            self.milestone_tweet_sender(self.scorer_name, "point", self.scorer_career_points)
 
         if hasattr(self, "primary_career_assists") and self.primary_career_assists % 100 == 0:
             logging.info("Primary - Career Assist Milestone - %s", self.primary_career_assists)
+            self.milestone_tweet_sender(self.primary_name, "assist", self.primary_career_assists)
 
         if hasattr(self, "primary_career_points") and self.primary_career_points % 100 == 0:
             logging.info("Primary - Career Point Milestone - %s", self.scorer_career_points)
+            self.milestone_tweet_sender(self.primary_name, "point", self.primary_career_points)
 
         if hasattr(self, "secondary_career_assists") and self.secondary_career_assists % 100 == 0:
             logging.info("Secondary - Career Assist Milestone - %s", self.secondary_career_assists)
+            self.milestone_tweet_sender(self.secondary_name, "assist", self.secondary_career_assists)
 
         if hasattr(self, "secondary_career_points") and self.secondary_career_points % 100 == 0:
             logging.info("Secondary - Career Point Milestone - %s", self.secondary_career_points)
+            self.milestone_tweet_sender(self.secondary_name, "point", self.secondary_career_points)
 
     def parse_assists(self, assist: list):
         """ Since we have to parse assists initially & for scoring changes, move this to a function. """
@@ -1138,6 +1143,16 @@ class GoalEvent(GenericEvent):
             return goal_scorechange_text
         else:
             return f"{goal_scorechange_title}\n\n{goal_scorechange_text}"
+
+    def milestone_tweet_sender(self, player_name, pointassist, number):
+        """ A function that generates / sends tweet if a player has hit some type of milestone. """
+        number_ordinal = utils.ordinal(number)
+        tweet_msg = f"🎉 Congratulations to {player_name} on their {number_ordinal} career {pointassist}!"
+
+        # Checking if self.tweet is None allows us to still use force_send only if the original tweet was sent
+        if not self.tweet:
+            social_ids = socialhandler.send(tweet_msg, reply=self.tweet, force_send=True, game_hashtag=True)
+            self.tweet = social_ids.get("twitter")
 
 
     def was_goal_removed(self, all_plays: dict):
@@ -1548,7 +1563,6 @@ class ShootoutEvent(GenericEvent):
             f"{self.game.preferred_team.short_name}: {shootout_preferred_score}\n"
             f"{self.game.other_team.short_name}: {shootout_other_score}"
         )
-
 
 
 class GameEndEvent(GenericEvent):
