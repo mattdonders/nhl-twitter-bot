@@ -100,6 +100,10 @@ def setup_logging():
     # pylint: disable=line-too-long
     # logger = logging.getLogger(__name__)
 
+    # Create logs directory if not present
+    if not os.path.exists(LOGS_PATH):
+        os.makedirs(LOGS_PATH)
+
     args = arguments.get_arguments()
 
     # Reset root handler to default so BasicConfig is respected
