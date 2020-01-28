@@ -36,6 +36,11 @@ def thirdparty_request(url, headers=None):
     session.mount("https://", retries)
     session.mount("http://", retries)
 
+    # Setup a Fake User Agent (simulates a real visit)
+    ua = UserAgent()
+    ua_header = {"User-Agent": str(ua.chrome)}
+    headers = ua_header if not headers else headers
+
     try:
         logging.info("Sending Third Party URL Request - %s", url)
         response = session.get(url, headers=headers, timeout=5)
@@ -260,7 +265,8 @@ def hockeyref_goalie_against_team(goalie, opponent):
             )
             return goalie_stats_split
 
-    return True
+    goalie_no_stats = "None (First Game)"
+    return goalie_no_stats
 
 
 def dailyfaceoff_lines_parser(lines, soup):
@@ -458,22 +464,25 @@ def scouting_the_refs(game, pref_team):
     refs = game_details.find_all("tr")[1].find_all("td")
     refs_season_games = game_details.find_all("tr")[2].find_all("td")
     refs_career_games = game_details.find_all("tr")[3].find_all("td")
+    refs_penalty_game = game_details.find_all("tr")[8].find_all("td")
     for i, ref in enumerate(refs):
-        ref_name = ref.text
+        ref_name = ref.text.replace("\n", "")
         ref_season_games = refs_season_games[i].text
         ref_career_games = refs_career_games[i].text
+        ref_penalty_game = refs_penalty_game[i].text.split(" (")[0]
         if ref_name:
             ref_dict = dict()
             ref_dict["name"] = ref_name
             ref_dict["seasongames"] = ref_season_games
             ref_dict["careergames"] = ref_career_games
+            ref_dict["penaltygame"] = ref_penalty_game
             return_referees.append(ref_dict)
 
     linesmen = game_details.find_all("tr")[21].find_all("td")
     linesmen_season_games = game_details.find_all("tr")[22].find_all("td")
     linesmen_career_games = game_details.find_all("tr")[23].find_all("td")
     for i, linesman in enumerate(linesmen):
-        linesman_name = linesman.text
+        linesman_name = linesman.text.replace("\n", "")
         linesman_season_games = linesmen_season_games[i].text
         linesman_career_games = linesmen_career_games[i].text
         if linesman_name:

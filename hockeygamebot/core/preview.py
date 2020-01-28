@@ -281,9 +281,15 @@ def game_preview_others(game: Game):
                         official_name = official.get("name")
                         official_season = official.get("seasongames")
                         official_career = official.get("careergames")
-                        official_detail = (
-                            f"{official_name} (Games: {official_season} / {official_career})"
-                        )
+                        official_penalty_game = official.get("penaltygame")
+                        if official_penalty_game:
+                            official_detail = (
+                                f"{official_name} (Games: {official_season} / {official_career} | Penalty / Game: {official_penalty_game})"
+                            )
+                        else:
+                            official_detail = (
+                                f"{official_name} (Games: {official_season} / {official_career})"
+                            )
                         officials_tweet_text = f"{officials_tweet_text}\n- {official_detail}"
 
                 social_dict = socialhandler.send(
