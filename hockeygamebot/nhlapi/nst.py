@@ -768,7 +768,9 @@ def generate_all_charts(game: Game):
     ov_sva_final_stats = {'home': ov_sva_stats['home']['Final'], 'away': ov_sva_stats['away']['Final']}
 
     logging.info("Generating Team Overview Chart.")
-    overview_chart = charts_overview(game, game_title, ov_sva_final_stats)
+    flipped_game_title = game_title.replace(" @ ", "@").split("@")
+    flipped_game_title = f"{flipped_game_title[1]} vs. {flipped_game_title[0]}"
+    overview_chart = charts_overview(game, flipped_game_title, ov_sva_final_stats)
     overview_chart_path = os.path.join(IMAGES_PATH, "temp", f"allcharts-overview-{game.game_id_shortid}.png")
     logging.info("Image Path: %s", overview_chart_path)
     overview_chart.savefig(overview_chart_path, bbox_inches="tight")
