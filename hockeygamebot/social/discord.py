@@ -26,21 +26,25 @@ def send_discord(msg, media=None):
     discord_config = config.discord[discordenv]
     webhook_url = discord_config["webhook_url"]
 
-    linebreak_msg = f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n{msg}"
-    payload = {"content": linebreak_msg}
+    # Support multiple Discord Servers
+    webhook_url = [webhook_url] if not isinstance(webhook_url, list) else webhook_url
 
-    if not media:
-        response = requests.post(webhook_url, json=payload)
-    else:
-        if isinstance(media, list):
-            files = dict()
-            for idx, image in enumerate(media):
-                files_key = f"file{idx}"
-                files[files_key] = open(image, "rb")
+    for url in webhook_url:
+        linebreak_msg = f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n{msg}"
+        payload = {"content": linebreak_msg}
+
+        if not media:
+            response = requests.post(url, json=payload)
         else:
-            files = {"file": open(media, "rb")}
-        response = requests.post(webhook_url, files=files, data=payload)
+            if isinstance(media, list):
+                files = dict()
+                for idx, image in enumerate(media):
+                    files_key = f"file{idx}"
+                    files[files_key] = open(image, "rb")
+            else:
+                files = {"file": open(media, "rb")}
+            response = requests.post(url, files=files, data=payload)
 
-    # If we get a non-OK code back from the Discord endpoint, log it.
-    if not response.ok:
-        logging.warning(response.json())
+        # If we get a non-OK code back from the Discord endpoint, log it.
+        if not response.ok:
+            logging.warning(response.json())
