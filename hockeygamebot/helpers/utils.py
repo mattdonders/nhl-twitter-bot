@@ -349,12 +349,15 @@ def time_remain_converter(time: str) -> str:
     Returns:
         time_new: possibly modified time string
     """
+    try:
+        minutes = time.split(":")[0]
+        seconds = time.split(":")[1]
 
-    minutes = time.split(":")[0]
-    seconds = time.split(":")[1]
-
-    time_new = f"{seconds} seconds" if minutes == "00" else time
-    return time_new
+        time_new = f"{seconds} seconds" if minutes == "00" else time
+        return time_new
+    except Exception as e:
+        logging.warning("The value %s cannot be converted to seconds. %s", time, e)
+        return "0 seconds"
 
 
 # def localdata_simulator(directory, game, sleep):
@@ -387,7 +390,7 @@ def from_mmss(time_input):
         output = int(m) * 60 + int(s)
         return output
     except Exception as e:
-        logging.error("The value %s cannot be converted to seconds. %s", time_input, e)
+        logging.warning("The value %s cannot be converted to seconds. %s", time_input, e)
         return 0
 
 

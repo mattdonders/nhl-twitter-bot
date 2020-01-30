@@ -452,6 +452,7 @@ def get_starters(game: Game):
         livefeed_resp = livefeed.get_livefeed(game.game_id)
         game.update_game(livefeed_resp)
         if GameState(game.game_state) == GameState.LIVE:
+            logging.info("Game state switched to live - forget about the starters.")
             return
 
         roster_endpoint = f"/{game.season}/RO{game.game_id_html}.HTM"

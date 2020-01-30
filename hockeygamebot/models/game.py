@@ -213,7 +213,6 @@ class Game:
         boxscore_away = boxscore.get("teams").get("away")
         self.away_team.score = linescore_away.get("goals")
         self.away_team.shots = linescore_away.get("shotsOnGoal")
-
         self.power_play_strength = linescore.get("powerPlayStrength")
         self.home_team.power_play = linescore_home.get("powerPlay")
         self.home_team.skaters = linescore_home.get("numSkaters")
@@ -232,6 +231,12 @@ class Game:
         """
         try:
             linescore = response.get("liveData").get("linescore")
+
+            # Sometimes (???) the linescore is empty...?
+            if not linescore:
+                logging.warning("Linescore is empty (???) - try again next time.")
+                return
+
             linescore_home = linescore.get("teams").get("home")
             linescore_away = linescore.get("teams").get("away")
 
@@ -283,9 +288,8 @@ class Game:
                 self.goalie_pull_social(self.away_team.short_name, trailing_score)
         except IndexError as e:
             logging.warning(
-                "Tried to update goalie pulled status, but got an error - try again next loop."
+                "Tried to update goalie pulled status, but got an error - try again next loop. %s", e
             )
-            logging.warning(e)
 
     def goalie_pull_social(self, team_name, trailing_score):
         """ Sends a message to social media about the goalie for a team being pulled.
