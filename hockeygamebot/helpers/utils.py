@@ -134,7 +134,7 @@ def setup_logging():
             filename=log_file,
             level=logging.INFO,
             datefmt="%Y-%m-%d %H:%M:%S",
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            format="%(asctime)s - %(module)s.%(funcName)s (%(lineno)d) - %(levelname)s - %(message)s",
         )
 
     # Reset logging level (outside of Basic Config)
