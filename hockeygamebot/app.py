@@ -111,10 +111,49 @@ def start_game_loop(game: Game):
                             with open(feed_json) as json_file:
                                 data = json.load(json_file)
 
+                            # Logging (Temporarily) for Penalty Killed Tweets
+                            logging.info(
+                                "Current Period Info: %s - %s",
+                                game.period.current_ordinal,
+                                game.period.time_remaining,
+                            )
+                            logging.info(
+                                "Pref On Ice: %s - %s",
+                                len(game.preferred_team.onice),
+                                game.preferred_team.onice,
+                            )
+                            logging.info(
+                                "Other On Ice: %s - %s",
+                                len(game.other_team.onice),
+                                game.other_team.onice,
+                            )
+
+                            # Penalty Killed Status
+                            penalty_situation = game.penalty_situation
+                            if penalty_situation.penalty_killed:
+                                logging.info("***** PENALTY KILLED NOTIFICATION *****")
+                                shots_taken = (
+                                    penalty_situation.pp_team.shots
+                                    - penalty_situation.pp_team_shots_start
+                                )
+                                logging.info("PP Shots Taken: %s", shots_taken)
+                                game.penalty_situation = PenaltySituation()
+
+                            if game.penalty_situation.in_situation:
+                                logging.info(
+                                    "Current Penalty (In Situation): %s",
+                                    vars(game.penalty_situation),
+                                )
+
+                            if not game.period.current_oneminute_sent:
+                                live.minute_remaining_check(game)
+
                             live.live_loop(livefeed=data, game=game)
                             game.update_game(data)
+
                             time.sleep(0.1)
 
+                # Non-Local Data
                 livefeed_resp = livefeed.get_livefeed(game.game_id)
                 # all_events = live.live_loop(livefeed=livefeed_resp, game=game)
 
@@ -140,10 +179,10 @@ def start_game_loop(game: Game):
                 # Penalty Killed Status
                 penalty_situation = game.penalty_situation
                 if penalty_situation.penalty_killed:
+                    logging.info("***** PENALTY KILLED NOTIFICATION *****")
                     shots_taken = (
                         penalty_situation.pp_team.shots - penalty_situation.pp_team_shots_start
                     )
-                    logging.info("***** PENALTY KILLED NOTIFICATION *****")
                     logging.info("PP Shots Taken: %s", shots_taken)
                     game.penalty_situation = PenaltySituation()
 

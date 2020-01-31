@@ -200,6 +200,11 @@ class Game:
         self.period.time_remaining_ss = utils.from_mmss(self.period.time_remaining)
         self.penalty_situation.current_ss = self.period.time_remaining_ss
 
+        # TODO: Handle penalties that roll over periods
+        if self.penalty_situation.current_ss == 0:
+            logging.info("End of Period - resetting Penalty Situation.")
+            self.penalty_situation = PenaltySituation()
+
         intermission = linescore.get("intermissionInfo")
         self.period.intermission = intermission.get("inIntermission")
         self.period.intermission_remaining = intermission.get("intermissionTimeRemaining")
@@ -310,6 +315,13 @@ class Game:
 
         socialhandler.send(msg=goalie_pull_text, force_send=True)
 
+
+    def custom_game_date(self, dt_format):
+        """Returns the game date in any format."""
+        game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
+        game_date_local = game_date + self.tz_offset
+        custom_game_date = game_date_local.strftime(dt_format)
+        return custom_game_date
 
     @property
     def day_of_game_local(self):
@@ -435,6 +447,10 @@ class PenaltySituation:
     @current_ss.setter
     def current_ss(self, ss):
         # Convert a MM:SS to pure seconds if passed into the setter
+        if ss in ('END', 0):
+            self._current_ss = 0
+            return
+
         if isinstance(ss, str) and ":" in ss:
             ss = utils.from_mmss(ss)
 

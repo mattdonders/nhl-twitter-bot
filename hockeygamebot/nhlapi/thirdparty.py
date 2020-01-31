@@ -499,13 +499,14 @@ def scouting_the_refs(game, pref_team):
     return return_dict
 
 
-def dailyfaceoff_goalies(pref_team, other_team, pref_homeaway):
+def dailyfaceoff_goalies(pref_team, other_team, pref_homeaway, game_date):
     """Scrapes Daily Faceoff for starting goalies for the night.
 
     Args:
         pref_team (Team): Preferred team object.
         other_team (Team): Other team object.
         pref_homeaway (str): Is preferred team home or away?
+        game_date: Game date to add to DF URL
 
     Returns:
         Tuple: dictionary {goalie string, goalie confirmed}
@@ -515,11 +516,7 @@ def dailyfaceoff_goalies(pref_team, other_team, pref_homeaway):
     args = arguments.get_arguments()
 
     df_goalies_url = urls["endpoints"]["df_starting_goalies"]
-    if args.date:
-        logging.info("Date was passed - append to the end of Daily Faceoff URL.")
-        game_date = datetime.strptime(args.date, "%Y-%m-%d")
-        game_date_mmddyyyy = game_date.strftime("%m-%d-%Y")
-        df_goalies_url = f"{df_goalies_url}{game_date_mmddyyyy}"
+    df_goalies_url = f"{df_goalies_url}{game_date}"
     df_linecombos_url = urls["endpoints"]["df_line_combos"]
 
     logging.info("Trying to get starting goalie information via Daily Faceoff.")

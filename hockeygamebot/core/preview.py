@@ -173,7 +173,8 @@ def game_preview_others(game: Game):
         # goalies_confirmed_values = ("Confirmed", "Likely", "Unconfirmed")
         goalies_confirmed_values = ("Confirmed", "Likely")
         try:
-            goalies_df = thirdparty.dailyfaceoff_goalies(pref_team, other_team, pref_team_homeaway)
+            df_date = game.custom_game_date("%m-%d-%Y")
+            goalies_df = thirdparty.dailyfaceoff_goalies(pref_team, other_team, pref_team_homeaway, df_date)
             logging.info(goalies_df)
 
             goalie_confirm_pref = bool(
