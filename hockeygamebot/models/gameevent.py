@@ -856,23 +856,23 @@ class GoalEvent(GenericEvent):
         self.tweet = social_ids.get("twitter")
 
         # Now that the main goal text is sent, check for milestones
-        if hasattr(self, "scorer_career_points") and self.scorer_career_points % 100 == 0:
+        if hasattr(self, "scorer_career_points") and self.scorer_career_points % 100 == 0 or self.scorer_career_points == 1:
             logging.info("Goal Scorer - Career Point Milestone - %s", self.scorer_career_points)
             self.milestone_tweet_sender(self.scorer_name, "point", self.scorer_career_points)
 
-        if hasattr(self, "primary_career_assists") and self.primary_career_assists % 100 == 0:
+        if hasattr(self, "primary_career_assists") and self.primary_career_assists % 100 == 0 or self.primary_career_assists == 1:
             logging.info("Primary - Career Assist Milestone - %s", self.primary_career_assists)
             self.milestone_tweet_sender(self.primary_name, "assist", self.primary_career_assists)
 
-        if hasattr(self, "primary_career_points") and self.primary_career_points % 100 == 0:
+        if hasattr(self, "primary_career_points") and self.primary_career_points % 100 == 0 or self.primary_career_points == 1:
             logging.info("Primary - Career Point Milestone - %s", self.scorer_career_points)
             self.milestone_tweet_sender(self.primary_name, "point", self.primary_career_points)
 
-        if hasattr(self, "secondary_career_assists") and self.secondary_career_assists % 100 == 0:
+        if hasattr(self, "secondary_career_assists") and self.secondary_career_assists % 100 == 0 or self.secondary_career_assists == 1:
             logging.info("Secondary - Career Assist Milestone - %s", self.secondary_career_assists)
             self.milestone_tweet_sender(self.secondary_name, "assist", self.secondary_career_assists)
 
-        if hasattr(self, "secondary_career_points") and self.secondary_career_points % 100 == 0:
+        if hasattr(self, "secondary_career_points") and self.secondary_career_points % 100 == 0 or self.secondary_career_points == 1:
             logging.info("Secondary - Career Point Milestone - %s", self.secondary_career_points)
             self.milestone_tweet_sender(self.secondary_name, "point", self.secondary_career_points)
 
@@ -893,10 +893,10 @@ class GoalEvent(GenericEvent):
             self.primary_game_points = self.primary_game_stats["points"] + 1
             self.primary_career_stats = stats.get_player_career_stats(self.primary_id)
             self.primary_career_assists = (
-                self.primary_career_stats["assists"] + self.primary_game_assists
+                self.primary_career_stats.get("assists", 0) + self.primary_game_assists
             )
             self.primary_career_points = (
-                self.primary_career_stats["points"] + self.primary_game_points
+                self.primary_career_stats.get("points", 0) + self.primary_game_points
             )
             print(f"Primary Assist ({self.primary_name}) Assists - {self.primary_game_assists}")
             print(
@@ -917,10 +917,10 @@ class GoalEvent(GenericEvent):
             self.secondary_game_points = self.secondary_game_stats["points"] + 1
             self.secondary_career_stats = stats.get_player_career_stats(self.secondary_id)
             self.secondary_career_assists = (
-                self.secondary_career_stats["assists"] + self.secondary_game_assists
+                self.secondary_career_stats.get("assists", 0) + self.secondary_game_assists
             )
             self.secondary_career_points = (
-                self.secondary_career_stats["points"] + self.secondary_game_points
+                self.secondary_career_stats.get("points", 0) + self.secondary_game_points
             )
             print(
                 f"Secondary Assist ({self.secondary_name}) Assists - {self.secondary_game_assists}"
