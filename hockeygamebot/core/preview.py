@@ -285,7 +285,7 @@ def game_preview_others(game: Game):
                         official_penalty_game = official.get("penaltygame")
                         if official_penalty_game:
                             official_detail = (
-                                f"{official_name} (Games: {official_season} / {official_career} | Penalty / Game: {official_penalty_game})"
+                                f"{official_name} (Gms: {official_season} / {official_career} | Penl / Gm: {official_penalty_game})"
                             )
                         else:
                             official_detail = (
