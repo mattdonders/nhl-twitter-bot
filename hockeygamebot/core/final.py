@@ -40,6 +40,7 @@ def final_score(livefeed: dict, game: Game):
     boxscore = livefeed["liveData"]["boxscore"]
     linescore = livefeed["liveData"]["linescore"]
 
+    linescore_period = linescore["currentPeriod"]
     linescore_teams = linescore["teams"]
     linescore_pref = linescore_teams[game.preferred_team.home_away]
     linescore_other = linescore_teams[game.other_team.home_away]
@@ -50,7 +51,8 @@ def final_score(livefeed: dict, game: Game):
 
     # Everytime there is a shootout, when the GAME_END event is posted,
     # the score of the game is still tied - fix this by checking the SO scores.
-    if score_pref == score_other:
+    if linescore_period == 5 and (score_pref == score_other):
+        logging.info("A shootout caused the final score to be tied - checke the shootoutInfo key")
         shootout_info = linescore["shootoutInfo"]
         pref_so_goals = shootout_info[game.preferred_team.home_away]["scores"]
         other_so_goals = shootout_info[game.other_team.home_away]["scores"]
@@ -58,6 +60,10 @@ def final_score(livefeed: dict, game: Game):
             score_pref = score_pref + 1
         else:
             score_other = score_other + 1
+
+        # Set Team Objects New Score
+        game.preferred_team.score = score_pref
+        game.other_team.score = score_other
 
     if score_pref > score_other:
         final_score_text = (
