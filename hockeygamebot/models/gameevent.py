@@ -810,9 +810,9 @@ class GoalEvent(GenericEvent):
 
         # Get Scorer Career Stats
         self.scorer_career_stats = stats.get_player_career_stats(self.scorer_id)
-        self.scorer_career_goals = self.scorer_career_stats["goals"] + self.scorer_game_total
+        self.scorer_career_goals = self.scorer_career_stats.get("goals", 0) + self.scorer_game_total
         self.scorer_career_points = (
-            self.scorer_career_stats["points"] + self.scorer_game_total_points
+            self.scorer_career_stats.get("points", 0) + self.scorer_game_total_points
         )
         print("==================== POINT TOALS SECTION ====================")
         print(f"Goal Scorer ({self.scorer_name}) Goals - {self.scorer_game_total}")
@@ -847,13 +847,17 @@ class GoalEvent(GenericEvent):
         self.goal_main_text = self.get_goal_main_text()
         self.social_msg = (
             f"{self.goal_title_text}\n\n{self.goal_main_text}\n\n"
-            f"{game.preferred_team.short_name}: {game.preferred_team.score} / "
+            f"{game.preferred_team.short_name}: {game.preferred_team.score}\n"
             f"{game.other_team.short_name}: {game.other_team.score}"
         )
-        social_ids = socialhandler.send(msg=self.social_msg, event=self, game_hashtag=True)
+
+        # Generate the Discord Embed
+        self.discord_embed = self.generate_discord_embed()
+        social_ids = socialhandler.send(msg=self.social_msg, event=self, game_hashtag=True, discord_embed=self.discord_embed, force_send=True)
 
         # Set any social media IDs
         self.tweet = social_ids.get("twitter")
+
 
         # Now that the main goal text is sent, check for milestones
         if hasattr(self, "scorer_career_points") and (self.scorer_career_points % 100 == 0 or self.scorer_career_points == 1):
@@ -1005,7 +1009,7 @@ class GoalEvent(GenericEvent):
         goal_title_text = f"{goal_milestone_text}{goal_title_text} {goal_emoji}"
         return goal_title_text
 
-    def get_goal_main_text(self):
+    def get_goal_main_text(self, discordfmt=False):
         """ Gets the main goal description (players, shots, etc). """
         # TODO: Add randomness to this section of code.
 
@@ -1036,28 +1040,65 @@ class GoalEvent(GenericEvent):
 
         # Assists Section
         if self.num_assists == 1:
-            goal_assist_text = (
-                f"Give the assist to {self.primary_name} ({self.primary_season_ttl})."
-            )
+            goal_assist_text = f"🍎 {self.primary_name} ({self.primary_season_ttl})"
+            goal_assist_discord = f"🍎 {self.primary_name} ({self.primary_season_ttl})"
         elif self.num_assists == 2:
             goal_assist_text = (
-                f"The goal was assisted by {self.primary_name} ({self.primary_season_ttl}) "
-                f"and {self.secondary_name} ({self.secondary_season_ttl})."
+                f"🍎 {self.primary_name} ({self.primary_season_ttl})\n"
+                f"🍏 {self.secondary_name} ({self.secondary_season_ttl})"
+            )
+            goal_assist_discord = (
+                f"🍎 {self.primary_name} ({self.primary_season_ttl})\n"
+                f"🍏 {self.secondary_name} ({self.secondary_season_ttl})"
             )
         else:
             goal_assist_text = None
+            goal_assist_discord = None
 
         # FIXME: Can I fix this weird if / else - come back to it.
         if goal_count_text is None and goal_assist_text is None:
             goal_main_text = goal_scoring_text
+            goal_main_discord = goal_scoring_text
         elif goal_count_text is None:
-            goal_main_text = f"{goal_scoring_text} {goal_assist_text}"
+            goal_main_text = f"{goal_scoring_text}\n\n{goal_assist_text}"
+            goal_main_discord = f"{goal_scoring_text}\n\n{goal_assist_discord}"
         elif goal_assist_text is None:
             goal_main_text = f"{goal_count_text} {goal_scoring_text}"
+            goal_main_discord = f"{goal_count_text} {goal_scoring_text}"
         else:
-            goal_main_text = f"{goal_count_text} {goal_scoring_text} {goal_assist_text}"
+            goal_main_text = f"{goal_count_text} {goal_scoring_text}\n\n{goal_assist_text}"
+            goal_main_discord = f"{goal_count_text} {goal_scoring_text}\n\n{goal_assist_text}"
+
+        if discordfmt:
+            return goal_main_discord
 
         return goal_main_text
+
+
+    def generate_discord_embed(self):
+        """ Generates the custom Discord embed used for Goals. """
+
+        discord_embed = {
+            "embeds": [
+                {
+                    "title": f"**{self.get_goal_title_text()}**",
+                    "description": self.get_goal_main_text(discordfmt=True),
+                    "color": 13111342,
+                    "timestamp": self.date_time,
+                    "footer": {"text": f"Period: {self.period} / Time Remaining: {self.period_time_remain_str}"},
+                    # "thumbnail": {"url": "https://i.imgur.com/lCBug3D.png"},
+                    # "image": {"url": "attachment://NewJerseyDevils.png"},
+                    # "author": {"name": "Hockey Game Bot"},
+                    "fields": [
+                        {"name": f"**{self.game.preferred_team.team_name}**", "value": f"Score: {self.pref_goals}", "inline": True},
+                        {"name": f"**{self.game.other_team.team_name}**", "value": f"Score: {self.other_goals}", "inline": True},
+                    ],
+                }
+            ]
+        }
+
+        return discord_embed
+
 
     def check_for_scoring_changes(self, data: dict):
         """ Checks for scoring changes or changes in assists (or even number of assists).
@@ -1106,14 +1147,14 @@ class GoalEvent(GenericEvent):
                 )
             elif self.num_assists == 1:
                 goal_scorechange_text = (
-                    f"Now reads as {self.scorer_name} ({self.scorer_season_ttl}) "
-                    f"from {self.primary_name} ({self.primary_season_ttl})."
+                    f"🚨 {self.scorer_name} ({self.scorer_season_ttl})\n"
+                    f"🍎 {self.primary_name} ({self.primary_season_ttl})"
                 )
             else:
                 goal_scorechange_text = (
-                    f"Now reads as {self.scorer_name} ({self.scorer_season_ttl}) "
-                    f"from {self.primary_name} ({self.primary_season_ttl}) "
-                    f"and {self.secondary_name} ({self.secondary_season_ttl})."
+                    f"🚨 {self.scorer_name} ({self.scorer_season_ttl})\n"
+                    f"🍎 {self.primary_name} ({self.primary_season_ttl})\n"
+                    f"🍏 {self.secondary_name} ({self.secondary_season_ttl})"
                 )
 
         elif assist_change:
@@ -1157,7 +1198,6 @@ class GoalEvent(GenericEvent):
         if not self.tweet:
             social_ids = socialhandler.send(tweet_msg, reply=self.tweet, force_send=True, game_hashtag=True)
             self.tweet = social_ids.get("twitter")
-
 
     def was_goal_removed(self, all_plays: dict):
         """ This function checks if the goal was removed from the livefeed (usually for a Challenge). """

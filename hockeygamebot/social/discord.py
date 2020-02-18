@@ -9,7 +9,7 @@ from hockeygamebot.helpers import arguments
 from hockeygamebot.helpers.config import config
 
 
-def send_discord(msg, media=None):
+def send_discord(msg, embed=None, media=None):
     """ Sends a text-only Discord message.
 
     Args:
@@ -30,6 +30,10 @@ def send_discord(msg, media=None):
     webhook_url = [webhook_url] if not isinstance(webhook_url, list) else webhook_url
 
     for url in webhook_url:
+        if embed:
+            requests.post(url, json=embed)
+            continue
+
         linebreak_msg = f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n{msg}"
         payload = {"content": linebreak_msg}
 
