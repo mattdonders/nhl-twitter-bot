@@ -1333,6 +1333,11 @@ class PenaltyEvent(GenericEvent):
         drew_by = [x for x in players if x.get("playerType").lower() == "drewby"]
         penalty_on = [x for x in players if x.get("playerType").lower() == "penaltyon"]
         served_by = [x for x in players if x.get("playerType").lower() == "servedby"]
+
+        # If penalty is a bench minor & served_by is empty, try again next loop
+        if self.severity == "bench minor" and not served_by:
+            raise ValueError("A bench-minor penalty should have a servedBy player.")
+
         # Sometimes the drew_by fields are not populated immediately
         self.drew_by_name = drew_by[0].get("player").get("fullName") if drew_by else None
         self.drew_by_id = drew_by[0].get("player").get("id") if drew_by else None
