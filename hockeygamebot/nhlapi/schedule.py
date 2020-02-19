@@ -162,18 +162,19 @@ def get_next_game(today_game_date: datetime, team_id: int) -> dict:
         next_game (dict) - Dictionary of next game attributes.
     """
 
+    game_date = today_game_date.strftime("%Y-%m-%d")
     tomorrow = (today_game_date + timedelta(days=1)).strftime("%Y-%m-%d")
     end_date = (today_game_date + timedelta(days=365)).strftime("%Y-%m-%d")
 
     logging.info("Checking the schedule API endpoint for the next game.")
-    url = f"schedule?teamId={team_id}&startDate={tomorrow}&endDate={end_date}"
+    url = f"schedule?teamId={team_id}&startDate={game_date}&endDate={end_date}"
 
     response = api.nhl_api(url)
     if not response:
         return None
 
     next_game_json = response.json()
-    next_game = next_game_json.get('dates')[0].get('games')[0]
+    next_game = next_game_json.get('dates')[1].get('games')[0]
 
     return next_game
 
