@@ -842,11 +842,21 @@ def generate_all_charts(game: Game):
     return list_of_charts
 
 
-def generate_team_season_charts(team_name, lastgames=False):
+def team_season_rank(df: pd.DataFrame, stat, team_name):
+    """ Takes a dataframe, a stat & a team name and finds the "rank" of that team in the DataFrame. """
+
+    # Sort the dataframe and find the team index
+    # Add 1 because a Dataframe is 0-index
+    sorted_df = df.sort_values(stat, ascending=False).reset_index(drop=True)
+    rank = sorted_df.index[sorted_df['Team'] == team_name].tolist()[0] + 1
+    return rank
+
+
+def generate_team_season_charts(team_name, situation, lastgames=False):
     urls = utils.load_urls()
     nst_base = urls["endpoints"]["nst"]
     last_games_mod = "" if not lastgames else f"&gp={lastgames}&gpf=c"
-    nst_team_url = f"{nst_base}/teamtable.php?sit=sva{last_games_mod}"
+    nst_team_url = f"{nst_base}/teamtable.php?sit={situation}{last_games_mod}"
 
     resp = thirdparty.thirdparty_request(nst_team_url)
     soup = thirdparty.bs4_parse(resp.content)
@@ -855,6 +865,10 @@ def generate_team_season_charts(team_name, lastgames=False):
     # And add the league average as an extra row
     teams = soup.find("table", id=f"teams")
     teams_df = pd.read_html(str(teams), index_col=0)[0]
+
+    # Before we calculate the average, store a copy of the dataframe that we can use to get rankings
+    rank_df = teams_df.copy()
+
     teams_df.loc["avg"] = teams_df.mean()
     teams_df.reset_index(drop=True)
     teams_df.iloc[31, teams_df.columns.get_loc("Team")] = "Average"
@@ -894,6 +908,27 @@ def generate_team_season_charts(team_name, lastgames=False):
     team_color_bg = images.rgb_to_hex(team_colors["bg"])
     team_color_text = images.rgb_to_hex(team_colors["text"])
 
+    # For each index value of the dataframe, add the rank to that index
+    # We transpose twice because volumns are easier to work with
+    ranked_columns = list()
+    pref_df_T = pref_df_T.T
+    for col in pref_df_T.columns:
+        stat_rank = utils.ordinal(team_season_rank(rank_df, col, team_name))
+        ranked_col = f"{col} ({stat_rank})"
+        ranked_columns.append(ranked_col)
+    pref_df_T.columns = ranked_columns
+    pref_df_T = pref_df_T.T
+
+    ranked_columns = list()
+    pref_df_no_against = pref_df_no_against.T
+    for col in pref_df_no_against.columns:
+        stat_rank = utils.ordinal(team_season_rank(rank_df, col, team_name))
+        ranked_col = f"{col} ({stat_rank})"
+        ranked_columns.append(ranked_col)
+    pref_df_no_against.columns = ranked_columns
+    pref_df_no_against = pref_df_no_against.T
+
+
     # Create the figure that we will plot the two separate graphs on
     overview_fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(11, 10))
 
@@ -929,7 +964,9 @@ def generate_team_season_charts(team_name, lastgames=False):
 
     # Add the Figure Title
     last_games_title = "Season Stats" if not lastgames else f"Last {lastgames} Games"
-    ax1.title.set_text(f"{team_name} {last_games_title} - 5v5 (SVA)\nData Courtesy: Natural Stat Trick")
+    sit_label = "5v5 (SVA)" if situation == "sva" else "All Situations"
+    print(situation, sit_label)
+    ax1.title.set_text(f"{team_name} {last_games_title} - {sit_label}\nData Courtesy: Natural Stat Trick")
 
     # Draw the text labels on each of the corresponding bars
     # The top graph values are centered in the bar so it doesn't conflict with the average marker
@@ -943,6 +980,6 @@ def generate_team_season_charts(team_name, lastgames=False):
         ax2.text(100 - 2, i, str(v), va="center", ha="right", color=team_color_text, fontweight="bold")
 
     last_games_file = "" if not lastgames else f"-last{lastgames}-"
-    overview_fig_path = os.path.join(IMAGES_PATH, "temp", f"allcharts-yesterday-team-season{last_games_file}.png")
+    overview_fig_path = os.path.join(IMAGES_PATH, "temp", f"allcharts-yesterday-team-season-{situation}-{last_games_file}.png")
     overview_fig.savefig(overview_fig_path, bbox_inches="tight")
     return overview_fig_path

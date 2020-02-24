@@ -402,9 +402,11 @@ def run():
                 f"\n\n{pref_hashtag}"
             )
 
-            team_season_fig = nst.generate_team_season_charts(team_name)
-            team_season_fig_last10 = nst.generate_team_season_charts(team_name, lastgames=10)
-            team_season_charts = [team_season_fig, team_season_fig_last10]
+            team_season_fig = nst.generate_team_season_charts(team_name, "sva")
+            team_season_fig_last10 = nst.generate_team_season_charts(team_name, "sva", lastgames=10)
+            team_season_fig_all = nst.generate_team_season_charts(team_name, "all")
+            team_season_fig_last10_all = nst.generate_team_season_charts(team_name, "all", lastgames=10)
+            team_season_charts = [team_season_fig, team_season_fig_last10, team_season_fig_all, team_season_fig_last10_all]
             socialhandler.send(team_season_msg, media=team_season_charts)
         else:
             logging.info("There was no game yesterday - exiting!")
