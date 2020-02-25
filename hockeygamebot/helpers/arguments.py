@@ -99,7 +99,7 @@ def parse_arguments(sysargs=None):
     # And set args.console to True to make `docker logs` easier to use
     if args.docker:
         # Check if a config file exists (needs to be manually copied via docker run command)
-        DOCKER_CONFIG = "/app/hockeygamebot/hockeygamebot/config/config.yaml"
+        DOCKER_CONFIG = "/app/hockeygamebot/config/config.yaml"
         if not os.path.exists(DOCKER_CONFIG):
             print(
                 "[ERROR] Docker requires a configuration file to be passed into the `docker run` command."
