@@ -37,7 +37,7 @@ def thirdparty_request(url, headers=None):
     session.mount("http://", retries)
 
     # Setup a Fake User Agent (simulates a real visit)
-    ua = UserAgent()
+    ua = UserAgent(cache=False)
     ua_header = {"User-Agent": str(ua.chrome)}
     headers = ua_header if not headers else headers
 
@@ -319,7 +319,7 @@ def dailyfaceoff_lines(game, team):
     df_linecombos_url = urls["endpoints"]["df_line_combos"]
 
     # Setup a Fake User Agent (simulates a real visit)
-    ua = UserAgent()
+    ua = UserAgent(cache=False)
     ua_header = {"User-Agent": str(ua.chrome)}
 
     df_team_encoded = team.team_name.replace(" ", "-").replace("é", "e").replace(".", "").lower()

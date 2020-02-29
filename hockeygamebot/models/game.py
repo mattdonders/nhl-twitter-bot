@@ -324,6 +324,13 @@ class Game:
         return custom_game_date
 
     @property
+    def local_datetime(self):
+        """Returns the day of date_time in local server time."""
+        game_dt_local = self.date_time_dt + self.tz_offset
+        return game_dt_local
+
+
+    @property
     def day_of_game_local(self):
         """Returns the day of date_time in local server time."""
         game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
