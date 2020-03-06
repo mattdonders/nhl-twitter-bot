@@ -174,7 +174,7 @@ def get_next_game(today_game_date: datetime, team_id: int) -> dict:
         return None
 
     next_game_json = response.json()
-    next_game = next_game_json.get('dates')[1].get('games')[0]
+    next_game = next_game_json.get("dates")[1].get("games")[0]
 
     return next_game
 
@@ -203,6 +203,7 @@ def get_previous_game(team_id: int) -> dict:
     prev_game = prev_game_sched.get("dates")[0].get("games")[0]
 
     return prev_game_date, prev_game
+
 
 def season_series(game_id, pref_team, other_team, last_season=False):
     """Generates season series, points leader & TOI leader.
@@ -357,7 +358,10 @@ def season_series(game_id, pref_team, other_team, last_season=False):
         if pref_points[id] == leader_points:
             point_leaders.append(id)
 
-    if len(point_leaders) == 1:
+    if leader_points == 0:
+        points_leader_str = "Points Leader: None (all players have 0 points)."
+
+    elif len(point_leaders) == 1:
         leader = point_leaders[0]
         player_name = roster.player_attr_by_id(pref_team.roster, leader, "fullName")
         # If the player is no longer on the team, get their information (change string here?)
@@ -369,12 +373,33 @@ def season_series(game_id, pref_team, other_team, last_season=False):
         player_assists = pref_assists[leader]
         if not roster_player:
             points_leader_str = (
-                f"Points Leader - {player_name} with {leader_points} points "
-                f"({player_goals}G, {player_assists}A) ")
+                f"Points Leader: {player_name} with {leader_points} points "
+                f"({player_goals}G {player_assists}A) "
+            )
         else:
-            points_leader_str = "Points Leader - {} with {} ({}G, {}A).".format(
+            points_leader_str = "Points Leader: {} with {} ({}G {}A).".format(
                 player_name, leader_points, player_goals, player_assists
             )
+
+    elif len(point_leaders) > 3:
+        point_leaders_with_attrs = list()
+        for leader in point_leaders:
+            player_name = roster.player_attr_by_id(pref_team.roster, leader, "fullName")
+            if player_name is None:
+                player_id_only = leader.replace("ID", "")
+                player_name = roster.nonroster_player_attr_by_id(player_id_only, "fullName")
+            player_goals = pref_goals[leader]
+            player_assists = pref_assists[leader]
+            player_short_name = f"{player_name[0]}. {' '.join(player_name.split()[1:])}"
+            point_leaders_with_attrs.append(player_short_name)
+
+        point_leaders_joined = (", ".join(point_leaders_with_attrs[0:3]))
+        leftover_leaders = len(point_leaders) - 3
+        points_leader_str = (
+            f"Points Leaders: {point_leaders_joined} & {leftover_leaders} "
+            f"other players with {leader_points} each."
+        )
+
     else:
         point_leaders_with_attrs = list()
         for leader in point_leaders:
@@ -385,11 +410,13 @@ def season_series(game_id, pref_team, other_team, last_season=False):
             player_goals = pref_goals[leader]
             player_assists = pref_assists[leader]
             player_short_name = f"{player_name[0]}. {' '.join(player_name.split()[1:])}"
-            player_str = f"{player_short_name} ({player_goals}G, {player_assists}A)"
+            player_str = f"{player_short_name} ({player_goals}G {player_assists}A)"
             point_leaders_with_attrs.append(player_str)
 
-        point_leaders_joined = " & ".join(point_leaders_with_attrs)
-        points_leader_str = "Points Leaders - {} with {} each.".format(
+        point_leaders_joined = (
+            f", ".join(point_leaders_with_attrs[:-1]) + f" & {point_leaders_with_attrs[-1]}"
+        )
+        points_leader_str = "Points Leaders: {} with {} each.".format(
             point_leaders_joined, leader_points
         )
 
