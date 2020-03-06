@@ -488,7 +488,7 @@ class StartOfGameSocial:
         self.core_msg = None
         self.core_sent = False
         self.season_series_msg = None
-        self.season_series_sent = None
+        self.season_series_sent = False
         self.goalies_pref_msg = None
         self.goalies_pref_sent = False
         self.goalies_other_msg = None

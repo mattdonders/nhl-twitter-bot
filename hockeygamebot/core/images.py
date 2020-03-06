@@ -46,6 +46,7 @@ class FontSizes:
     DETAIL_LARGE = 56
     DETAIL_SMALL = 50
     RECORD = 38
+    STREAK = 30
     GAMENUMBER = 40
     PRESEASON = 28
     STAT_TITLE = 19
@@ -361,6 +362,7 @@ def pregame_image(game: Game):
     # Fonts used within the pregame image
     FONT_TITLE = ImageFont.truetype(FontFiles.BITTER_BOLD, FontSizes.TITLE)
     FONT_RECORD = ImageFont.truetype(FontFiles.BITTER_BOLD, FontSizes.RECORD)
+    FONT_STREAK = ImageFont.truetype(FontFiles.BITTER_BOLD, FontSizes.STREAK)
     FONT_DETAIL_LARGE = ImageFont.truetype(FontFiles.BITTER_BOLD, FontSizes.DETAIL_LARGE)
     FONT_DETAIL_SMALL = ImageFont.truetype(FontFiles.BITTER_BOLD, FontSizes.DETAIL_SMALL)
     FONT_GAMENUMBER = ImageFont.truetype(FontFiles.BITTER_BOLD, FontSizes.GAMENUMBER * 3)
@@ -374,12 +376,15 @@ def pregame_image(game: Game):
     COORDS_AWAY_LOGO = (COORDS_AWAY_X, LOGO_Y)
     COORDS_GAME_NUM = (-90, 80)
     TEAM_RECORD_Y = LOGO_Y + 200
+    TEAM_STREAK_Y = TEAM_RECORD_Y + FontSizes.RECORD + 10
 
     # Generate records, venue & other strings
     home_pts = game.home_team.points
     home_record_str = f"{home_pts} PTS • {game.home_team.current_record}"
+    home_streak_last10 = f"⬇ {game.home_team.streak} • LAST 10: {game.home_team.last_ten}"
     away_pts = game.away_team.points
     away_record_str = f"{away_pts} PTS • {game.away_team.current_record}"
+    away_streak_last10 = f"⬆ {game.away_team.streak} • LAST 10: {game.away_team.last_ten}"
 
     text_gamenumber = "PRESEASON" if game.game_type == "PR" else f"{game.preferred_team.games + 1} OF 82"
 
@@ -413,8 +418,18 @@ def pregame_image(game: Game):
     )
 
     center_text(
+        draw=draw, left=COORDS_HOME_X, top=TEAM_STREAK_Y, width=300,
+        text=home_streak_last10, color=Colors.WHITE, font=FONT_STREAK
+    )
+
+    center_text(
         draw=draw, left=COORDS_AWAY_X, top=TEAM_RECORD_Y, width=300,
         text=away_record_str, color=Colors.WHITE, font=FONT_RECORD
+    )
+
+    center_text(
+        draw=draw, left=COORDS_AWAY_X, top=TEAM_STREAK_Y, width=300,
+        text=away_streak_last10, color=Colors.WHITE, font=FONT_STREAK
     )
 
     center_text(

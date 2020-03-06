@@ -12,7 +12,17 @@ class Team(object):
     """Holds attributes related to a team - usually two created per game."""
 
     def __init__(
-        self, team_id, team_name, short_name, tri_code, home_away, tv_channel, games, record, season, tz_id
+        self,
+        team_id,
+        team_name,
+        short_name,
+        tri_code,
+        home_away,
+        tv_channel,
+        games,
+        record,
+        season,
+        tz_id,
     ):
         self.team_id = team_id
         self.team_name = team_name
@@ -89,6 +99,62 @@ class Team(object):
             self.lead_trail_trail1P = "N/A-N/A-N/A"
             self.lead_trail_trail2P = "N/A-N/A-N/A"
 
+        # Get Last 10 & Streak for each team
+        try:
+            standings_records_endpoint = "/standings?expand=standings.record"
+            logging.info("Getting records and streaks for %s via NHL API.", self.short_name)
+            standings_resp = nhlapi.api.nhl_api(standings_records_endpoint).json()
+            records = standings_resp["records"]
+            team_record = next(x for record in records for x in record['teamRecords'] if x["team"]["name"] == self.team_name)
+
+            self.streak = team_record["streak"]["streakCode"]
+
+            overall_record = team_record["records"]["overallRecords"]
+            l10_record = next(x for x in overall_record if x["type"] == "lastTen")
+            self.last_ten = f"{l10_record['wins']}-{l10_record['losses']}-{l10_record['ot']}"
+        except (IndexError, KeyError) as e:
+            logging.warning("Error getting record and standings stats - %s", e)
+            self.pp_time_stats = None
+
+        # Send request for power play time stats based on situation
+        try:
+            pp_time_endpoint = (
+                f"/powerplaytime?isAggregate=false&isGame=false"
+                f"&cayenneExp=seasonId={self.season}%20and%20teamId={self.team_id}"
+            )
+            logging.info(
+                "Getting power play time stats for %s via NHL Report API.", self.short_name
+            )
+            pp_time_resp = nhlapi.api.nhl_rpt(pp_time_endpoint).json()
+            pp_time_resp = pp_time_resp["data"][0]
+            self.pp_time_stats = {"5v4": {}, "5v3": {}, "4v3": {}}
+            for i in ("5v4", "5v3", "4v3"):
+                self.pp_time_stats[i] = {
+                    k.replace(i, ""): v for (k, v) in self.pp_time_stats.items() if i in k
+                }
+        except (IndexError, KeyError) as e:
+            logging.warning("Error getting Power Play time stats - %s", e)
+            self.pp_time_stats = None
+
+        # Send request for penalty kill time stats based on situation
+        try:
+            pk_time_endpoint = (
+                f"/penaltykilltime?isAggregate=false&isGame=false"
+                f"&cayenneExp=seasonId={self.season}%20and%20teamId={self.team_id}"
+            )
+            logging.info(
+                "Getting penalty kill time stats for %s via NHL Report API.", self.short_name
+            )
+            pk_time_resp = nhlapi.api.nhl_rpt(pk_time_endpoint).json()
+            pk_time_resp = pk_time_resp["data"][0]
+            self.pk_time_stats = {"4v5": {}, "3v5": {}, "3v4": {}}
+            for i in ("4v5", "3v5", "3v4"):
+                self.pk_time_stats[i] = {
+                    k.replace(i, ""): v for (k, v) in self.pk_time_stats.items() if i in k
+                }
+        except (IndexError, KeyError) as e:
+            self.pk_time_stats = None
+
         # Send request to get stats
         try:
             api = utils.load_urls()["endpoints"]["nhl_endpoint"]
@@ -148,7 +214,7 @@ class Team(object):
             games=games,
             record=record,
             season=resp["season"],
-            tz_id=tz_id
+            tz_id=tz_id,
         )
 
     @property

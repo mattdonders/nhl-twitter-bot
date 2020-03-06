@@ -64,9 +64,9 @@ def generate_game_preview(game: Game):
 
     # Generate clock, channel & hashtag emoji text preview
     preview_text_emojis = (
-        f"{clock_emoji}: {game.game_time_local}\n"
-        f"\U0001F4FA: {pref_team.tv_channel}\n"
-        f"\U00000023\U0000FE0F\U000020E3: {game.game_hashtag}"
+        f"{clock_emoji} {game.game_time_local}\n"
+        f"\U0001F4FA {pref_team.tv_channel}\n"
+        f"\U00000023\U0000FE0F\U000020E3 {game.game_hashtag}"
     )
 
     # Generate final preview tweet text
@@ -134,6 +134,8 @@ def generate_game_preview(game: Game):
     )
 
     game.pregame_lasttweet = social_dict["twitter"]
+
+
     game.preview_socials.core_sent = True
     game.preview_socials.season_series_sent = True
 
