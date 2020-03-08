@@ -63,3 +63,43 @@ def search_milestones_for_id(milestones, event_id):
     except AttributeError:
         logging.error("Error getting video ID and / or NHL Video URL.")
         return False, None, None
+
+
+def get_game_recap(content_feed):
+    """ Searches the content feed for the game recap.
+
+    Args:
+        content_feed (dict): NHL Content Feed
+
+    Returns:
+        recap (dict): Dictionary of the full recap event
+        nhl_video_url (string): URL pointing to the NHL Video Recap
+    """
+
+    epg = content_feed["media"]["epg"]
+    recap = next(x for x in epg if x["title"] == "Recap")
+
+    video_id = recap["items"][0]["id"]
+    nhl_video_url = f"https://www.nhl.com/video/c-{video_id}?tcid=tw_video_content_id"
+
+    return recap, nhl_video_url
+
+
+def get_condensed_game(content_feed):
+    """ Searches the content feed for the condensed game / extended highlights.
+
+    Args:
+        content_feed (dict): NHL Content Feed
+
+    Returns:
+        recap (dict): Dictionary of the full recap event
+        nhl_video_url (string): URL pointing to the NHL Video Condensed Game
+    """
+
+    epg = content_feed["media"]["epg"]
+    condensed = next(x for x in epg if x["title"] == "Extended Highlights")
+
+    video_id = condensed["items"][0]["id"]
+    nhl_video_url = f"https://www.nhl.com/video/c-{video_id}?tcid=tw_video_content_id"
+
+    return condensed, nhl_video_url

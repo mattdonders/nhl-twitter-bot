@@ -24,7 +24,7 @@ from hockeygamebot.models.game import Game, PenaltySituation
 from hockeygamebot.models.gamestate import GameState
 from hockeygamebot.models.globalgame import GlobalGame
 from hockeygamebot.models.team import Team
-from hockeygamebot.nhlapi import livefeed, nst, roster, schedule
+from hockeygamebot.nhlapi import contentfeed, livefeed, nst, roster, schedule
 from hockeygamebot.social import socialhandler
 
 
@@ -380,8 +380,33 @@ def run():
         game_yesterday, prev_game = schedule.was_game_yesterday(team_id, date)
         if game_yesterday:
             logging.info(
-                "There was a game yesterday - generate new season overview stats chart, tweet it & exit."
+                "There was a game yesterday - send recap, condensed game "
+                "and generate new season overview stats chart, tweet it & exit."
             )
+
+            # Get the Recap & Condensed Game
+            game_id = prev_game['gamePk']
+            content_feed = contentfeed.get_content_feed(game_id)
+            recap, recap_video_url = contentfeed.get_game_recap(content_feed)
+            condensed_game, condensed_video_url = contentfeed.get_condensed_game(content_feed)
+
+            # Send Recap Tweet
+            try:
+                recap_description = recap['items'][0]['description']
+                recap_msg = f"📺 {recap_description}.\n\n{recap_video_url}"
+                socialhandler.send(recap_msg)
+            except Exception as e:
+                logging.error("Error getting Game Recap. %s", e)
+
+            # Send Condensed Game / Extended Highlights Tweet
+            try:
+                condensed_blurb = condensed_game['items'][0]['blurb']
+                condensed_msg = f"📺 {condensed_blurb}.\n\n{condensed_video_url}"
+                socialhandler.send(condensed_msg)
+            except Exception as e:
+                logging.error("Error getting Condensed Game. %s", e)
+
+            # Generate the Season Overview charts
             home_team = prev_game["teams"]["home"]
             away_team = prev_game["teams"]["away"]
 
@@ -405,8 +430,15 @@ def run():
             team_season_fig = nst.generate_team_season_charts(team_name, "sva")
             team_season_fig_last10 = nst.generate_team_season_charts(team_name, "sva", lastgames=10)
             team_season_fig_all = nst.generate_team_season_charts(team_name, "all")
-            team_season_fig_last10_all = nst.generate_team_season_charts(team_name, "all", lastgames=10)
-            team_season_charts = [team_season_fig, team_season_fig_last10, team_season_fig_all, team_season_fig_last10_all]
+            team_season_fig_last10_all = nst.generate_team_season_charts(
+                team_name, "all", lastgames=10
+            )
+            team_season_charts = [
+                team_season_fig,
+                team_season_fig_last10,
+                team_season_fig_all,
+                team_season_fig_last10_all,
+            ]
             socialhandler.send(team_season_msg, media=team_season_charts)
         else:
             logging.info("There was no game yesterday - exiting!")
