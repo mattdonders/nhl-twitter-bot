@@ -1,10 +1,10 @@
 #!/bin/bash
 
-if [ "$#" -lt 2 ]; then
-	echo "Usage: ./hockeygamebot.sh <VENV|PYTHONEXEC> <SCRIPT-PARAMS>"
+if [ "$#" -lt 1 ]; then
+    echo "Usage: ./hockeygamebot.sh <VENV|PYTHONEXEC> <SCRIPT-PARAMS:optional>"
     echo "VENV|PYTHONEXEC is the path to the virtual environment to active or the Python binary to use."
-    echo "SCRIPT-PARAMS are the parameters being passed into the game bot script."
-	exit 1
+    echo "SCRIPT-PARAMS are the optional parameters being passed into the game bot script."
+    exit 1
 fi
 
 if [[ "$@" == *"--console"* ]]; then
