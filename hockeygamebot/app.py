@@ -24,7 +24,7 @@ from hockeygamebot.models.game import Game, PenaltySituation
 from hockeygamebot.models.gamestate import GameState
 from hockeygamebot.models.globalgame import GlobalGame
 from hockeygamebot.models.team import Team
-from hockeygamebot.nhlapi import contentfeed, livefeed, nst, roster, schedule
+from hockeygamebot.nhlapi import contentfeed, livefeed, nst, roster, schedule, youtube
 from hockeygamebot.social import socialhandler
 
 
@@ -384,31 +384,11 @@ def run():
                 "and generate new season overview stats chart, tweet it & exit."
             )
 
-            # Get the Recap & Condensed Game
-            game_id = prev_game['gamePk']
-            content_feed = contentfeed.get_content_feed(game_id)
-            recap, recap_video_url = contentfeed.get_game_recap(content_feed)
-            condensed_game, condensed_video_url = contentfeed.get_condensed_game(content_feed)
-
-            # Send Recap Tweet
-            try:
-                recap_description = recap['items'][0]['description']
-                recap_msg = f"📺 {recap_description}.\n\n{recap_video_url}"
-                socialhandler.send(recap_msg)
-            except Exception as e:
-                logging.error("Error getting Game Recap. %s", e)
-
-            # Send Condensed Game / Extended Highlights Tweet
-            try:
-                condensed_blurb = condensed_game['items'][0]['blurb']
-                condensed_msg = f"📺 {condensed_blurb}.\n\n{condensed_video_url}"
-                socialhandler.send(condensed_msg)
-            except Exception as e:
-                logging.error("Error getting Condensed Game. %s", e)
-
-            # Generate the Season Overview charts
+            # Get Team Information
             home_team = prev_game["teams"]["home"]
+            home_team_name = home_team["team"]["name"]
             away_team = prev_game["teams"]["away"]
+            away_team_name = away_team["team"]["name"]
 
             pref_team = home_team if home_team["team"]["name"] == team_name else away_team
             other_team = away_team if home_team["team"]["name"] == team_name else home_team
@@ -419,6 +399,39 @@ def run():
             other_team_name = other_team["team"]["name"]
             other_score = other_team["score"]
 
+
+            # Get the Recap & Condensed Game
+            game_id = prev_game['gamePk']
+            content_feed = contentfeed.get_content_feed(game_id)
+
+            # Send Recap Tweet
+            try:
+                recap, recap_video_url = contentfeed.get_game_recap(content_feed)
+                recap_description = recap['items'][0]['description']
+                recap_msg = f"📺 {recap_description}.\n\n{recap_video_url}"
+                socialhandler.send(recap_msg)
+            except Exception as e:
+                logging.error("Error getting Game Recap. %s", e)
+
+            # Send Condensed Game / Extended Highlights Tweet
+            try:
+                condensed_game, condensed_video_url = contentfeed.get_condensed_game(content_feed)
+                condensed_blurb = condensed_game['items'][0]['blurb']
+                condensed_msg = f"📺 {condensed_blurb}.\n\n{condensed_video_url}"
+                socialhandler.send(condensed_msg)
+            except Exception as e:
+                logging.error("Error getting Condensed Game from NHL - trying YouTube. %s", e)
+                try:
+                    condensed_game = youtube.youtube_condensed(away_team_name, home_team_name)
+                    condensed_blurb = condensed_game["title"]
+                    condensed_video_url = condensed_game["yt_link"]
+                    condensed_msg = f"📺 {condensed_blurb}.\n\n{condensed_video_url}"
+                    socialhandler.send(condensed_msg)
+                except Exception as e:
+                    logging.error("Error getting Condensed Game from NHL & YouTube - skip this today. %s", e)
+
+
+            # Generate the Season Overview charts
             game_result_str = "defeat" if pref_score > other_score else "lose to"
 
             team_season_msg = (

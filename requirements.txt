@@ -15,3 +15,4 @@ linode==0.4
 responses==0.10.6
 PyYAML==5.1.2
 lxml==4.4.2
+youtube-search==0.1.3
