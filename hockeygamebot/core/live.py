@@ -7,6 +7,7 @@ This module contains all functions pertaining to a game in Live State.
 import logging
 import time
 
+from hockeygamebot.core import common
 from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.models import gameevent
 from hockeygamebot.models.game import Game
@@ -83,7 +84,7 @@ def live_loop(livefeed: dict, game: Game):
         logging.error(e)
 
 
-def intermission_loop(game):
+def intermission_loop(game: Game):
     """ The live-game intermission loop. Things to do during an intermission
 
     Args:
@@ -134,6 +135,11 @@ def intermission_loop(game):
                 logging.error(
                     "Error creating Natural Stat Trick charts (%s) - sleep for a bit longer.", e
                 )
+
+    # Check if our shotmap was RT'd & if not try to search for it and send it out
+    shotmap_retweet_sent = game.period.shotmap_retweet
+    if not shotmap_retweet_sent and config["socials"]["twitter"]:
+        game.period.shotmap_retweet = common.search_send_shotmap(game=game)
 
     # Calculate proper sleep time based on intermission status
     if game.period.intermission_remaining > config["script"]["intermission_sleep_time"]:

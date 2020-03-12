@@ -441,6 +441,7 @@ class PeriodStartEvent(GenericEvent):
         super().__init__(data, game)
 
         # Reset the 1-minute remaining property for this period
+        self.game.period.shotmap_retweet = False
         self.game.period.current_oneminute_sent = False
 
         # Now call any functions that should be called when creating a new object
@@ -853,7 +854,7 @@ class GoalEvent(GenericEvent):
 
         # Generate the Discord Embed
         self.discord_embed = self.generate_discord_embed()
-        social_ids = socialhandler.send(msg=self.social_msg, event=self, game_hashtag=True, discord_embed=self.discord_embed, force_send=True)
+        social_ids = socialhandler.send(msg=self.social_msg, event=self, game_hashtag=True, discord_embed=self.discord_embed)
 
         # Set any social media IDs
         self.tweet = social_ids.get("twitter")

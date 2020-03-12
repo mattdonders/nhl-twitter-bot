@@ -101,3 +101,19 @@ def send_tweet(
         logging.error("Failed to send tweet : %s", tweet_text)
         logging.error(e)
         return None
+
+
+def search_twitter(search_term, num_items):
+    """ Searches Twitter for a specified search term and returns a number of results.
+
+    Args:
+        search_term: What to search Twitter for
+        num_items: number of matching tweets to return
+
+    Returns:
+        tweets: ItemIterator of tweets matching the search term
+    """
+    api = get_api()
+
+    tweets = tweepy.Cursor(api.search, q=search_term).items(num_items)
+    return tweets

@@ -571,6 +571,7 @@ class EndOfGameSocial:
         self.nst_linetool_sent = False
         self.hsc_msg = None
         self.hsc_sent = False
+        self.shotmap_retweet = False
 
     @property
     def all_social_sent(self):

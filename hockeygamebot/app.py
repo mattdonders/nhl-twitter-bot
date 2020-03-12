@@ -17,7 +17,7 @@ try:
 except ImportError:
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir))
 
-from hockeygamebot.core import final, live, preview
+from hockeygamebot.core import final, live, preview, common
 from hockeygamebot.definitions import VERSION
 from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.models.game import Game, PenaltySituation
@@ -245,6 +245,9 @@ def start_game_loop(game: Game):
             if not game.final_socials.nst_linetool_sent:
                 # thirdparty.nst_linetool(game=game, team=game.preferred_team)
                 game.final_socials.nst_linetool_sent = True
+
+            if not game.final_socials.shotmap_retweet:
+                game.final_socials.shotmap_retweet = common.search_send_shotmap(game=game)
 
             if not game.final_socials.hsc_sent:
                 final.hockeystatcards(game=game)

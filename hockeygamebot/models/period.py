@@ -12,3 +12,4 @@ class Period(object):
         self.intermission = False
         self.intermission_remaining = 0
         self.current_oneminute_sent = False
+        self.shotmap_retweet = False
