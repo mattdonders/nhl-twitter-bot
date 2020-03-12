@@ -155,13 +155,14 @@ def event_factory(game: Game, play: dict, livefeed: dict, new_plays: bool):
         if not obj.video_url and should_check_content:
             logging.info("A Goal without a video has been found - check the content feed for it.")
             milestones = contentfeed.get_content_feed(game_id=game.game_id, milestones=True)
-            content_exists, highlight, video_url = contentfeed.search_milestones_for_id(milestones, event_id)
+            content_exists, highlight, video_url, mp4_url = contentfeed.search_milestones_for_id(milestones, event_id)
             if content_exists:
                 # blurb = highlight.get('blurb')
                 description = highlight.get('description')
                 content_msg = f"NHL Video Highlight - {description}. \n\n{video_url}"
+                discord_msg = f"NHL Video Highlight - {description}. \n{video_url}"
                 social_ids = socialhandler.send(
-                    msg=content_msg, reply=obj.tweet, force_send=True, game_hashtag=True
+                    msg=content_msg, reply=obj.tweet, force_send=True, game_hashtag=True, discord_msg=discord_msg
                 )
                 obj.tweet = social_ids.get("twitter")
                 obj.video_url = video_url

@@ -59,7 +59,10 @@ def search_milestones_for_id(milestones, event_id):
             return False, None, None
 
         nhl_video_url = f"https://www.nhl.com/video/c-{video_id}?tcid=tw_video_content_id"
-        return True, highlight, nhl_video_url
+
+        playbacks = highlight.get("playbacks")
+        nhl_mp4_url = next(x["url"] for x in playbacks if x["name"] == "FLASH_1800K_896x504")
+        return True, highlight, nhl_video_url, nhl_mp4_url
     except AttributeError:
         logging.error("Error getting video ID and / or NHL Video URL.")
         return False, None, None

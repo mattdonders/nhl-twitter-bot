@@ -66,6 +66,7 @@ def send(msg, **kwargs):
         return_dict["twitter"] = tweet_id
 
     if social_config["discord"]:
+        msg = kwargs.get("discord_msg", msg)
         discord.send_discord(msg, embed=kwargs.get("discord_embed"), media=kwargs.get("media"))
 
     if social_config["slack"]:
