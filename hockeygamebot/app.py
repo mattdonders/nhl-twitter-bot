@@ -21,7 +21,7 @@ from hockeygamebot.core import final, live, preview, common
 from hockeygamebot.definitions import VERSION
 from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.models.game import Game, PenaltySituation
-from hockeygamebot.models.gamestate import GameState
+from hockeygamebot.models.gamestate import GameState, GameStateCode
 from hockeygamebot.models.globalgame import GlobalGame
 from hockeygamebot.models.team import Team
 from hockeygamebot.nhlapi import contentfeed, livefeed, nst, roster, schedule, youtube
@@ -49,6 +49,14 @@ def start_game_loop(game: Game):
         if GameState(game.game_state) == GameState.PREVIEW:
             livefeed_resp = livefeed.get_livefeed(game.game_id)
             game.update_game(livefeed_resp)
+
+            # If after the update_game() function runs, we have a Postponed Game
+            # We should tweet it - this means it happened after the game was scheduled
+            if GameStateCode(game.game_state_code) == GameStateCode.POSTPONED:
+                logging.warning("This game was originally scheduled, but is now postponed.")
+                social_msg = f"⚠️ The {game.preferred_team.team_name} game scheduled for today has been postponed."
+                socialhandler.send(social_msg)
+                end_game_loop(game)
 
             if game.game_time_countdown > 0:
                 logging.info("Game is in Preview state - send out all pregame information.")
@@ -402,15 +410,14 @@ def run():
             other_team_name = other_team["team"]["name"]
             other_score = other_team["score"]
 
-
             # Get the Recap & Condensed Game
-            game_id = prev_game['gamePk']
+            game_id = prev_game["gamePk"]
             content_feed = contentfeed.get_content_feed(game_id)
 
             # Send Recap Tweet
             try:
                 recap, recap_video_url = contentfeed.get_game_recap(content_feed)
-                recap_description = recap['items'][0]['description']
+                recap_description = recap["items"][0]["description"]
                 recap_msg = f"📺 {recap_description}.\n\n{recap_video_url}"
                 socialhandler.send(recap_msg)
             except Exception as e:
@@ -419,7 +426,7 @@ def run():
             # Send Condensed Game / Extended Highlights Tweet
             try:
                 condensed_game, condensed_video_url = contentfeed.get_condensed_game(content_feed)
-                condensed_blurb = condensed_game['items'][0]['blurb']
+                condensed_blurb = condensed_game["items"][0]["blurb"]
                 condensed_msg = f"📺 {condensed_blurb}.\n\n{condensed_video_url}"
                 socialhandler.send(condensed_msg)
             except Exception as e:
@@ -431,8 +438,9 @@ def run():
                     condensed_msg = f"📺 {condensed_blurb}.\n\n{condensed_video_url}"
                     socialhandler.send(condensed_msg)
                 except Exception as e:
-                    logging.error("Error getting Condensed Game from NHL & YouTube - skip this today. %s", e)
-
+                    logging.error(
+                        "Error getting Condensed Game from NHL & YouTube - skip this today. %s", e
+                    )
 
             # Generate the Season Overview charts
             game_result_str = "defeat" if pref_score > other_score else "lose to"
@@ -492,6 +500,11 @@ def run():
     # print(vars(game))
     # print(vars(away_team))
     # print(vars(home_team))
+
+    # If the codedGameState is set to 9 originally, game is postponed (exit immediately)
+    if GameStateCode(game.game_state_code) == GameStateCode.POSTPONED:
+        logging.warning("This game is marked as postponed during our first run - exit silently.")
+        end_game_loop(game)
 
     # Return the game object to use in the game loop function
     return game

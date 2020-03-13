@@ -15,7 +15,9 @@ from hockeygamebot.models.shootout import Shootout
 from hockeygamebot.models.team import Team
 from hockeygamebot.models.hashtag import Hashtag
 from hockeygamebot.social import socialhandler
+
 # from hockeygamebot.models.gameevent import GameEndEvent
+
 
 class Game:
     """Holds all game related attributes - usually one instance created per game."""
@@ -31,6 +33,7 @@ class Game:
         game_type,
         date_time,
         game_state,
+        game_state_code,
         venue,
         home: Team,
         away: Team,
@@ -44,6 +47,7 @@ class Game:
         self.date_time = date_time
         self.date_time_dt = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
         self.game_state = game_state
+        self.game_state_code = game_state_code
         self.venue = venue
         self.live_feed_endpoint = live_feed
         self.home_team = home
@@ -166,6 +170,7 @@ class Game:
             game_type=resp.get("gameType"),
             date_time=resp.get("gameDate"),
             game_state=resp.get("status").get("abstractGameState"),
+            game_state_code=int(resp.get("status").get("codedGameState")),
             live_feed=resp.get("link"),
             venue=venue,
             home=home_team,
@@ -187,13 +192,21 @@ class Game:
         # Don't update the game state if its final since we might have manually set it this way.
         lf_game_state = response.get("gameData").get("status").get("abstractGameState")
 
-        if GameState(lf_game_state) == GameState.FINAL and not models.gameevent.GameEndEvent.cache.entries:
-            logging.warning("Game State is FINAL, but no GameEndEvent recorded - don't update thie game state yet.")
+        if (
+            GameState(lf_game_state) == GameState.FINAL
+            and not models.gameevent.GameEndEvent.cache.entries
+        ):
+            logging.warning(
+                "Game State is FINAL, but no GameEndEvent recorded - don't update thie game state yet."
+            )
         elif GameState(self.game_state) != GameState.FINAL:
             self.game_state = lf_game_state
         else:
-            logging.warning("Game State is FINAL - do not update in case we manually set this via GameEndEvent.")
+            logging.warning(
+                "Game State is FINAL - do not update in case we manually set this via GameEndEvent."
+            )
 
+        self.game_state_code = int(response.get("gameData").get("status").get("codedGameState"))
         self.period.current = linescore.get("currentPeriod")
         self.period.current_ordinal = linescore.get("currentPeriodOrdinal")
         self.period.time_remaining = linescore.get("currentPeriodTimeRemaining")
@@ -262,7 +275,8 @@ class Game:
                 home_goalie_pulled = self.home_team.goalie_pulled_setter(home_goalie_current)
             elif self.home_team.goalie_pulled and isinstance(last_tracked_event, event_filter_list):
                 logging.info(
-                    "Home goalie previously pulled, but important event detected (%s) - update & check.", last_tracked_event
+                    "Home goalie previously pulled, but important event detected (%s) - update & check.",
+                    last_tracked_event,
                 )
                 home_goalie_pulled = self.home_team.goalie_pulled_setter(home_goalie_current)
             else:
@@ -293,7 +307,8 @@ class Game:
                 self.goalie_pull_social(self.away_team.short_name, trailing_score)
         except IndexError as e:
             logging.warning(
-                "Tried to update goalie pulled status, but got an error - try again next loop. %s", e
+                "Tried to update goalie pulled status, but got an error - try again next loop. %s",
+                e,
             )
 
     def goalie_pull_social(self, team_name, trailing_score):
@@ -315,7 +330,6 @@ class Game:
 
         socialhandler.send(msg=goalie_pull_text, force_send=True)
 
-
     def custom_game_date(self, dt_format):
         """Returns the game date in any format."""
         game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
@@ -328,7 +342,6 @@ class Game:
         """Returns the day of date_time in local server time."""
         game_dt_local = self.date_time_dt + self.tz_offset
         return game_dt_local
-
 
     @property
     def day_of_game_local(self):
@@ -454,7 +467,7 @@ class PenaltySituation:
     @current_ss.setter
     def current_ss(self, ss):
         # Convert a MM:SS to pure seconds if passed into the setter
-        if ss in ('END', 0):
+        if ss in ("END", 0):
             self._current_ss = 0
             return
 
@@ -466,7 +479,6 @@ class PenaltySituation:
             self.penalty_killed = True
         else:
             self._current_ss = ss
-
 
     # @property
     # def pp_team_shots_now(self):
@@ -537,7 +549,10 @@ class StartOfGameSocial:
 
         lines_changed = bool(lines != original_lines)
         if lines_sent and lines_changed:
-            logging.info("The lines for the %s team have changed - update them and send updated socials!", prefother)
+            logging.info(
+                "The lines for the %s team have changed - update them and send updated socials!",
+                prefother,
+            )
             lines = f"❗️ Updated {lines}"
             return (True, lines)
 

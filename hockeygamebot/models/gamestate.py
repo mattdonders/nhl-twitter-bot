@@ -19,4 +19,4 @@ class GameStateCode(Enum):
     GAMEOVER = 5
     NEWLYFINAL = 6
     FINAL = 7
-
+    POSTPONED = 9
