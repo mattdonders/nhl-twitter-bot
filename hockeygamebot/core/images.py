@@ -91,7 +91,7 @@ class StatTypes(Enum):
 
 def luminance(pixel):
     """ Calculates the luminance of an (R,G,B) color."""
-    return (0.299 * pixel[0] + 0.587 * pixel[1] + 0.114 * pixel[2])
+    return 0.299 * pixel[0] + 0.587 * pixel[1] + 0.114 * pixel[2]
 
 
 def is_similar(pixel_a, pixel_b, threshold):
@@ -114,16 +114,16 @@ def both_team_colors_compared(first_team_name, second_team_name, threshold=None)
     first_colors = team_colors(first_team_name)
     second_colors = team_colors(second_team_name)
 
-    first_primary_bg = first_colors['primary']['bg']
-    second_primary_bg = second_colors['primary']['bg']
+    first_primary_bg = first_colors["primary"]["bg"]
+    second_primary_bg = second_colors["primary"]["bg"]
 
     # Check if the primary team colors are the same or similar
     threshold = threshold if threshold else Constants.SIMILAR_THRESHOLD
     similar_colors = is_similar(first_primary_bg, second_primary_bg, threshold)
 
     # Build the returning dictionary
-    colors_dict = {'first': first_colors['primary']}
-    colors_dict['second'] = second_colors['secondary'] if similar_colors else second_colors['primary']
+    colors_dict = {"first": first_colors["primary"]}
+    colors_dict["second"] = second_colors["secondary"] if similar_colors else second_colors["primary"]
     return colors_dict
 
 
@@ -200,7 +200,7 @@ def team_colors(team_name):
         },
         "Montréal Canadiens": {
             "primary": {"bg": (166, 25, 46), "text": (255, 255, 255)},
-            "secondary": {"bg": (0, 30, 98), "text": (0, 0, 0)},
+            "secondary": {"bg": (0, 30, 98), "text": (255, 255, 255)},
         },
         "Nashville Predators": {
             "primary": {"bg": (255, 184, 28), "text": (255, 255, 255)},
@@ -280,8 +280,8 @@ def rgb_to_hex(value1, value2=None, value3=None):
 
     for value in (value1, value2, value3):
         if not 0 <= value <= 255:
-            raise ValueError('Value each slider must be ranges from 0 to 255')
-    return '#{0:02X}{1:02X}{2:02X}'.format(value1, value2, value3)
+            raise ValueError("Value each slider must be ranges from 0 to 255")
+    return "#{0:02X}{1:02X}{2:02X}".format(value1, value2, value3)
 
 
 def center_text(draw, left, top, width, text, color, font, vertical=False, height=None):
@@ -663,8 +663,8 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
 
     # Setup Colors (via functions)
     colors_dict = both_team_colors_compared(game.preferred_team.team_name, game.other_team.team_name)
-    pref_colors = colors_dict['first']
-    other_colors = colors_dict['second']
+    pref_colors = colors_dict["first"]
+    other_colors = colors_dict["second"]
 
     logging.debug("Pref Colors - %s // Other Colors - %s", pref_colors, other_colors)
 
@@ -742,7 +742,7 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
                 GOAL_START_Y + GOAL_SCORER_BOX_H + GOAL_SCORER_BOX_SEPARATOR + GOAL_SCORER_BOX_TEAM_H,
             ),
         ),
-        fill=other_colors["bg"]
+        fill=other_colors["bg"],
     )
 
     # fmt: off
@@ -873,7 +873,7 @@ def hockeystatcards_charts(game: Game, home_gs: dict, away_gs: dict):
     for idx, gs in enumerate((home_gs, away_gs)):
         # Setup Team Name & Proper Colors
         team_name = game.home_team.team_name if idx == 0 else game.away_team.team_name
-        color = rgb_to_hex(team_colors(team_name).get('primary').get('bg'))
+        color = rgb_to_hex(team_colors(team_name).get("primary").get("bg"))
 
         logging.info("Generating the %s Game Score Chart.", team_name)
 
@@ -882,7 +882,7 @@ def hockeystatcards_charts(game: Game, home_gs: dict, away_gs: dict):
         gs_df = gs_df[["player", "toi", "gamescore", "hero", "gsavg"]]
         gs_df["gamescore"] = pd.to_numeric(gs_df["gamescore"])
         gs_df["gsavg"] = pd.to_numeric(gs_df["gsavg"])
-        gs_df = gs_df.sort_values(by=['gamescore'], ascending=False)
+        gs_df = gs_df.sort_values(by=["gamescore"], ascending=False)
         gs_df.set_index("player", drop=True, inplace=True)
         gs_df = gs_df.iloc[::-1]
 
@@ -930,7 +930,7 @@ def hockeystatcards_charts(game: Game, home_gs: dict, away_gs: dict):
             "Hatched (///) Pattern Indicates Breakout Game.\n"
             "A breakout game is ~1.5X the standard deviation from the player's mean GameScore.",
             horizontalalignment="center",
-            fontsize=8
+            fontsize=8,
         )
 
         gs_chart_path = os.path.join(IMAGES_PATH, "temp", f"hsc_gamescore-{game.game_id_shortid}-{idx}.png")
@@ -941,4 +941,3 @@ def hockeystatcards_charts(game: Game, home_gs: dict, away_gs: dict):
         gs_charts.append(gs_chart_path)
 
     return gs_charts
-
