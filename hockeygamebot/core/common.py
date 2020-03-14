@@ -22,7 +22,7 @@ def search_send_shotmap(game):
         tweet_id = tweet.id
 
         # If the period from the tweet doesn't match the game bot period, skip this loop
-        game_final = True if GameState(game.game_state) == GameState.FINAL else False
+        game_final = True if game.game_state == GameState.FINAL.value else False
         current_period_check = "end of the game" if game_final else game.period.current_ordinal
         if current_period_check not in tweet_text:
             logging.info("Current Period: %s | Tweet Text: %s", current_period_check, tweet_text)

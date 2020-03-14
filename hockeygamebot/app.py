@@ -46,13 +46,13 @@ def start_game_loop(game: Game):
     # ------------------------------------------------------------------------------
 
     while True:
-        if GameState(game.game_state) == GameState.PREVIEW:
+        if game.game_state == GameState.PREVIEW.value:
             livefeed_resp = livefeed.get_livefeed(game.game_id)
             game.update_game(livefeed_resp)
 
             # If after the update_game() function runs, we have a Postponed Game
             # We should tweet it - this means it happened after the game was scheduled
-            if GameStateCode(game.game_state_code) == GameStateCode.POSTPONED:
+            if game.game_state_code == GameStateCode.POSTPONED.value:
                 logging.warning("This game was originally scheduled, but is now postponed.")
                 social_msg = f"⚠️ The {game.preferred_team.team_name} game scheduled for today has been postponed."
                 socialhandler.send(social_msg)
@@ -93,7 +93,7 @@ def start_game_loop(game: Game):
                 sleep_time = config["script"]["pregame_sleep_time"]
                 time.sleep(sleep_time)
 
-        elif GameState(game.game_state) == GameState.LIVE:
+        elif game.game_state == GameState.LIVE.value:
             try:
                 logging.info("-" * 80)
                 logging.info(
@@ -225,7 +225,7 @@ def start_game_loop(game: Game):
             game.live_loop_counter += 1
             time.sleep(live_sleep_time)
 
-        elif GameState(game.game_state) == GameState.FINAL:
+        elif game.game_state == GameState.FINAL.value:
             logging.info(
                 "Game is now over & 'Final' - run end of game functions with increased sleep time."
             )
@@ -502,7 +502,7 @@ def run():
     # print(vars(home_team))
 
     # If the codedGameState is set to 9 originally, game is postponed (exit immediately)
-    if GameStateCode(game.game_state_code) == GameStateCode.POSTPONED:
+    if game.game_state_code == GameStateCode.POSTPONED.value:
         logging.warning("This game is marked as postponed during our first run - exit silently.")
         end_game_loop(game)
 

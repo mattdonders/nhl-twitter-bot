@@ -193,13 +193,13 @@ class Game:
         lf_game_state = response.get("gameData").get("status").get("abstractGameState")
 
         if (
-            GameState(lf_game_state) == GameState.FINAL
+            lf_game_state == GameState.FINAL.value
             and not models.gameevent.GameEndEvent.cache.entries
         ):
             logging.warning(
                 "Game State is FINAL, but no GameEndEvent recorded - don't update thie game state yet."
             )
-        elif GameState(self.game_state) != GameState.FINAL:
+        elif self.game_state != GameState.FINAL.value:
             self.game_state = lf_game_state
         else:
             logging.warning(

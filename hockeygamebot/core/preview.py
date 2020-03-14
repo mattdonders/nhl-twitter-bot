@@ -135,7 +135,6 @@ def generate_game_preview(game: Game):
 
     game.pregame_lasttweet = social_dict["twitter"]
 
-
     game.preview_socials.core_sent = True
     game.preview_socials.season_series_sent = True
 
@@ -176,7 +175,9 @@ def game_preview_others(game: Game):
         goalies_confirmed_values = ("Confirmed", "Likely")
         try:
             df_date = game.custom_game_date("%m-%d-%Y")
-            goalies_df = thirdparty.dailyfaceoff_goalies(pref_team, other_team, pref_team_homeaway, df_date)
+            goalies_df = thirdparty.dailyfaceoff_goalies(
+                pref_team, other_team, pref_team_homeaway, df_date
+            )
             logging.info(goalies_df)
 
             goalie_confirm_pref = bool(
@@ -286,9 +287,7 @@ def game_preview_others(game: Game):
                         official_career = official.get("careergames")
                         official_penalty_game = official.get("penaltygame")
                         if official_penalty_game:
-                            official_detail = (
-                                f"{official_name} (Gms: {official_season} / {official_career} | Penl / Gm: {official_penalty_game})"
-                            )
+                            official_detail = f"{official_name} (Gms: {official_season} / {official_career} | Penl / Gm: {official_penalty_game})"
                         else:
                             official_detail = (
                                 f"{official_name} (Games: {official_season} / {official_career})"
@@ -435,7 +434,7 @@ def game_preview_others(game: Game):
     else:
         logging.info(
             "Game State is Preview & all tweets are sent. Sleep for %s seconds until game time.",
-            game.game_time_countdown
+            game.game_time_countdown,
         )
 
         # We need to subtract 5-minutes from this
@@ -450,11 +449,10 @@ def get_starters(game: Game):
         player_name = score_rpt_row.find_all("td")[2].text
         return " ".join(player_name.replace(" (A)", "").replace(" (C)", "").title().split()[1:])
 
-
     while not game.preview_socials.starters_sent:
         livefeed_resp = livefeed.get_livefeed(game.game_id)
         game.update_game(livefeed_resp)
-        if GameState(game.game_state) == GameState.LIVE:
+        if game.game_state == GameState.LIVE.value:
             logging.info("Game state switched to live - forget about the starters.")
             return
 
@@ -476,13 +474,18 @@ def get_starters(game: Game):
             players = [x for x in roster.find_all("tr")]
 
             starters = list()
-            for pos in [('L', 'R', 'C'), 'D', 'G']:
+            for pos in [("L", "R", "C"), "D", "G"]:
                 pos_all = [x for x in players if x.find_all("td")[1].text in pos]
-                pos_start = [get_players_name(x) for x in pos_all if 'bold' in x.find_all("td")[0]['class']]
+                pos_start = [
+                    get_players_name(x) for x in pos_all if "bold" in x.find_all("td")[0]["class"]
+                ]
                 pos_start_str = " - ".join(pos_start)
                 starters.append(pos_start_str)
         except Exception as e:
-            logging.error("Something happened while trying to get the starters - sleep for 20s & try again. %s", e)
+            logging.error(
+                "Something happened while trying to get the starters - sleep for 20s & try again. %s",
+                e,
+            )
             time.sleep(20)
             continue
 
@@ -499,8 +502,4 @@ def get_starters(game: Game):
         socialhandler.send(starters_msg, force_send=True, game_hashtag=True)
         game.preview_socials.starters_msg = starters_msg
         game.preview_socials.starters_sent = True
-
-
-
-
 
