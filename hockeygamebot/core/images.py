@@ -123,7 +123,9 @@ def both_team_colors_compared(first_team_name, second_team_name, threshold=None)
 
     # Build the returning dictionary
     colors_dict = {"first": first_colors["primary"]}
-    colors_dict["second"] = second_colors["secondary"] if similar_colors else second_colors["primary"]
+    colors_dict["second"] = (
+        second_colors["secondary"] if similar_colors else second_colors["primary"]
+    )
     return colors_dict
 
 
@@ -386,10 +388,14 @@ def pregame_image(game: Game):
     away_record_str = f"{away_pts} PTS • {game.away_team.current_record}"
     away_streak_last10 = f"⬆ {game.away_team.streak} • LAST 10: {game.away_team.last_ten}"
 
-    text_gamenumber = "PRESEASON" if game.game_type == "PR" else f"{game.preferred_team.games + 1} OF 82"
+    text_gamenumber = (
+        "PRESEASON" if game.game_type == "PR" else f"{game.preferred_team.games + 1} OF 82"
+    )
 
     text_datetime = f"{game.game_date_short} • {game.game_time_local}"
-    text_hashtags = f"{utils.team_hashtag(game.preferred_team.team_name, game.game_type)} • {game.game_hashtag}"
+    text_hashtags = (
+        f"{utils.team_hashtag(game.preferred_team.team_name, game.game_type)} • {game.game_hashtag}"
+    )
 
     bg = Image.open(Backgrounds.PREGAME)
     bg_w, bg_h = bg.size
@@ -451,7 +457,9 @@ def pregame_image(game: Game):
     # Create a new image to put the game number & cleanly rotate it
     txt = Image.new("L", (900, 900))
     d = ImageDraw.Draw(txt)
-    center_text(draw=d, left=0, top=0, width=900, text=text_gamenumber, color=255, font=FONT_GAMENUMBER)
+    center_text(
+        draw=d, left=0, top=0, width=900, text=text_gamenumber, color=255, font=FONT_GAMENUMBER
+    )
     w = txt.rotate(315, expand=True, resample=Image.BICUBIC)
     w_resize = w.resize((300, 300), Image.ANTIALIAS)
     bg.paste(w_resize, COORDS_GAME_NUM, w_resize)
@@ -561,7 +569,9 @@ def generate_stats_bar(draw, stat, pref_value, other_value, pref_color, other_co
     # fmt: on
 
 
-def draw_goal_text(draw, pref_other, number, goal, assist_p, assist_s, strength, period, time, team_color):
+def draw_goal_text(
+    draw, pref_other, number, goal, assist_p, assist_s, strength, period, time, team_color
+):
     """ Draws goal text (scorer & assists in the goals box).
 
     Args:
@@ -593,7 +603,15 @@ def draw_goal_text(draw, pref_other, number, goal, assist_p, assist_s, strength,
     # Draw Goal Scorer Text (Bold) & then get font size (to offset assists)
     TOP = TOP + (goal_iter * (10 + FontSizes.GOAL_SCORER))
     goal_text = f"{goal} - {strength}" if strength != "EVEN" else goal
-    valign_center_text(draw=draw, left=LEFT, top=TOP, height=HEIGHT, text=goal_text, color=Colors.BLACK, font=FONT_GOAL)
+    valign_center_text(
+        draw=draw,
+        left=LEFT,
+        top=TOP,
+        height=HEIGHT,
+        text=goal_text,
+        color=Colors.BLACK,
+        font=FONT_GOAL,
+    )
     goal_w, _ = draw.textsize(goal_text, FONT_GOAL)
 
     # Generate assists texts (or unassisted) via list comprehension
@@ -606,14 +624,26 @@ def draw_goal_text(draw, pref_other, number, goal, assist_p, assist_s, strength,
 
     # Draw assists text (non-bold) * then get font size (to offset time)
     valign_center_text(
-        draw, LEFT + goal_w + 5, TOP, height=HEIGHT, text=assist_text, color=Colors.BLACK, font=FONT_ASST
+        draw,
+        LEFT + goal_w + 5,
+        TOP,
+        height=HEIGHT,
+        text=assist_text,
+        color=Colors.BLACK,
+        font=FONT_ASST,
     )
     asst_w, _ = draw.textsize(assist_text, FONT_ASST)
 
     # Generate time / period text & draw it
     time_period_text = f"[{time} / {period}]" if number < 7 else f"[{time} / {period}]   & MORE!"
     valign_center_text(
-        draw, LEFT + goal_w + asst_w + 15, TOP, height=HEIGHT, text=time_period_text, color=team_color, font=FONT_TIME
+        draw,
+        LEFT + goal_w + asst_w + 15,
+        TOP,
+        height=HEIGHT,
+        text=time_period_text,
+        color=team_color,
+        font=FONT_TIME,
     )
 
 
@@ -642,11 +672,11 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
     # Pre-game specific constant values (incl coordinates)
     HEADER_TEXT = "END OF GAME RECAP!" if game_end else "INTERMISSION REPORT!"
     LOGO_Y = 110
-    COORDS_HOME_X = 775
-    COORDS_AWAY_X = 975
+    COORDS_PREF_X = 775
+    COORDS_OTHER_X = 975
     LOGO_SCORE_SPACING = 50
-    COORDS_HOME_LOGO = (COORDS_HOME_X, LOGO_Y)
-    COORDS_AWAY_LOGO = (COORDS_AWAY_X, LOGO_Y)
+    COORDS_PREF_LOGO = (COORDS_PREF_X, LOGO_Y)
+    COORDS_OTHER_LOGO = (COORDS_OTHER_X, LOGO_Y)
 
     CHART_START_X = 35
     CHART_END_X = 725
@@ -662,7 +692,9 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
     GOAL_SCORER_BOX_SEPARATOR = 15
 
     # Setup Colors (via functions)
-    colors_dict = both_team_colors_compared(game.preferred_team.team_name, game.other_team.team_name)
+    colors_dict = both_team_colors_compared(
+        game.preferred_team.team_name, game.other_team.team_name
+    )
     pref_colors = colors_dict["first"]
     other_colors = colors_dict["second"]
 
@@ -672,18 +704,18 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
     bg = Image.open(Backgrounds.STATS)
     bg_w, bg_h = bg.size
 
-    away_team = game.away_team.team_name.replace(" ", "")
-    home_team = game.home_team.team_name.replace(" ", "")
-    away_logo = Image.open(os.path.join(PROJECT_ROOT, f"resources/logos/{away_team}.png"))
-    home_logo = Image.open(os.path.join(PROJECT_ROOT, f"resources/logos/{home_team}.png"))
+    pref_team = game.preferred_team.team_name.replace(" ", "")
+    other_team = game.home_team.team_name.replace(" ", "")
+    pref_logo = Image.open(os.path.join(PROJECT_ROOT, f"resources/logos/{pref_team}.png"))
+    other_logo = Image.open(os.path.join(PROJECT_ROOT, f"resources/logos/{other_team}.png"))
 
     # Resize & paste the home / away logos with the mask the same as the image
     # TODO: Convert losing team to black & white (code snippet below)
     LOGO_RESIZE = (120, 120)
-    home_logo.thumbnail(LOGO_RESIZE, Image.ANTIALIAS)
-    away_logo.thumbnail(LOGO_RESIZE, Image.ANTIALIAS)
-    bg.paste(away_logo, COORDS_AWAY_LOGO, away_logo)
-    bg.paste(home_logo, COORDS_HOME_LOGO, home_logo)
+    pref_logo.thumbnail(LOGO_RESIZE, Image.ANTIALIAS)
+    other_logo.thumbnail(LOGO_RESIZE, Image.ANTIALIAS)
+    bg.paste(pref_logo, COORDS_PREF_LOGO, pref_logo)
+    bg.paste(other_logo, COORDS_OTHER_LOGO, other_logo)
 
     # if game.preferred_team.score > game.other_team.score:
     #     bg.paste(pref_logo, COORDS_PREF_LOGO, pref_logo)
@@ -695,16 +727,18 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
     # Generates a 'draw' object that we use to draw on top of the image
     draw = ImageDraw.Draw(bg)
 
-    center_text(draw=draw, left=0, top=0, width=bg_w, text=HEADER_TEXT, color=Colors.WHITE, font=FONT_TITLE)
+    center_text(
+        draw=draw, left=0, top=0, width=bg_w, text=HEADER_TEXT, color=Colors.WHITE, font=FONT_TITLE
+    )
 
     # Draw the scores on the image
     # fmt:off
     center_text(
-        draw=draw, left=COORDS_HOME_X + LOGO_SCORE_SPACING, top=LOGO_Y, width=190,
+        draw=draw, left=COORDS_PREF_X + LOGO_SCORE_SPACING, top=LOGO_Y, width=190,
         text=str(game.home_team.score), color=Colors.WHITE, font=FONT_SCORE, vertical=True, height=FontSizes.SCORE
     )
     center_text(
-        draw=draw, left=COORDS_AWAY_X + LOGO_SCORE_SPACING, top=LOGO_Y, width=190,
+        draw=draw, left=COORDS_OTHER_X + LOGO_SCORE_SPACING, top=LOGO_Y, width=190,
         text=str(game.away_team.score), color=Colors.WHITE, font=FONT_SCORE, vertical=True, height=FontSizes.SCORE
     )
     # fmt: on
@@ -726,7 +760,10 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
     )
     draw.rectangle(
         (
-            (725 + CHART_GOAL_SEPARATOR, GOAL_START_Y + GOAL_SCORER_BOX_SEPARATOR + GOAL_SCORER_BOX_H),
+            (
+                725 + CHART_GOAL_SEPARATOR,
+                GOAL_START_Y + GOAL_SCORER_BOX_SEPARATOR + GOAL_SCORER_BOX_H,
+            ),
             (
                 725 + CHART_GOAL_SEPARATOR + GOAL_SCORER_BOX_W,
                 GOAL_START_Y + 2 * GOAL_SCORER_BOX_H + GOAL_SCORER_BOX_SEPARATOR,
@@ -736,10 +773,16 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
     )
     draw.rectangle(
         (
-            (725 + CHART_GOAL_SEPARATOR, GOAL_START_Y + GOAL_SCORER_BOX_SEPARATOR + GOAL_SCORER_BOX_H),
+            (
+                725 + CHART_GOAL_SEPARATOR,
+                GOAL_START_Y + GOAL_SCORER_BOX_SEPARATOR + GOAL_SCORER_BOX_H,
+            ),
             (
                 725 + CHART_GOAL_SEPARATOR + GOAL_SCORER_BOX_W,
-                GOAL_START_Y + GOAL_SCORER_BOX_H + GOAL_SCORER_BOX_SEPARATOR + GOAL_SCORER_BOX_TEAM_H,
+                GOAL_START_Y
+                + GOAL_SCORER_BOX_H
+                + GOAL_SCORER_BOX_SEPARATOR
+                + GOAL_SCORER_BOX_TEAM_H,
             ),
         ),
         fill=other_colors["bg"],
@@ -761,7 +804,9 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
     for i in range(6):
         CHART_TOP_Y = CHART_START_Y + (i * CHART_RECT_H) + (i * CHART_SEPARATOR)
         CHART_BOTTOM_Y = CHART_START_Y + ((i + 1) * CHART_RECT_H) + (i * CHART_SEPARATOR)
-        draw.rectangle(((CHART_START_X, CHART_TOP_Y), (CHART_END_X, CHART_BOTTOM_Y)), fill=Colors.WHITE)
+        draw.rectangle(
+            ((CHART_START_X, CHART_TOP_Y), (CHART_END_X, CHART_BOTTOM_Y)), fill=Colors.WHITE
+        )
 
     # Get the boxscores for each team (via the homeaway variable)
     boxscore_pref = boxscore["teams"][game.preferred_team.home_away]
@@ -933,7 +978,9 @@ def hockeystatcards_charts(game: Game, home_gs: dict, away_gs: dict):
             fontsize=8,
         )
 
-        gs_chart_path = os.path.join(IMAGES_PATH, "temp", f"hsc_gamescore-{game.game_id_shortid}-{idx}.png")
+        gs_chart_path = os.path.join(
+            IMAGES_PATH, "temp", f"hsc_gamescore-{game.game_id_shortid}-{idx}.png"
+        )
         logging.info("Image Path: %s", gs_chart_path)
         gs_fig.savefig(gs_chart_path, bbox_inches="tight")
 

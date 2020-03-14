@@ -137,9 +137,11 @@ def is_nst_ready(team_name):
     logging.error("The specified team cannot be found or is not playing today.")
     return False
 
+
 ###################################################
 # NST SOUP PARSING FUNCTIONS - CREATES DICTS & DF
 ###################################################
+
 
 def parse_team_table(team_keys, teamtable):
     pass
@@ -147,11 +149,11 @@ def parse_team_table(team_keys, teamtable):
 
 def parse_overview(ov_keys, overview):
     # Initialize the return dictionary
-    overview_stats = { 'home': dict(), 'away': dict() }
+    overview_stats = {"home": dict(), "away": dict()}
 
     # Find all home team stats in the Overview Section (by column)
     # And del the team name element off the array
-    ov_home = overview.find_all('tr')[0].find_all('td')
+    ov_home = overview.find_all("tr")[0].find_all("td")
     del ov_home[0]
 
     ov_stats_home = list()
@@ -159,11 +161,13 @@ def parse_overview(ov_keys, overview):
         ov_stats_home.append([s for s in col.text.splitlines() if s])
 
     ov_stats_home = list(zip(*ov_stats_home))
-    ov_stats_home_final = {x.get('Period'):x for x in [dict(zip(ov_keys, values)) for values in ov_stats_home]}
+    ov_stats_home_final = {
+        x.get("Period"): x for x in [dict(zip(ov_keys, values)) for values in ov_stats_home]
+    }
 
     # Find all home team stats in the Overview Section (by column)
     # And del the team name element off the array
-    ov_away = overview.find_all('tr')[1].find_all('td')
+    ov_away = overview.find_all("tr")[1].find_all("td")
     del ov_away[0]
 
     ov_stats_away = list()
@@ -171,10 +175,12 @@ def parse_overview(ov_keys, overview):
         ov_stats_away.append([s for s in col.text.splitlines() if s])
 
     ov_stats_away = list(zip(*ov_stats_away))
-    ov_stats_away_final = {x.get('Period'):x for x in [dict(zip(ov_keys, values)) for values in ov_stats_away]}
+    ov_stats_away_final = {
+        x.get("Period"): x for x in [dict(zip(ov_keys, values)) for values in ov_stats_away]
+    }
 
-    overview_stats['home'] = ov_stats_home_final
-    overview_stats['away'] = ov_stats_away_final
+    overview_stats["home"] = ov_stats_home_final
+    overview_stats["away"] = ov_stats_away_final
 
     return overview_stats
 
@@ -313,7 +319,7 @@ def parse_nst_fwdstats(fwd_sva):
             "hdcf": hdcf,
             "hdca": hdca,
             "hdc_diff": hdc_diff,
-            "hdcdpct": hdcfpct
+            "hdcdpct": hdcfpct,
         }
         fwd_sva_stats.append(stats)
 
@@ -353,9 +359,9 @@ def parse_nst_defstats(soup, def_player_ids, def_players_dict):
             hdc_diff = round(hdcf - hdca, 2)
 
             if (
-                    any(d["corsi_diff"] == corsi_diff for d in def_sva_stats)
-                    and any(d["xg_diff"] == xg_diff for d in def_sva_stats)
-                    and any(d["hdc_diff"] == hdc_diff for d in def_sva_stats)
+                any(d["corsi_diff"] == corsi_diff for d in def_sva_stats)
+                and any(d["xg_diff"] == xg_diff for d in def_sva_stats)
+                and any(d["hdc_diff"] == hdc_diff for d in def_sva_stats)
             ):
                 # print(f"{def_name} & {last_name} pairing already exists, skipping.")
                 continue
@@ -374,7 +380,7 @@ def parse_nst_defstats(soup, def_player_ids, def_players_dict):
                 "hdcf": hdcf,
                 "hdca": hdca,
                 "hdc_diff": hdc_diff,
-                "hdcfpct": hdcfpct
+                "hdcfpct": hdcfpct,
             }
             def_sva_stats.append(stats)
 
@@ -384,7 +390,7 @@ def parse_nst_defstats(soup, def_player_ids, def_players_dict):
 def parse_nst_opposition(team_abbrev, soup, players_ids, players_dict):
     oppo_toi = dict()
     oppo_cfwith = dict()
-    oppo_soup = soup.find(id=f"{team_abbrev}wyoplb").find_parent('div')
+    oppo_soup = soup.find(id=f"{team_abbrev}wyoplb").find_parent("div")
     for player_id in players_ids:
         player_name = players_dict[player_id]
         oppo_toi[player_name] = dict()
@@ -409,7 +415,7 @@ def parse_nst_opposition(team_abbrev, soup, players_ids, players_dict):
 def parse_nst_linemate(team_abbrev, soup, players_ids, players_dict):
     linemate_toi = dict()
     linemate_cfwith = dict()
-    linemate_soup = soup.find(id=f"{team_abbrev}wylmlb").find_parent('div')
+    linemate_soup = soup.find(id=f"{team_abbrev}wylmlb").find_parent("div")
     for player_id in players_ids:
         player_name = players_dict[player_id]
         linemate_toi[player_name] = dict()
@@ -428,9 +434,11 @@ def parse_nst_linemate(team_abbrev, soup, players_ids, players_dict):
 
     return linemate_toi, linemate_cfwith
 
+
 ###################################################
 # ALL CHARTING FUNCTIONS - MATPLOTLIB & SEABORN
 ###################################################
+
 
 def toi_to_mmss(toi):
     toi_mm = int(toi)
@@ -445,8 +453,12 @@ def floor_ceil(number):
 
 
 def calculate_xticks(spacing, df_min, df_max):
-    xtick_min = df_min - (df_min % spacing) if df_min < 0 else df_min - (df_min % spacing) + (2 * spacing)
-    xtick_max = df_max - (df_max % spacing) if df_max < 0 else df_max - (df_max % spacing) + (2 * spacing)
+    xtick_min = (
+        df_min - (df_min % spacing) if df_min < 0 else df_min - (df_min % spacing) + (2 * spacing)
+    )
+    xtick_max = (
+        df_max - (df_max % spacing) if df_max < 0 else df_max - (df_max % spacing) + (2 * spacing)
+    )
     return (xtick_min, xtick_max)
 
 
@@ -456,7 +468,9 @@ def charts_heatmap_oppo_lm(game_title, team, oppo_toi, oppo_cfwith, linemate_toi
     oppo_df = pd.DataFrame(oppo_toi).T
 
     linemate_df = pd.DataFrame(linemate_toi).T
-    linemate_df = linemate_df.apply(lambda col: col.where((col.name == col.index) | col.notnull(), 0))
+    linemate_df = linemate_df.apply(
+        lambda col: col.where((col.name == col.index) | col.notnull(), 0)
+    )
     corr = linemate_df.corr()
 
     # Create the CF% With Dataframes
@@ -477,25 +491,40 @@ def charts_heatmap_oppo_lm(game_title, team, oppo_toi, oppo_cfwith, linemate_toi
 
     # Create the Opposition TOI Heatmap
     sns.heatmap(
-        oppo_df, ax=ax1, annot=oppo_cf_df, linewidths=.5,
-        fmt='.1%', cmap=colormap, annot_kws={"size": 6}, cbar_kws={'label': 'Time on Ice'}
+        oppo_df,
+        ax=ax1,
+        annot=oppo_cf_df,
+        linewidths=0.5,
+        fmt=".1%",
+        cmap=colormap,
+        annot_kws={"size": 6},
+        cbar_kws={"label": "Time on Ice"},
     )
 
-    ax1.set_xticklabels(ax1.get_xticklabels(), rotation=-90, ha='center')
+    ax1.set_xticklabels(ax1.get_xticklabels(), rotation=-90, ha="center")
     ax1.title.set_text(f"{team} Opposition - 5v5 TOI (with CF%)")
 
     # Create the Linemates TOI Heatmap
     sns.heatmap(
-        linemate_df, mask=mask, ax=ax2, annot=linemate_cf_df, fmt='.1%',
-        linewidths=.5, cmap=colormap, annot_kws={"size": 6}, cbar_kws={'label': 'Time on Ice'}
+        linemate_df,
+        mask=mask,
+        ax=ax2,
+        annot=linemate_cf_df,
+        fmt=".1%",
+        linewidths=0.5,
+        cmap=colormap,
+        annot_kws={"size": 6},
+        cbar_kws={"label": "Time on Ice"},
     )
 
-    ax2.set_xticklabels(ax2.get_xticklabels(), rotation=-90, ha='center')
+    ax2.set_xticklabels(ax2.get_xticklabels(), rotation=-90, ha="center")
     ax2.title.set_text(f"{team} Linemates - 5v5 TOI (with CF%)")
 
     heatmap_oppo_lm_fig.tight_layout(rect=[0, 0.0, 1, 0.92], pad=2)
     heatmap_oppo_lm_fig.suptitle(
-        f"{game_title}\nLinemates & Opposition Data\nData Courtesy: Natural Stat Trick", x=0.45, fontsize=14
+        f"{game_title}\nLinemates & Opposition Data\nData Courtesy: Natural Stat Trick",
+        x=0.45,
+        fontsize=14,
     )
 
     return heatmap_oppo_lm_fig
@@ -518,7 +547,6 @@ def charts_toi_individual(game_title, team, toi_dict, ind_stats, oi_sva_stats):
     ax1.grid(True, which="major", axis="x")
     ax1.title.set_text(f"Time on Ice Breakdown - {team}")
 
-
     # (AX2) Generates ixG Graph from Dataframe
     df_ixg = pd.DataFrame(ind_stats).sort_values("ixg", ascending=True)
     df_ixg_toi = df_ixg["toi"]
@@ -535,26 +563,25 @@ def charts_toi_individual(game_title, team, toi_dict, ind_stats, oi_sva_stats):
     for i, v in enumerate(df_ixg.ixg):
         ax2.text(v, i, " " + str(v), color="black", va="center", fontsize=8)
 
-
     # (AX3) Generates On-Ice Corsi Graph from Dataframe
     df_oi_corsi = pd.DataFrame(oi_sva_stats).sort_values("corsi_diff", ascending=True)
     df_oi_corsi_toi = df_oi_corsi["toi"]
     max_oi_corsi_toi = max(df_oi_corsi_toi)
     oi_corsi_toi_color = df_oi_corsi_toi / float(max_oi_corsi_toi)
     oi_corsi_colormap = color_map(oi_corsi_toi_color)
-    oi_corsi_colormap_shots = plt.cm.get_cmap('Reds')(oi_corsi_toi_color)
-
+    oi_corsi_colormap_shots = plt.cm.get_cmap("Reds")(oi_corsi_toi_color)
 
     ax3.barh(width=df_oi_corsi.corsi_diff, y=df_oi_corsi.player, color=oi_corsi_colormap)
     # NOTE: Uncomment the below two lines to add Red shots on top of Coris
     # ax3.barh(width=df_oi_corsi.shots_diff, y=df_oi_corsi.player, color=oi_corsi_colormap_shots)
     # ax3.title.set_text(f"5v5 (SVA) On-Ice Corsi (Blue) & Shots (Red) Differential - {team}")
     spacing = 3
-    xtick_min, xtick_max = calculate_xticks(spacing, df_oi_corsi.corsi_diff.min(), df_oi_corsi.corsi_diff.max())
+    xtick_min, xtick_max = calculate_xticks(
+        spacing, df_oi_corsi.corsi_diff.min(), df_oi_corsi.corsi_diff.max()
+    )
     ax3.set_xticks(np.arange(xtick_min, xtick_max, spacing))
     ax3.grid(True, which="major", axis="x")
     ax3.title.set_text(f"5v5 (SVA) On-Ice Corsi (Blue) Differential - {team}")
-
 
     # (AX4) Generates On-Ice xG Graph from Dataframe
     df_oi_xg = pd.DataFrame(oi_sva_stats).sort_values("xg_diff", ascending=True)
@@ -573,7 +600,9 @@ def charts_toi_individual(game_title, team, toi_dict, ind_stats, oi_sva_stats):
     # Tight Layout (Making Space for Title)
     toi_ind_fig.tight_layout(rect=[0, 0.0, 1, 0.92], pad=2)
     toi_ind_fig.suptitle(
-        f"{game_title}\nIndividual & On-Ice Data\nData Courtesy: Natural Stat Trick", x=0.45, fontsize=14
+        f"{game_title}\nIndividual & On-Ice Data\nData Courtesy: Natural Stat Trick",
+        x=0.45,
+        fontsize=14,
     )
 
     # Add a Global Colorbar
@@ -620,15 +649,35 @@ def charts_fwds_def(game_title, team, fwd_sva_stats, def_sva_stats):
     max_lines_stats_toi = max(df_lines_stats_toi)
     lines_stats_toi_color = df_lines_stats_toi / float(max_lines_stats_toi)
     lines_stats_colormap = color_map(lines_stats_toi_color)
-    cmap_orange = plt.cm.get_cmap('Greens')(lines_stats_toi_color)
-    cmap_green = plt.cm.get_cmap('Oranges')(lines_stats_toi_color)
+    cmap_orange = plt.cm.get_cmap("Greens")(lines_stats_toi_color)
+    cmap_green = plt.cm.get_cmap("Oranges")(lines_stats_toi_color)
 
     bar_height = 0.25
     ind = np.arange(len(df_all_lines))
-    ax1.barh(width=df_all_lines.hdcfpct, y=2*bar_height + ind, height=bar_height, color=cmap_green, edgecolor='white', label='HDCF%')
-    ax1.barh(width=df_all_lines.xgfpct, y=bar_height + ind, height=bar_height, color=cmap_orange, edgecolor='white', label='xGF%')
-    ax1.barh(width=df_all_lines.cfpct, y=ind, height=bar_height, color=lines_stats_colormap, edgecolor='white', label='CF%')
-
+    ax1.barh(
+        width=df_all_lines.hdcfpct,
+        y=2 * bar_height + ind,
+        height=bar_height,
+        color=cmap_green,
+        edgecolor="white",
+        label="HDCF%",
+    )
+    ax1.barh(
+        width=df_all_lines.xgfpct,
+        y=bar_height + ind,
+        height=bar_height,
+        color=cmap_orange,
+        edgecolor="white",
+        label="xGF%",
+    )
+    ax1.barh(
+        width=df_all_lines.cfpct,
+        y=ind,
+        height=bar_height,
+        color=lines_stats_colormap,
+        edgecolor="white",
+        label="CF%",
+    )
 
     ax1.set_xticks(np.arange(0, 101, 10))
     ax1.set_yticks(bar_height + ind)
@@ -636,7 +685,6 @@ def charts_fwds_def(game_title, team, fwd_sva_stats, def_sva_stats):
     ax1.grid(True, which="major", axis="x")
     ax1.legend(loc="best")
     ax1.title.set_text(f"5v5 (SVA) CF%, xGF% & HDCF% - {team}")
-
 
     # (AX2) Generates ixG Graph from Dataframe
     df_lines_xg = df_all_lines.sort_values("xg_diff", ascending=True)
@@ -650,11 +698,12 @@ def charts_fwds_def(game_title, team, fwd_sva_stats, def_sva_stats):
     ax2.barh(width=df_lines_xg.xg_diff, y=df_lines_xg.line, color=lines_xg_colormap)
 
     spacing = 0.25
-    xtick_min, xtick_max = calculate_xticks(spacing, df_lines_xg.xg_diff.min(), df_lines_xg.xg_diff.max())
+    xtick_min, xtick_max = calculate_xticks(
+        spacing, df_lines_xg.xg_diff.min(), df_lines_xg.xg_diff.max()
+    )
     ax2.set_xticks(np.arange(xtick_min, xtick_max, spacing))
     ax2.grid(True, which="major", axis="x")
     ax2.title.set_text(f"5v5 (SVA) xG Differential - {team}")
-
 
     # (AX3) Generates Lines Corsi Graph from Dataframe
     df_lines_corsi = df_all_lines.sort_values("corsi_diff", ascending=True)
@@ -668,11 +717,12 @@ def charts_fwds_def(game_title, team, fwd_sva_stats, def_sva_stats):
     ax3.barh(width=df_lines_corsi.corsi_diff, y=df_lines_corsi.line, color=lines_corsi_colormap)
 
     spacing = 3
-    xtick_min, xtick_max = calculate_xticks(spacing, df_lines_corsi.corsi_diff.min(), df_lines_corsi.corsi_diff.max())
+    xtick_min, xtick_max = calculate_xticks(
+        spacing, df_lines_corsi.corsi_diff.min(), df_lines_corsi.corsi_diff.max()
+    )
     ax3.set_xticks(np.arange(xtick_min, xtick_max, spacing))
     ax3.grid(True, which="major", axis="x")
     ax3.title.set_text(f"5v5 (SVA) Corsi Differential - {team}")
-
 
     # (AX4) Generates Lines High Danger Graph from Dataframe
     df_lines_hdc = df_all_lines.sort_values("hdc_diff", ascending=True)
@@ -685,16 +735,19 @@ def charts_fwds_def(game_title, team, fwd_sva_stats, def_sva_stats):
     ax4.barh(width=df_lines_hdc.hdc_diff, y=df_lines_hdc.line, color=lines_hdc_colormap)
 
     spacing = 1
-    xtick_min, xtick_max = calculate_xticks(spacing, df_lines_hdc.hdc_diff.min(), df_lines_hdc.hdc_diff.max())
+    xtick_min, xtick_max = calculate_xticks(
+        spacing, df_lines_hdc.hdc_diff.min(), df_lines_hdc.hdc_diff.max()
+    )
     ax4.set_xticks(np.arange(xtick_min, xtick_max, spacing))
     ax4.grid(True, which="major", axis="x")
     ax4.title.set_text(f"5v5 (SVA) High Danger Differential - {team}")
 
-
     # Tight Layout (Making Space for Title)
     fwds_def_fig.tight_layout(rect=[0, 0.0, 1, 0.93], pad=2)
     fwds_def_fig.suptitle(
-        f"{game_title}\nForward Lines & Defensive Pairings\nData Courtesy: Natural Stat Trick", x=0.45, fontsize=14
+        f"{game_title}\nForward Lines & Defensive Pairings\nData Courtesy: Natural Stat Trick",
+        x=0.45,
+        fontsize=14,
     )
 
     # Add a Global Colorbar
@@ -718,31 +771,66 @@ def charts_fwds_def(game_title, team, fwd_sva_stats, def_sva_stats):
 
 def charts_overview(game, game_title, overview_stats):
     # Get the Team Colors (for the split / stacked bars)
-    colors_dict = images.both_team_colors_compared(game.home_team.team_name, game.away_team.team_name)
-    home_colors = colors_dict['first']
-    away_colors = colors_dict['second']
+    colors_dict = images.both_team_colors_compared(
+        game.preferred_team.team_name, game.other_team.team_name
+    )
+    pref_colors = colors_dict["first"]
+    other_colors = colors_dict["second"]
 
-    overview_fig, ax1 = plt.subplots(1, 1, figsize=(10,5))
+    overview_fig, ax1 = plt.subplots(1, 1, figsize=(10, 5))
     df_overview = pd.DataFrame(overview_stats).T
-    df_overview_ltd = df_overview[['CF%', 'SCF%', 'HDCF%', 'xGF%', 'GF%']]
-    df_overview_ltd = df_overview_ltd.replace({'%':''}, regex=True).replace({'-':'0'}, regex=True).apply(pd.to_numeric)
+    df_overview_ltd = df_overview[["CF%", "SCF%", "HDCF%", "xGF%", "GF%"]]
+    df_overview_ltd = (
+        df_overview_ltd.replace({"%": ""}, regex=True)
+        .replace({"-": "0"}, regex=True)
+        .apply(pd.to_numeric)
+    )
 
     # Re-Transpose & Reverse
     df_overview_ltd = df_overview_ltd.T.iloc[::-1]
-    df_overview_ltd.plot(kind="barh", stacked=True, ax=ax1, color=[[x/255 for x in home_colors["bg"]], [x/255 for x in away_colors["bg"]]])
+    df_overview_ltd.plot(
+        kind="barh",
+        stacked=True,
+        ax=ax1,
+        color=[[x / 255 for x in pref_colors["bg"]], [x / 255 for x in other_colors["bg"]]],
+    )
     ax1.grid(True, which="major", axis="x", color="#cccccc")
     ax1.set_axisbelow(True)
     ax1.set(frame_on=False)
-    ax1.legend([game.home_team.short_name, game.away_team.short_name], bbox_to_anchor=(0.5, -0.2), loc="lower center", ncol=2, frameon=False)
-    ax1.title.set_text(f"{game_title}\nTeam Overview Stats - 5v5 (SVA)\nData Courtesy: Natural Stat Trick")
+    ax1.legend(
+        [game.preferred_team.short_name, game.other_team.short_name],
+        bbox_to_anchor=(0.5, -0.2),
+        loc="lower center",
+        ncol=2,
+        frameon=False,
+    )
+    ax1.title.set_text(
+        f"{game_title}\nTeam Overview Stats - 5v5 (SVA)\nData Courtesy: Natural Stat Trick"
+    )
 
-    for i, v in enumerate(df_overview_ltd['home'].values):
+    for i, v in enumerate(df_overview_ltd["pref"].values):
         if v > 0:
-            ax1.text(float(v) - 2, i, str(v), va='center', ha="right", color=[x/255 for x in home_colors["text"]], fontweight="bold")
+            ax1.text(
+                float(v) - 2,
+                i,
+                str(v),
+                va="center",
+                ha="right",
+                color=[x / 255 for x in pref_colors["text"]],
+                fontweight="bold",
+            )
 
-    for i, v in enumerate(df_overview_ltd['away'].values):
+    for i, v in enumerate(df_overview_ltd["other"].values):
         if v > 0:
-            ax1.text(100 - 2, i, str(v), va='center', ha="right", color=[x/255 for x in home_colors["text"]], fontweight="bold")
+            ax1.text(
+                100 - 2,
+                i,
+                str(v),
+                va="center",
+                ha="right",
+                color=[x / 255 for x in other_colors["text"]],
+                fontweight="bold",
+            )
 
     return overview_fig
 
@@ -760,24 +848,36 @@ def generate_all_charts(game: Game):
     game_title = soup.find("h1").text
 
     # Section off separate parts of NST for different parsing routins
-    ov_sva = soup.find('table', id=f'tbtssva').find('tbody')
-    ov_header = soup.find('table', id=f'tbtsall').find('thead').find_all('th')
+    ov_sva = soup.find("table", id=f"tbtssva").find("tbody")
+    ov_header = soup.find("table", id=f"tbtsall").find("thead").find_all("th")
     ov_keys = [x.text for x in ov_header if x.text]
 
     ov_sva_stats = parse_overview(ov_keys, ov_sva)
-    ov_sva_final_stats = {'home': ov_sva_stats['home']['Final'], 'away': ov_sva_stats['away']['Final']}
+
+    # Add pref / other keys to this final dictionary so we can re-arrange if necessary
+    ov_sva_final_stats = {
+        # "home": ov_sva_stats["home"]["Final"],
+        # "away": ov_sva_stats["away"]["Final"],
+        "pref": ov_sva_stats[game.preferred_team.home_away]["Final"],
+        "other": ov_sva_stats[game.other_team.home_away]["Final"],
+    }
 
     logging.info("Generating Team Overview Chart.")
-    flipped_game_title = game_title.replace(" @ ", "@").split("@")
-    flipped_game_title = f"{flipped_game_title[1]} vs. {flipped_game_title[0]}"
-    overview_chart = charts_overview(game, flipped_game_title, ov_sva_final_stats)
-    overview_chart_path = os.path.join(IMAGES_PATH, "temp", f"allcharts-overview-{game.game_id_shortid}.png")
+    # flipped_game_title = game_title.replace(" @ ", "@").split("@")
+    # flipped_game_title = f"{flipped_game_title[1]} vs. {flipped_game_title[0]}"
+    title_separator = "vs" if game.preferred_team.home_away == "home" else "@"
+    preferred_game_title = (
+        f"{game.preferred_team.team_name} {title_separator} {game.other_team.team_name}"
+    )
+    overview_chart = charts_overview(game, preferred_game_title, ov_sva_final_stats)
+    overview_chart_path = os.path.join(
+        IMAGES_PATH, "temp", f"allcharts-overview-{game.game_id_shortid}.png"
+    )
     logging.info("Image Path: %s", overview_chart_path)
     overview_chart.savefig(overview_chart_path, bbox_inches="tight")
 
     # Add the overview image path to our list
     list_of_charts.append(overview_chart_path)
-
 
     # Generate team specific charts (2x per team)
     teams = [game.preferred_team, game.other_team]
@@ -789,8 +889,8 @@ def generate_all_charts(game: Game):
         game_title = soup.find("h1").text
 
         # Section off separate parts of NST for different parsing routins
-        ov_sva = soup.find('table', id=f'tbtssva').find('tbody')
-        ov_header = soup.find('table', id=f'tbtsall').find('thead').find_all('th')
+        ov_sva = soup.find("table", id=f"tbtssva").find("tbody")
+        ov_header = soup.find("table", id=f"tbtsall").find("thead").find_all("th")
         ov_keys = [x.text for x in ov_header if x.text]
 
         ind_5v5 = soup.find(id=f"tb{team_abbrev}st5v5").find("tbody").find_all("tr")
@@ -802,13 +902,28 @@ def generate_all_charts(game: Game):
         # Create Dictionarys needed for parsing players
         players = soup.find(id=f"tb{team_abbrev}st5v5").find("tbody").find_all("tr")
         all_players = [x.find_all("td")[0].text.replace("\xa0", " ") for x in players]
-        defense = [x.find_all("td")[0].text.replace("\xa0", " ") for x in players if x.find_all("td")[1].text == "D"]
+        defense = [
+            x.find_all("td")[0].text.replace("\xa0", " ")
+            for x in players
+            if x.find_all("td")[1].text == "D"
+        ]
 
         team_dropdown = soup.find(id=f"s{team_abbrev}lb").find_next_sibling("ul").find_all("li")
         all_players_ids = [x.label.attrs["for"][2:] for x in team_dropdown]
-        all_players_dict = {x.label.attrs["for"][2:]: " ".join(x.text.replace("\xa0", " ").split()[1:]) for x in team_dropdown}
-        def_player_ids = [x.label.attrs["for"][2:] for x in team_dropdown if x.text.replace("\xa0", " ") in defense]
-        def_players_dict = {x.label.attrs["for"][2:]: x.text.replace("\xa0", " ") for x in team_dropdown if x.text.replace("\xa0", " ") in defense}
+        all_players_dict = {
+            x.label.attrs["for"][2:]: " ".join(x.text.replace("\xa0", " ").split()[1:])
+            for x in team_dropdown
+        }
+        def_player_ids = [
+            x.label.attrs["for"][2:]
+            for x in team_dropdown
+            if x.text.replace("\xa0", " ") in defense
+        ]
+        def_players_dict = {
+            x.label.attrs["for"][2:]: x.text.replace("\xa0", " ")
+            for x in team_dropdown
+            if x.text.replace("\xa0", " ") in defense
+        }
 
         # All NST Parsing Routines
         toi_dict, ind_stats = parse_nst_timeonice(ind_5v5, ind_pp, ind_pk)
@@ -819,20 +934,25 @@ def generate_all_charts(game: Game):
         # oppo_toi, oppo_cfwith = parse_nst_opposition(team_abbrev, soup, all_players_ids, all_players_dict)
         # linemate_toi, linemate_cfwith = parse_nst_linemate(team_abbrev, soup, all_players_ids, all_players_dict)
 
-
         # Now create all necessary graphs, charts, heatmaps, etc
         # heatmap = charts_heatmap_oppo_lm(game_title, team.short_name, oppo_toi, oppo_cfwith, linemate_toi, linemate_cfwith)
         # heatmap.savefig(f'{PROJECT_ROOT}/allcharts-heatmaps-{team_abbrev}-{game.game_id_shortid}.png')
 
         logging.info("Generating Individual / On-Ice charts for %s.", team.team_name)
-        ind_onice_chart = charts_toi_individual(game_title, team.short_name, toi_dict, ind_stats, oi_sva_stats)
-        ind_onice_chart_path = os.path.join(IMAGES_PATH, "temp", f"allcharts-ind-onice-{team_abbrev}-{game.game_id_shortid}.png")
+        ind_onice_chart = charts_toi_individual(
+            game_title, team.short_name, toi_dict, ind_stats, oi_sva_stats
+        )
+        ind_onice_chart_path = os.path.join(
+            IMAGES_PATH, "temp", f"allcharts-ind-onice-{team_abbrev}-{game.game_id_shortid}.png"
+        )
         logging.info("Image Path: %s", ind_onice_chart_path)
         ind_onice_chart.savefig(ind_onice_chart_path, bbox_inches="tight")
 
         logging.info("Generating Forwards Lines / Defensive Pairing charts for %s.", team.team_name)
         fwds_def_chart = charts_fwds_def(game_title, team.short_name, fwd_sva_stats, def_sva_stats)
-        fwds_def_chart_path = os.path.join(IMAGES_PATH, "temp", f"allcharts-fwd-def-{team_abbrev}-{game.game_id_shortid}.png")
+        fwds_def_chart_path = os.path.join(
+            IMAGES_PATH, "temp", f"allcharts-fwd-def-{team_abbrev}-{game.game_id_shortid}.png"
+        )
         logging.info("Image Path: %s", fwds_def_chart_path)
         fwds_def_chart.savefig(fwds_def_chart_path, bbox_inches="tight")
 
@@ -848,7 +968,7 @@ def team_season_rank(df: pd.DataFrame, stat, team_name):
     # Sort the dataframe and find the team index
     # Add 1 because a Dataframe is 0-index
     sorted_df = df.sort_values(stat, ascending=False).reset_index(drop=True)
-    rank = sorted_df.index[sorted_df['Team'] == team_name].tolist()[0] + 1
+    rank = sorted_df.index[sorted_df["Team"] == team_name].tolist()[0] + 1
     return rank
 
 
@@ -928,7 +1048,6 @@ def generate_team_season_charts(team_name, situation, lastgames=False):
     pref_df_no_against.columns = ranked_columns
     pref_df_no_against = pref_df_no_against.T
 
-
     # Create the figure that we will plot the two separate graphs on
     overview_fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(11, 10))
 
@@ -954,7 +1073,11 @@ def generate_team_season_charts(team_name, situation, lastgames=False):
     )
 
     ax2.legend(
-        [team_name, "Opponents"], bbox_to_anchor=(0.5, -0.2), loc="lower center", ncol=2, frameon=False
+        [team_name, "Opponents"],
+        bbox_to_anchor=(0.5, -0.2),
+        loc="lower center",
+        ncol=2,
+        frameon=False,
     )
 
     for ax in [ax1, ax2]:
@@ -966,20 +1089,42 @@ def generate_team_season_charts(team_name, situation, lastgames=False):
     last_games_title = "Season Stats" if not lastgames else f"Last {lastgames} Games"
     sit_label = "5v5 (SVA)" if situation == "sva" else "All Situations"
     print(situation, sit_label)
-    ax1.title.set_text(f"{team_name} {last_games_title} - {sit_label}\nData Courtesy: Natural Stat Trick")
+    ax1.title.set_text(
+        f"{team_name} {last_games_title} - {sit_label}\nData Courtesy: Natural Stat Trick"
+    )
 
     # Draw the text labels on each of the corresponding bars
     # The top graph values are centered in the bar so it doesn't conflict with the average marker
     for i, v in enumerate(pref_df_no_against["FOR"].values):
-        ax1.text(float(v) / 2, i, str(round(v, 2)), va="center", ha="center", color=team_color_text, fontweight="bold")
+        ax1.text(
+            float(v) / 2,
+            i,
+            str(round(v, 2)),
+            va="center",
+            ha="center",
+            color=team_color_text,
+            fontweight="bold",
+        )
 
     for i, v in enumerate(pref_df_T["FOR"].values):
-        ax2.text(float(v) - 2, i, str(v), va="center", ha="right", color=team_color_text, fontweight="bold")
+        ax2.text(
+            float(v) - 2,
+            i,
+            str(v),
+            va="center",
+            ha="right",
+            color=team_color_text,
+            fontweight="bold",
+        )
 
     for i, v in enumerate(pref_df_T["AGAINST"].values):
-        ax2.text(100 - 2, i, str(v), va="center", ha="right", color=team_color_text, fontweight="bold")
+        ax2.text(
+            100 - 2, i, str(v), va="center", ha="right", color=team_color_text, fontweight="bold"
+        )
 
     last_games_file = "" if not lastgames else f"-last{lastgames}-"
-    overview_fig_path = os.path.join(IMAGES_PATH, "temp", f"allcharts-yesterday-team-season-{situation}-{last_games_file}.png")
+    overview_fig_path = os.path.join(
+        IMAGES_PATH, "temp", f"allcharts-yesterday-team-season-{situation}-{last_games_file}.png"
+    )
     overview_fig.savefig(overview_fig_path, bbox_inches="tight")
     return overview_fig_path
