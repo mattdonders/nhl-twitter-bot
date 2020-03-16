@@ -1,6 +1,6 @@
 # Hockey Game Bot
 
-[![Generic badge](https://img.shields.io/badge/version-2.1.0-brightgreen.svg)](https://shields.io/) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com) [![Maintained](https://img.shields.io/maintenance/yes/2020)]() [![Python Version](https://img.shields.io/badge/python-3.6%20%7C%203.7-blue)]() ![Beerpay](https://img.shields.io/beerpay/mattdonders/nhl-twitter-bot) ![Twitter Follow](https://img.shields.io/twitter/follow/njdevilsgamebot?label=%40NJDevilsGameBot&style=social)
+[![Generic badge](https://img.shields.io/badge/version-2.1.0-brightgreen.svg)](https://shields.io/) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com) [![Maintained](https://img.shields.io/maintenance/yes/2020)]() [![Python Version](https://img.shields.io/badge/python-3.6%20%7C%203.7-blue)]() [![Beerpay](https://img.shields.io/beerpay/mattdonders/nhl-twitter-bot)](https://beerpay.io/mattdonders/nhl-twitter-bot) ![Twitter Follow](https://img.shields.io/twitter/follow/njdevilsgamebot?label=%40NJDevilsGameBot&style=social)
 
 The **Hockey Game Bot** is a Python application that leverages the NHL API and other hockey related statistics sites to send (near) real-time messages to social media platforms. The game bot allows fans of NHL teams to view the events & stats of a game all in one convenient place.
 
@@ -199,19 +199,19 @@ Crontab is also supported in the [Windows Subsystem for Linux](https://docs.micr
 
 # Currently Operating Game Bots
 
-As of January 17, 2020 there is currently game bot covereage for 9 of 31 teams. The table below contains information about the accounts, their respective owners and any notes. More than one person can run one for the same team without issue, but there will be overlap in the Twitter feed.
+As of March 15, 2020 there is currently game bot covereage for 12 of 31 teams. The table below contains information about the accounts, their respective owners and any notes. More than one person can run one for the same team without issue, but there will be overlap in the Twitter feed.
 
 | Team Name             | Twitter Account  | Owner          | Notes                                             |
 |-----------------------|------------------|----------------|---------------------------------------------------|
 | Anaheim Ducks         |                  |                |                                                   |
-| Arizona Coyotes       |[@CoyotesGameBot](https://twitter.com/@CoyotesGameBot)  |[@mattdonders](https://twitter.com/@mattdonders)   |                                                   |
+| Arizona Coyotes       |[@CoyotesGameBot](https://twitter.com/CoyotesGameBot)  |[@mattdonders](https://twitter.com/mattdonders)   |                                                   |
 | Boston Bruins         |                  |                |                                                   |
-| Buffalo Sabres        |[@BotSabres](https://twitter.com/@BotSabres)       |[@KurekRobbie](https://twitter.com/@KurekRobbie)   |                                                   |
+| Buffalo Sabres        |[@BotSabres](https://twitter.com/BotSabres)       |[@KurekRobbie](https://twitter.com/KurekRobbie)   |                                                   |
 | Calgary Flames        |                  |                |                                                   |
-| Carolina Hurricanes   |                  |                |                                                   |
+| Carolina Hurricanes   |[@HurricanesBot](https://twitter.com/HurricanesBot)   |[@bancksholmes](https://twitter.com/bancksholmes) |                                                   |
 | Chicago Blackhawks    |                  |                |                                                   |
 | Colorado Avalanche    |                  |                |                                                   |
-| Columbus Blue Jackets |                  |                |                                                   |
+| Columbus Blue Jackets |[@CBJGameBot](https://twitter.com/CBJGameBot) |[@mattdonders](https://twitter.com/mattdonders)   | Willing to reliquensh to a Blue Jackets fan.             |
 | Dallas Stars          |                  |                |                                                   |
 | Detroit Red Wings     |                  |                |                                                   |
 | Edmonton Oilers       |                  |                |                                                   |
@@ -219,20 +219,20 @@ As of January 17, 2020 there is currently game bot covereage for 9 of 31 teams. 
 | Los Angeles Kings     |                  |                |                                                   |
 | Minnesota Wild        |                  |                |                                                   |
 | Montreal Canadiens    |                  |                |                                                   |
-| Nashville Predators   |[@OTF_Preds_Bot](https://twitter.com/@OTF_Preds_Bot)   |[@projpatsummit](https://twitter.com/@projpatsummit) |                                                   |
-| New Jersey Devils     |[@NJDevilsGameBot](https://twitter.com/@NJDevilsGameBot) |[@mattdonders](https://twitter.com/@mattdonders)   |                                                   |
+| Nashville Predators   |[@OTF_Preds_Bot](https://twitter.com/OTF_Preds_Bot)   |[@projpatsummit](https://twitter.com/projpatsummit) |                                                   |
+| New Jersey Devils     |[@NJDevilsGameBot](https://twitter.com/NJDevilsGameBot) |[@mattdonders](https://twitter.com/mattdonders)   |                                                   |
 | New York Islanders    |                  |                |                                                   |
 | New York Rangers      |                  |                |                                                   |
 | Ottawa Senators       |                  |                |                                                   |
 | Philadelphia Flyers   |                  |                |                                                   |
-| Pittsburgh Penguins   |                  |                |                                                   |
-| Saint Louis Blues     |[@STLBluesGameBot](https://twitter.com/@STLBluesGameBot) |[@mattdonders](https://twitter.com/@mattdonders)   | Willing to reliquensh to a Blues fan.             |
-| San Jose Sharks       |[@Sharks_Gamebot](https://twitter.com/@Sharks_Gamebot)  |[@projpatsummit](https://twitter.com/@projpatsummit) |                                                   |
+| Pittsburgh Penguins   |[@bot_penguins](https://twitter.com/bot_penguins)   |[@skiminer36](https://twitter.com/skiminer36) |                                                   |
+| Saint Louis Blues     |[@STLBluesGameBot](https://twitter.com/STLBluesGameBot) |[@mattdonders](https://twitter.com/mattdonders)   | Willing to reliquensh to a Blues fan.             |
+| San Jose Sharks       |[@Sharks_Gamebot](https://twitter.com/Sharks_Gamebot)  |[@projpatsummit](https://twitter.com/projpatsummit) |                                                   |
 | Tampa Bay Lighting    |                  |                |                                                   |
-| Toronto Maple Leafs   |[@MapleLeafsBot](https://twitter.com/@MapleLeafsBot)   |[@RevelMagic](https://twitter.com/@RevelMagic)    | Upgrading to V2 shortly.                          |
+| Toronto Maple Leafs   |[@MapleLeafsBot](https://twitter.com/MapleLeafsBot)   |[@RevelMagic](https://twitter.com/RevelMagic)    |                           |
 | Vancouver Canucks     |                  |                |                                                   |
-| Vegas Golden Knights  |[@VGKGameBot](https://twitter.com/@VGKGameBot)      |[@702goonie](https://twitter.com/@702goonie)     | Forked version of V1 - not sure about V2 upgrade. |
-| Washington Capitals   |[@CapitalsHill](https://twitter.com/@CapitalsHill)    |[@CapitalsHill](https://twitter.com/@CapitalsHill)  | Game bot mixed into regular feed.                 |
+| Vegas Golden Knights  |[@VGKGameBot](https://twitter.com/VGKGameBot)      |[@702goonie](https://twitter.com/702goonie)     | Forked version of V1 - not sure about V2 upgrade. |
+| Washington Capitals   |[@CapitalsHill](https://twitter.com/CapitalsHill)    |[@CapitalsHill](https://twitter.com/CapitalsHill)  | Game bot mixed into regular feed.                 |
 | Winnipeg Jets         |                  |                |                                                   |
 
 ## Versioning
