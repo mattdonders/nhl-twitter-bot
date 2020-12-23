@@ -8,7 +8,7 @@ tweepy==3.7.0
 linode_api==4.1.6b0
 matplotlib==3.0.0
 pytz==2018.3
-Pillow==6.2.1
+Pillow==7.1.0
 beautifulsoup4==4.8.1
 python_dateutil==2.8.0
 linode==0.4
