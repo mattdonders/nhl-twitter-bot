@@ -14,7 +14,7 @@ from hockeygamebot.definitions import IMAGES_PATH, PROJECT_ROOT
 from hockeygamebot.helpers import utils
 from hockeygamebot.models.game import Game
 from hockeygamebot.models.gameevent import GoalEvent
-from hockeygamebot.nhlapi import thirdparty
+from hockeygamebot.nhlapi import schedule, thirdparty
 
 
 class Backgrounds:
@@ -101,7 +101,7 @@ def is_similar(pixel_a, pixel_b, threshold):
 
 
 def both_team_colors_compared(first_team_name, second_team_name, threshold=None):
-    """ Takes two team names and determins if the colors are the same or similar.
+    """Takes two team names and determins if the colors are the same or similar.
         Retruns a dictionary of pref_team & other_team colors.
 
     Args:
@@ -123,14 +123,12 @@ def both_team_colors_compared(first_team_name, second_team_name, threshold=None)
 
     # Build the returning dictionary
     colors_dict = {"first": first_colors["primary"]}
-    colors_dict["second"] = (
-        second_colors["secondary"] if similar_colors else second_colors["primary"]
-    )
+    colors_dict["second"] = second_colors["secondary"] if similar_colors else second_colors["primary"]
     return colors_dict
 
 
 def team_colors(team_name):
-    """ Accepts a team name and returns the background color & text color.
+    """Accepts a team name and returns the background color & text color.
 
     Args:
         team_name: Full name of the NHL Team
@@ -287,7 +285,7 @@ def rgb_to_hex(value1, value2=None, value3=None):
 
 
 def center_text(draw, left, top, width, text, color, font, vertical=False, height=None):
-    """ Draws text (at least) horizontally centered in a specified width. Can also
+    """Draws text (at least) horizontally centered in a specified width. Can also
         center vertically if specified.
 
     Args:
@@ -323,7 +321,7 @@ def center_text(draw, left, top, width, text, color, font, vertical=False, heigh
 
 
 def valign_center_text(draw, left, top, height, text, color, font):
-    """ Draws text centered in the vertical orientation in a specified height.
+    """Draws text centered in the vertical orientation in a specified height.
 
     Args:
         draw: Current PIL draw Object
@@ -351,7 +349,7 @@ def valign_center_text(draw, left, top, height, text, color, font):
 
 
 def pregame_image(game: Game):
-    """ Generates the pre-game image that is sent to social media platforms at the first
+    """Generates the pre-game image that is sent to social media platforms at the first
         run of the hockeygamebot script per day.
 
     Args:
@@ -368,6 +366,7 @@ def pregame_image(game: Game):
     FONT_DETAIL_LARGE = ImageFont.truetype(FontFiles.BITTER_BOLD, FontSizes.DETAIL_LARGE)
     FONT_DETAIL_SMALL = ImageFont.truetype(FontFiles.BITTER_BOLD, FontSizes.DETAIL_SMALL)
     FONT_GAMENUMBER = ImageFont.truetype(FontFiles.BITTER_BOLD, FontSizes.GAMENUMBER * 3)
+    FONT_BOT_TAG = ImageFont.truetype(FontFiles.BITTER_BOLD, FontSizes.GAMENUMBER * 2)
 
     # Pre-game specific constant values (incl coordinates)
     HEADER_TEXT = "PRE-GAME MATCHUP"
@@ -377,19 +376,29 @@ def pregame_image(game: Game):
     COORDS_HOME_LOGO = (COORDS_HOME_X, LOGO_Y)
     COORDS_AWAY_LOGO = (COORDS_AWAY_X, LOGO_Y)
     COORDS_GAME_NUM = (-90, 80)
+    COORDS_BOT_TAG = (910, 330)
     TEAM_RECORD_Y = LOGO_Y + 200
     TEAM_STREAK_Y = TEAM_RECORD_Y + FontSizes.RECORD + 10
 
     # Generate records, venue & other strings
+    # If this is the first team, game then no streak
     home_pts = game.home_team.points
     home_record_str = f"{home_pts} PTS • {game.home_team.current_record}"
-    home_streak_last10 = f"⬇ {game.home_team.streak} • LAST 10: {game.home_team.last_ten}"
+    home_streak_last10 = (
+        f"{game.home_team.streak} • LAST 10: {game.home_team.last_ten}" if game.home_team.games > 0 else ""
+    )
+
     away_pts = game.away_team.points
     away_record_str = f"{away_pts} PTS • {game.away_team.current_record}"
-    away_streak_last10 = f"⬆ {game.away_team.streak} • LAST 10: {game.away_team.last_ten}"
+    away_streak_last10 = (
+        f"{game.away_team.streak} • LAST 10: {game.away_team.last_ten}" if game.away_team.games > 0 else ""
+    )
 
+    num_games = schedule.get_number_games(
+        season=game.season, team_id=game.preferred_team.team_id, game_type_code=game.game_type
+    )
     text_gamenumber = (
-        "PRESEASON" if game.game_type == "PR" else f"{game.preferred_team.games + 1} OF 82"
+        "PRESEASON" if game.game_type == "PR" else f"{game.preferred_team.games + 1} OF {num_games}"
     )
 
     text_datetime = f"{game.game_date_short} • {game.game_time_local}"
@@ -458,17 +467,39 @@ def pregame_image(game: Game):
     txt = Image.new("L", (900, 900))
     d = ImageDraw.Draw(txt)
     center_text(
-        draw=d, left=0, top=0, width=900, text=text_gamenumber, color=255, font=FONT_GAMENUMBER
+        draw=d,
+        left=0,
+        top=0,
+        width=900,
+        text=text_gamenumber,
+        color=255,
+        font=FONT_GAMENUMBER,
     )
     w = txt.rotate(315, expand=True, resample=Image.BICUBIC)
     w_resize = w.resize((300, 300), Image.ANTIALIAS)
     bg.paste(w_resize, COORDS_GAME_NUM, w_resize)
 
+    # Create a new image to put the game bot handle & cleanly rotate it
+    txt = Image.new("L", (900, 900))
+    d = ImageDraw.Draw(txt)
+    center_text(
+        draw=d,
+        left=0,
+        top=0,
+        width=900,
+        text="@NJDevilsGameBot",
+        color=255,
+        font=FONT_BOT_TAG,
+    )
+    w = txt.rotate(315, expand=True, resample=Image.BICUBIC)
+    w_resize = w.resize((300, 300), Image.ANTIALIAS)
+    bg.paste(w_resize, COORDS_BOT_TAG, w_resize)
+
     return bg
 
 
 def generate_stats_bar(draw, stat, pref_value, other_value, pref_color, other_color):
-    """ Used in conjunction with the stats_image function to draw the label & the actual
+    """Used in conjunction with the stats_image function to draw the label & the actual
         value bars of each stat from the boxscore for each preferred & other teams.
 
     Args:
@@ -570,9 +601,18 @@ def generate_stats_bar(draw, stat, pref_value, other_value, pref_color, other_co
 
 
 def draw_goal_text(
-    draw, pref_other, number, goal, assist_p, assist_s, strength, period, time, team_color
+    draw,
+    pref_other,
+    number,
+    goal,
+    assist_p,
+    assist_s,
+    strength,
+    period,
+    time,
+    team_color,
 ):
-    """ Draws goal text (scorer & assists in the goals box).
+    """Draws goal text (scorer & assists in the goals box).
 
     Args:
         TBD
@@ -648,7 +688,7 @@ def draw_goal_text(
 
 
 def stats_image(game: Game, game_end: bool, boxscore: dict):
-    """ Generates the intermission & final image that contains bar chart starts & goal scorers.
+    """Generates the intermission & final image that contains bar chart starts & goal scorers.
         This is sent to social media platforms at each PERIOD_END & GAME_END event.
 
     Args:
@@ -692,9 +732,7 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
     GOAL_SCORER_BOX_SEPARATOR = 15
 
     # Setup Colors (via functions)
-    colors_dict = both_team_colors_compared(
-        game.preferred_team.team_name, game.other_team.team_name
-    )
+    colors_dict = both_team_colors_compared(game.preferred_team.team_name, game.other_team.team_name)
     pref_colors = colors_dict["first"]
     other_colors = colors_dict["second"]
 
@@ -728,7 +766,13 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
     draw = ImageDraw.Draw(bg)
 
     center_text(
-        draw=draw, left=0, top=0, width=bg_w, text=HEADER_TEXT, color=Colors.WHITE, font=FONT_TITLE
+        draw=draw,
+        left=0,
+        top=0,
+        width=bg_w,
+        text=HEADER_TEXT,
+        color=Colors.WHITE,
+        font=FONT_TITLE,
     )
 
     # Draw the scores on the image
@@ -747,14 +791,20 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
     draw.rectangle(
         (
             (725 + CHART_GOAL_SEPARATOR, GOAL_START_Y),
-            (725 + CHART_GOAL_SEPARATOR + GOAL_SCORER_BOX_W, GOAL_START_Y + GOAL_SCORER_BOX_H),
+            (
+                725 + CHART_GOAL_SEPARATOR + GOAL_SCORER_BOX_W,
+                GOAL_START_Y + GOAL_SCORER_BOX_H,
+            ),
         ),
         fill=(255, 255, 255),
     )
     draw.rectangle(
         (
             (725 + CHART_GOAL_SEPARATOR, GOAL_START_Y),
-            (725 + CHART_GOAL_SEPARATOR + GOAL_SCORER_BOX_W, GOAL_START_Y + GOAL_SCORER_BOX_TEAM_H),
+            (
+                725 + CHART_GOAL_SEPARATOR + GOAL_SCORER_BOX_W,
+                GOAL_START_Y + GOAL_SCORER_BOX_TEAM_H,
+            ),
         ),
         fill=pref_colors["bg"],
     )
@@ -779,10 +829,7 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
             ),
             (
                 725 + CHART_GOAL_SEPARATOR + GOAL_SCORER_BOX_W,
-                GOAL_START_Y
-                + GOAL_SCORER_BOX_H
-                + GOAL_SCORER_BOX_SEPARATOR
-                + GOAL_SCORER_BOX_TEAM_H,
+                GOAL_START_Y + GOAL_SCORER_BOX_H + GOAL_SCORER_BOX_SEPARATOR + GOAL_SCORER_BOX_TEAM_H,
             ),
         ),
         fill=other_colors["bg"],
@@ -805,7 +852,8 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
         CHART_TOP_Y = CHART_START_Y + (i * CHART_RECT_H) + (i * CHART_SEPARATOR)
         CHART_BOTTOM_Y = CHART_START_Y + ((i + 1) * CHART_RECT_H) + (i * CHART_SEPARATOR)
         draw.rectangle(
-            ((CHART_START_X, CHART_TOP_Y), (CHART_END_X, CHART_BOTTOM_Y)), fill=Colors.WHITE
+            ((CHART_START_X, CHART_TOP_Y), (CHART_END_X, CHART_BOTTOM_Y)),
+            fill=Colors.WHITE,
         )
 
     # Get the boxscores for each team (via the homeaway variable)
@@ -899,7 +947,7 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
 
 
 def hockeystatcards_charts(game: Game, home_gs: dict, away_gs: dict):
-    """ Generates two charts of each team's GameScore (with their average & breakout status).
+    """Generates two charts of each team's GameScore (with their average & breakout status).
         This is sent to social media platforms at the end of each game.
 
     Args:
@@ -978,9 +1026,7 @@ def hockeystatcards_charts(game: Game, home_gs: dict, away_gs: dict):
             fontsize=8,
         )
 
-        gs_chart_path = os.path.join(
-            IMAGES_PATH, "temp", f"hsc_gamescore-{game.game_id_shortid}-{idx}.png"
-        )
+        gs_chart_path = os.path.join(IMAGES_PATH, "temp", f"hsc_gamescore-{game.game_id_shortid}-{idx}.png")
         logging.info("Image Path: %s", gs_chart_path)
         gs_fig.savefig(gs_chart_path, bbox_inches="tight")
 

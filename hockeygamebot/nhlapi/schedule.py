@@ -14,7 +14,7 @@ from hockeygamebot.nhlapi import api, roster
 
 
 def get_team_id(team_name):
-    """ Passes team name to NHL API and returns team ID.
+    """Passes team name to NHL API and returns team ID.
 
     Args:
         team_name: Valid NHL team name.
@@ -40,9 +40,7 @@ def get_team_id(team_name):
             break
 
     if not team_id:
-        raise ValueError(
-            "{} is not a valid NHL team. Check your configuraiton file!".format(team_name)
-        )
+        raise ValueError("{} is not a valid NHL team. Check your configuraiton file!".format(team_name))
 
     return team_id
 
@@ -60,9 +58,8 @@ def is_game_today(team_id, date):
     """
     args = arguments.get_arguments()
 
-    url = (
-        "/schedule?teamId={id}&expand="
-        "schedule.broadcasts,schedule.teams&date={date:%Y-%m-%d}".format(id=team_id, date=date)
+    url = "/schedule?teamId={id}&expand=" "schedule.broadcasts,schedule.teams&date={date:%Y-%m-%d}".format(
+        id=team_id, date=date
     )
 
     response = api.nhl_api(url)
@@ -84,9 +81,7 @@ def is_game_today(team_id, date):
             time.sleep(10)
         else:
             game_index = 1
-            logging.info(
-                "Split Squad - this is the process to pick up second game (sleep 5 seconds)."
-            )
+            logging.info("Split Squad - this is the process to pick up second game (sleep 5 seconds).")
             time.sleep(5)
 
         games_info = schedule["dates"][0]["games"][game_index]
@@ -152,7 +147,7 @@ def get_broadcasts(resp):
 
 
 def get_next_game(today_game_date: datetime, team_id: int) -> dict:
-    """ Takes today's game date & the team ID to get the next game from the NHL API endpoint.
+    """Takes today's game date & the team ID to get the next game from the NHL API endpoint.
 
     Args:
         today_game_date (datetime) - The date of today's game.
@@ -180,7 +175,7 @@ def get_next_game(today_game_date: datetime, team_id: int) -> dict:
 
 
 def get_previous_game(team_id: int) -> dict:
-    """ Takes a team ID & gets the previous game from the schedule API modified endpoint.
+    """Takes a team ID & gets the previous game from the schedule API modified endpoint.
 
     Args:
         team_id (int) - The unique identifier of the team (from get_team function).
@@ -203,6 +198,31 @@ def get_previous_game(team_id: int) -> dict:
     prev_game = prev_game_sched.get("dates")[0].get("games")[0]
 
     return prev_game_date, prev_game
+
+
+def get_number_games(season: str, team_id: int, game_type_code: str = "R") -> dict:
+    """Queries the NHL Schedule API to how many games are in this season.
+        This is particularly important in the 2020-2021 shortened season.
+
+    Args:
+        season (str) - The 8-digit season code (ex: 20202021).
+        team_id (int) - The unique identifier of the team (from get_team function).
+
+    Returns:
+        num_games (int) - The number of games played in the regular season.
+    """
+    args = arguments.get_arguments()
+
+    endpoint = f"/schedule?teamId={team_id}&season={season}&gameType={game_type_code}"
+    response = api.nhl_api(endpoint)
+
+    if response:
+        schedule = response.json()
+        games_total = schedule["totalItems"]
+        return games_total
+
+    # If no valid response, just return default number of games (82)
+    return 82
 
 
 def season_series(game_id, pref_team, other_team, last_season=False):
@@ -393,7 +413,7 @@ def season_series(game_id, pref_team, other_team, last_season=False):
             player_short_name = f"{player_name[0]}. {' '.join(player_name.split()[1:])}"
             point_leaders_with_attrs.append(player_short_name)
 
-        point_leaders_joined = (", ".join(point_leaders_with_attrs[0:3]))
+        point_leaders_joined = ", ".join(point_leaders_with_attrs[0:3])
         leftover_leaders = len(point_leaders) - 3
         points_leader_str = (
             f"Points Leaders: {point_leaders_joined} & {leftover_leaders} "
@@ -416,8 +436,6 @@ def season_series(game_id, pref_team, other_team, last_season=False):
         point_leaders_joined = (
             f", ".join(point_leaders_with_attrs[:-1]) + f" & {point_leaders_with_attrs[-1]}"
         )
-        points_leader_str = "Points Leaders: {} with {} each.".format(
-            point_leaders_joined, leader_points
-        )
+        points_leader_str = "Points Leaders: {} with {} each.".format(point_leaders_joined, leader_points)
 
     return season_series_str, points_leader_str, toi_leader_str
