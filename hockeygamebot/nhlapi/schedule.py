@@ -370,7 +370,7 @@ def season_series(game_id, pref_team, other_team, last_season=False):
             toi_s = int(s)
             toi_s = "0{}".format(toi_s) if toi_s < 10 else toi_s
             toi_avg = "{}:{}".format(toi_m, toi_s)
-            toi_leader_str = "TOI Leader - {} with {} / game.".format(player_name, toi_avg)
+            toi_leader_str = "TOI Leader: {} with {} / game.".format(player_name, toi_avg)
 
     # Handle tied points leaders
     point_leaders = list()

@@ -11,7 +11,7 @@ import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 
 from hockeygamebot.definitions import IMAGES_PATH, PROJECT_ROOT
-from hockeygamebot.helpers import utils
+from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.models.game import Game
 from hockeygamebot.models.gameevent import GoalEvent
 from hockeygamebot.nhlapi import schedule, thirdparty
@@ -480,6 +480,11 @@ def pregame_image(game: Game):
     bg.paste(w_resize, COORDS_GAME_NUM, w_resize)
 
     # Create a new image to put the game bot handle & cleanly rotate it
+    args = arguments.get_arguments()
+    twitterenv = "debug" if args.debugsocial else "prod"
+    twitter_config = utils.load_config()["twitter"][twitterenv]
+    twitter_handle = twitter_config["handle"]
+
     txt = Image.new("L", (900, 900))
     d = ImageDraw.Draw(txt)
     center_text(
@@ -487,7 +492,7 @@ def pregame_image(game: Game):
         left=0,
         top=0,
         width=900,
-        text="@NJDevilsGameBot",
+        text=f"@{twitter_handle}",
         color=255,
         font=FONT_BOT_TAG,
     )

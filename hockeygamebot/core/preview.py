@@ -93,15 +93,13 @@ def generate_game_preview(game: Game):
             "First game of the season - re-run the season series function with the last_season flag."
         )
 
-        season_series = schedule.season_series(
-            game.game_id, pref_team, other_team, last_season=True
-        )
+        season_series = schedule.season_series(game.game_id, pref_team, other_team, last_season=True)
 
         season_series_string = season_series[0]
         season_series_string = (
             f"This is the first meeting of the season between the "
-            f"{pref_team.short_name} & the {other_team.short_name}. "
-            f"Last season -\n\n{season_series_string}"
+            f"{pref_team.short_name} & the {other_team.short_name}.\n\n"
+            f"LAST SEASON STATS\n{season_series_string}"
         )
 
         # season_series_tweet_text = (
@@ -140,7 +138,7 @@ def generate_game_preview(game: Game):
 
 
 def game_preview_others(game: Game):
-    """ Other game preview information (excluding our core game preview).
+    """Other game preview information (excluding our core game preview).
         This includes things like goalies, lines, referees, etc.
 
     This function runs when the game is in Preview State and it is not yet
@@ -175,17 +173,11 @@ def game_preview_others(game: Game):
         goalies_confirmed_values = ("Confirmed", "Likely")
         try:
             df_date = game.custom_game_date("%m-%d-%Y")
-            goalies_df = thirdparty.dailyfaceoff_goalies(
-                pref_team, other_team, pref_team_homeaway, df_date
-            )
+            goalies_df = thirdparty.dailyfaceoff_goalies(pref_team, other_team, pref_team_homeaway, df_date)
             logging.info(goalies_df)
 
-            goalie_confirm_pref = bool(
-                goalies_df.get("pref").get("confirm") in goalies_confirmed_values
-            )
-            goalie_confirm_other = bool(
-                goalies_df.get("other").get("confirm") in goalies_confirmed_values
-            )
+            goalie_confirm_pref = bool(goalies_df.get("pref").get("confirm") in goalies_confirmed_values)
+            goalie_confirm_other = bool(goalies_df.get("other").get("confirm") in goalies_confirmed_values)
 
             logging.info("Goalie Confirmed PREF : %s", goalie_confirm_pref)
             logging.info("Goalie Confirmed OTHER : %s", goalie_confirm_other)
@@ -254,9 +246,7 @@ def game_preview_others(game: Game):
                     game.preview_socials.goalies_other_sent = True
 
                 except Exception as e:
-                    logging.error(
-                        "Exception getting OTHER Hockey Reference splits - try again next loop."
-                    )
+                    logging.error("Exception getting OTHER Hockey Reference splits - try again next loop.")
                     logging.error(e)
             else:
                 logging.info("Other goalie not yet confirmed - try again next loop.")
@@ -274,9 +264,7 @@ def game_preview_others(game: Game):
             officials_confirmed = officials.get("confirmed")
 
             if officials_confirmed:
-                officials_tweet_text = (
-                    f"The officials for {game.game_hashtag} are -\n(via @ScoutingTheRefs)"
-                )
+                officials_tweet_text = f"The officials for {game.game_hashtag} are -\n(via @ScoutingTheRefs)"
                 for key, attrs in officials.items():
                     if key == "confirmed":
                         continue
@@ -308,15 +296,11 @@ def game_preview_others(game: Game):
             logging.error(e)
 
     # Process the pre-game information for the preferred team lines
-    if not game.preview_socials.pref_lines_sent or game.preview_socials.check_for_changed_lines(
-        "preferred"
-    ):
+    if not game.preview_socials.pref_lines_sent or game.preview_socials.check_for_changed_lines("preferred"):
         try:
             pref_lines = thirdparty.dailyfaceoff_lines(game, pref_team)
             if not pref_lines.get("confirmed"):
-                raise AttributeError(
-                    "Preferred team lines are not yet confirmed yet - try again next loop."
-                )
+                raise AttributeError("Preferred team lines are not yet confirmed yet - try again next loop.")
 
             fwd_string = pref_lines.get("fwd_string")
             def_string = pref_lines.get("def_string")
@@ -348,28 +332,20 @@ def game_preview_others(game: Game):
                     game.preview_socials.pref_lines_msg = lines_tweet_text
                     game.preview_socials.pref_lines_resent = True
                 else:
-                    logging.info(
-                        "The preferred team lines have not changed - check again in an hour."
-                    )
+                    logging.info("The preferred team lines have not changed - check again in an hour.")
 
         except AttributeError as e:
             logging.info(e)
         except Exception as e:
-            logging.error(
-                "Exception getting Daily Faceoff lines information - try again next loop."
-            )
+            logging.error("Exception getting Daily Faceoff lines information - try again next loop.")
             logging.error(e)
 
     # Process the pre-game information for the preferred team lines
-    if not game.preview_socials.other_lines_sent or game.preview_socials.check_for_changed_lines(
-        "other"
-    ):
+    if not game.preview_socials.other_lines_sent or game.preview_socials.check_for_changed_lines("other"):
         try:
             other_lines = thirdparty.dailyfaceoff_lines(game, other_team)
             if not other_lines.get("confirmed"):
-                raise AttributeError(
-                    "Other team lines are not yet confirmed yet - try again next loop."
-                )
+                raise AttributeError("Other team lines are not yet confirmed yet - try again next loop.")
 
             fwd_string = other_lines.get("fwd_string")
             def_string = other_lines.get("def_string")
@@ -401,16 +377,12 @@ def game_preview_others(game: Game):
                     game.preview_socials.other_lines_msg = lines_tweet_text
                     game.preview_socials.other_lines_resent = True
                 else:
-                    logging.info(
-                        "The preferred team lines have not changed - check again in an hour."
-                    )
+                    logging.info("The preferred team lines have not changed - check again in an hour.")
 
         except AttributeError as e:
             logging.info(e)
         except Exception as e:
-            logging.error(
-                "Exception getting Daily Faceoff lines information - try again next loop."
-            )
+            logging.error("Exception getting Daily Faceoff lines information - try again next loop.")
             logging.error(e)
 
     # Check if all pre-game tweets are sent
@@ -419,8 +391,7 @@ def game_preview_others(game: Game):
 
     if not all_pregametweets and game.game_time_countdown > preview_sleep_time:
         logging.info(
-            "Game State is Preview & all pre-game tweets are not sent. "
-            "Sleep for 30 minutes & check again."
+            "Game State is Preview & all pre-game tweets are not sent. " "Sleep for 30 minutes & check again."
         )
         return preview_sleep_time, False
     elif not all_pregametweets and game.game_time_countdown < preview_sleep_time:
@@ -476,9 +447,7 @@ def get_starters(game: Game):
             starters = list()
             for pos in [("L", "R", "C"), "D", "G"]:
                 pos_all = [x for x in players if x.find_all("td")[1].text in pos]
-                pos_start = [
-                    get_players_name(x) for x in pos_all if "bold" in x.find_all("td")[0]["class"]
-                ]
+                pos_start = [get_players_name(x) for x in pos_all if "bold" in x.find_all("td")[0]["class"]]
                 pos_start_str = " - ".join(pos_start)
                 starters.append(pos_start_str)
         except Exception as e:
@@ -496,10 +465,8 @@ def get_starters(game: Game):
 
         starters_string = "\n".join(starters)
         starters_msg = (
-            f"{utils.team_hashtag(game.preferred_team.team_name)} Starters:"
-            f"\n\n{starters_string}"
+            f"{utils.team_hashtag(game.preferred_team.team_name)} Starters:" f"\n\n{starters_string}"
         )
         socialhandler.send(starters_msg, force_send=True, game_hashtag=True)
         game.preview_socials.starters_msg = starters_msg
         game.preview_socials.starters_sent = True
-
