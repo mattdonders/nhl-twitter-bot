@@ -273,7 +273,7 @@ def team_hashtag(team, game_type=None):
         "Winnipeg Jets": "#GoJetsGo",
     }
 
-    team_hashtags_playoffs =
+    team_hashtags_playoffs = {
         "Anaheim Ducks": "#FlyTogether",
         "Arizona Coyotes": "#Yotes",
         "Boston Bruins": "#NHLBruins",
