@@ -20,9 +20,9 @@ from hockeygamebot.models.gametype import GameType
 
 # Social Media Decorator
 def check_social_timeout(func):
-    """ A function decorate used within the GameEvent module to determine
-        if we should send this event to social media. This can only wrap
-        functions that have an attribute of a GameEvent.
+    """A function decorate used within the GameEvent module to determine
+    if we should send this event to social media. This can only wrap
+    functions that have an attribute of a GameEvent.
 
     """
 
@@ -64,7 +64,7 @@ def check_social_timeout(func):
 
 
 def load_config():
-    """ Loads the configuration yaml file and returns a yaml object / dictionary..
+    """Loads the configuration yaml file and returns a yaml object / dictionary..
 
     Args:
         None
@@ -80,7 +80,7 @@ def load_config():
 
 
 def load_urls():
-    """ Loads the URLs yaml file and returns a yaml object / dictionary..
+    """Loads the URLs yaml file and returns a yaml object / dictionary..
 
     Args:
         None
@@ -112,9 +112,7 @@ def setup_logging():
         for handler in root.handlers:
             root.removeHandler(handler)
 
-    log_file_name = datetime.now().strftime(
-        load_config()["script"]["log_file_name"] + "-%Y%m%d%H%M%S.log"
-    )
+    log_file_name = datetime.now().strftime(load_config()["script"]["log_file_name"] + "-%Y%m%d%H%M%S.log")
     log_file = os.path.join(LOGS_PATH, log_file_name)
     if args.console and args.debug:
         logging.basicConfig(
@@ -144,7 +142,7 @@ def setup_logging():
 
 
 def ordinal(n):
-    """ Converts an integer into its ordinal equivalent.
+    """Converts an integer into its ordinal equivalent.
 
     Args:
         n: number to convert
@@ -157,7 +155,7 @@ def ordinal(n):
 
 
 def date_parser(date):
-    """ Converts a string in Y-m-d format to datetime object.
+    """Converts a string in Y-m-d format to datetime object.
 
     Args:
         date: a string in Y-m-d format
@@ -241,10 +239,10 @@ def team_hashtag(team, game_type=None):
     """
 
     team_hashtags = {
-        "Anaheim Ducks": "#LetsGoDucks",
+        "Anaheim Ducks": "#FlyTogether",
         "Arizona Coyotes": "#Yotes",
         "Boston Bruins": "#NHLBruins",
-        "Buffalo Sabres": "#Sabres50",
+        "Buffalo Sabres": "#LetsGoBuffalo",
         "Calgary Flames": "#Flames",
         "Carolina Hurricanes": "#LetsGoCanes",
         "Chicago Blackhawks": "#Blackhawks",
@@ -263,7 +261,7 @@ def team_hashtag(team, game_type=None):
         "New York Islanders": "#Isles",
         "New York Rangers": "#PlayLikeANewYorker",
         "Ottawa Senators": "#GoSensGo",
-        "Philadelphia Flyers": "#FlyOrDie",
+        "Philadelphia Flyers": "#AnytimeAnywhere",
         "Pittsburgh Penguins": "#LetsGoPens",
         "San Jose Sharks": "#SJSharks",
         "St. Louis Blues": "#STLBlues",
@@ -275,23 +273,39 @@ def team_hashtag(team, game_type=None):
         "Winnipeg Jets": "#GoJetsGo",
     }
 
-    team_hashtags_playoffs = {
-        "Anaheim Ducks": "#LetsGoDucks",
-        "Boston Bruins": "#GoBruins",
+    team_hashtags_playoffs =
+        "Anaheim Ducks": "#FlyTogether",
+        "Arizona Coyotes": "#Yotes",
+        "Boston Bruins": "#NHLBruins",
+        "Buffalo Sabres": "#LetsGoBuffalo",
+        "Calgary Flames": "#Flames",
+        "Carolina Hurricanes": "#LetsGoCanes",
+        "Chicago Blackhawks": "#Blackhawks",
         "Colorado Avalanche": "#GoAvsGo",
         "Columbus Blue Jackets": "#CBJ",
+        "Dallas Stars": "#GoStars",
+        "Detroit Red Wings": "#LGRW",
+        "Edmonton Oilers": "#LetsGoOilers",
+        "Florida Panthers": "#FLAPanthers",
         "Los Angeles Kings": "#GoKingsGo",
-        "Minnesota Wild": "#mnwild",
-        "Nashville Predators": "#standwithus",
-        "New Jersey Devils": "#NowWeRise",
-        "Philadelphia Flyers": "#EarnTomorrow",
-        "Pittsburgh Penguins": "#3elieve",
+        "Minnesota Wild": "#MNWild",
+        "Montréal Canadiens": "#GoHabsGo",
+        "Montreal Canadiens": "#GoHabsGo",
+        "Nashville Predators": "#Preds",
+        "New Jersey Devils": "#NJDevils",
+        "New York Islanders": "#Isles",
+        "New York Rangers": "#PlayLikeANewYorker",
+        "Ottawa Senators": "#GoSensGo",
+        "Philadelphia Flyers": "#AnytimeAnywhere",
+        "Pittsburgh Penguins": "#LetsGoPens",
         "San Jose Sharks": "#SJSharks",
+        "St. Louis Blues": "#STLBlues",
         "Tampa Bay Lightning": "#GoBolts",
-        "Toronto Maple Leafs": "#TMLTalk",
+        "Toronto Maple Leafs": "#LeafsForever",
+        "Vancouver Canucks": "#Canucks",
         "Vegas Golden Knights": "#VegasBorn",
         "Washington Capitals": "#ALLCAPS",
-        "Winnipeg Jets": "#WPGWhiteout",
+        "Winnipeg Jets": "#GoJetsGo",
     }
 
     # if GameType(game_type) == GameType.PLAYOFFS:
@@ -303,7 +317,7 @@ def team_hashtag(team, game_type=None):
 
 
 def calculate_shot_distance(x: int, y: int) -> str:
-    """ Takes a (x,y) shot coordinate and calculates the distance to the net.
+    """Takes a (x,y) shot coordinate and calculates the distance to the net.
 
     Args:
         x: x-coordinate of the shot
@@ -341,7 +355,7 @@ def determine_event_zone(x: int, y: int, period: int, homeaway: str) -> str:
 
 
 def time_remain_converter(time: str) -> str:
-    """ Takes a time remaining string and determines if its less than 1 minute.
+    """Takes a time remaining string and determines if its less than 1 minute.
 
     Args:
         time: time remaining in the period
