@@ -322,9 +322,7 @@ def season_series(game_id, pref_team, other_team, last_season=False):
         else:
             pref_record["losses"] += 1
 
-        season_series_str = (
-            f"Season Series: {pref_record['wins']}-" f"{pref_record['losses']}-{pref_record['ot']}"
-        )
+        season_series_str = f"Series: {pref_record['wins']}-" f"{pref_record['losses']}-{pref_record['ot']}"
 
         # Get stats leaders
         # pref_teamstats = game["liveData"]["boxscore"]["teams"][pref_homeaway]["teamStats"]
@@ -370,7 +368,8 @@ def season_series(game_id, pref_team, other_team, last_season=False):
             toi_s = int(s)
             toi_s = "0{}".format(toi_s) if toi_s < 10 else toi_s
             toi_avg = "{}:{}".format(toi_m, toi_s)
-            toi_leader_str = "TOI Leader: {} with {} / game.".format(player_name, toi_avg)
+            player_short_name = f"{player_name[0]}. {' '.join(player_name.split()[1:])}"
+            toi_leader_str = "TOI Leader: {} with {} / game.".format(player_short_name, toi_avg)
 
     # Handle tied points leaders
     point_leaders = list()
@@ -416,8 +415,7 @@ def season_series(game_id, pref_team, other_team, last_season=False):
         point_leaders_joined = ", ".join(point_leaders_with_attrs[0:3])
         leftover_leaders = len(point_leaders) - 3
         points_leader_str = (
-            f"Points Leaders: {point_leaders_joined} & {leftover_leaders} "
-            f"other players with {leader_points} each."
+            f"Points Leaders: {point_leaders_joined} & {leftover_leaders} others ({leader_points} each)."
         )
 
     else:
