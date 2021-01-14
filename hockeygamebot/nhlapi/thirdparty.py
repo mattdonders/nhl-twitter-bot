@@ -54,7 +54,7 @@ def thirdparty_request(url, headers=None):
 
 
 def bs4_parse(content):
-    """ Instead of speficying lxml every time, we define this function and pass
+    """Instead of speficying lxml every time, we define this function and pass
         any content that requires scraping to it.
 
     Args:
@@ -71,7 +71,7 @@ def bs4_parse(content):
 
 
 def nst_abbreviation(team_name: str) -> str:
-    """ Returns the 3-character team abbreviation used in Shift Charts & therefore by most other
+    """Returns the 3-character team abbreviation used in Shift Charts & therefore by most other
         third party stats sites (ex - N.J instead of NJD).
 
     Args:
@@ -119,16 +119,16 @@ def nst_abbreviation(team_name: str) -> str:
 
 
 def get_nst_stat(list, index):
-    if list[index].text == '-':
-        return 'N/A'
+    if list[index].text == "-":
+        return "N/A"
     try:
         return list[index].text
     except ValueError:
-        return 'N/A'
+        return "N/A"
 
 
 def nst_linetool(game: Game, team: Team):
-    """ Scrapes Natural Stat Trick's Limited Report to get advanced stats for forward lines
+    """Scrapes Natural Stat Trick's Limited Report to get advanced stats for forward lines
         and defensive pairings.
 
         #TODO: Defensive Pairings are manually calc'd & retrieved.
@@ -167,7 +167,7 @@ def nst_linetool(game: Game, team: Team):
     for idx, line in enumerate(fwd_lines_5v5_rows):
         line_stats = list()
         line = line.find_all("td")
-        line_players = '-'.join([' '.join(x.text.split()[1:]) for x in line][0:3])
+        line_players = "-".join([" ".join(x.text.split()[1:]) for x in line][0:3])
         line_toi = float(line[3].text)
         line_toi_mm = int(line_toi)
         line_toi_ss = (line_toi * 60) % 60
@@ -178,14 +178,23 @@ def nst_linetool(game: Game, team: Team):
         line_scf_pct = get_nst_stat(line, 22)
         line_hdcf_pct = get_nst_stat(line, 26)
         line_stats.extend(
-            [line_players, line_toi_mmss, line_cf_pct, line_cfpct_rel,
-            line_gf_pct, line_scf_pct, line_hdcf_pct]
+            [
+                line_players,
+                line_toi_mmss,
+                line_cf_pct,
+                line_cfpct_rel,
+                line_gf_pct,
+                line_scf_pct,
+                line_hdcf_pct,
+            ]
         )
 
         if idx == 0:
             # Headers (Centered)
-            print("{: ^25s} {: ^10s} {: ^10s} {: ^10s} {: ^10s} {: ^10s} {: ^10s}".format(
-                "Players", "TOI", "CF%", "CF% REL", "GF%", "SCF%", "HDCF%")
+            print(
+                "{: ^25s} {: ^10s} {: ^10s} {: ^10s} {: ^10s} {: ^10s} {: ^10s}".format(
+                    "Players", "TOI", "CF%", "CF% REL", "GF%", "SCF%", "HDCF%"
+                )
             )
             # Dashes (not very readable, but I'm lazy)
             print("-" * 25 + " " + " ".join([("-" * 10)] * 6))
@@ -231,7 +240,7 @@ def hockeyref_goalie_against_team(goalie, opponent):
 
     hr_player_info = soup.find("div", attrs={"itemtype": "https://schema.org/Person"})
     hr_player_info_attr = hr_player_info.find_all("p")
-    hr_name = soup.find("h1", attrs={"itemprop": "name"}).text
+    hr_name = soup.find("h1", attrs={"itemprop": "name"}).text.strip()
 
     for attr in hr_player_info_attr:
         if "Position:" in attr.text:
@@ -240,7 +249,7 @@ def hockeyref_goalie_against_team(goalie, opponent):
 
     # If the goalie name doesn't match exactly or the player position is not goalie, try Player 02
     if hr_name.lower() != goalie_name_orig.lower() or not hr_position_goalie:
-        logging.warning("%s is not who we are looking for, or is not a goalie - trying 02.")
+        logging.warning("%s is not who we are looking for, or is not a goalie - trying 02.", hr_name)
         goalie_hockeyref_name = f"{goalie_last_name[0:5]}{goalie_first_name[0:2]}02"
         hockeyref_url = f"{hockeyref_base}/{goalie_last_name[0]}/{goalie_hockeyref_name}/splits"
         resp = thirdparty_request(hockeyref_url)
@@ -270,7 +279,7 @@ def hockeyref_goalie_against_team(goalie, opponent):
 
 
 def dailyfaceoff_lines_parser(lines, soup):
-    """ A sub-function of the dailyfaceoff_lines(...) that takes a BS4 Soup
+    """A sub-function of the dailyfaceoff_lines(...) that takes a BS4 Soup
         and parses it to break it down by individual player & position.
 
     Args:
@@ -427,8 +436,10 @@ def scouting_the_refs(game, pref_team):
         post_date = parse(post.get("date"))
         posted_today = bool(post_date.date() == datetime.today().date())
         post_title = post.get("title").get("rendered")
-        if (921 in categories and posted_today) or (posted_today and 'NHL Referees and Linesmen' in post_title):
-        # if 921 in categories:     # This line is uncommented for testing on non-game days
+        if (921 in categories and posted_today) or (
+            posted_today and "NHL Referees and Linesmen" in post_title
+        ):
+            # if 921 in categories:     # This line is uncommented for testing on non-game days
             content = post.get("content").get("rendered")
             soup = bs4_parse(content)
             break
@@ -618,8 +629,9 @@ def dailyfaceoff_goalies(pref_team, other_team, pref_homeaway, game_date):
 
     return True
 
+
 def hockeystatcard_gamescores(game: Game):
-    """ Uses the Hockey Stat Cards API to retrieve gamescores for the current game.
+    """Uses the Hockey Stat Cards API to retrieve gamescores for the current game.
         Returns two lists of game scores - one for the home team and one for the away team.
 
     Args:
@@ -633,7 +645,7 @@ def hockeystatcard_gamescores(game: Game):
     hsc_base = urls["endpoints"]["hockey_stat_cards"]
 
     hsc_season = f"{game.season[2:4]}{game.season[6:8]}"
-    hsc_gametype = "ps" if game.game_id_gametype_shortid == '1' else "rs"
+    hsc_gametype = "ps" if game.game_id_gametype_shortid == "1" else "rs"
     hsc_nst_num = int(f"{game.game_id_gametype_id}{game.game_id_shortid}")
     hsc_game_num = None
 
@@ -665,26 +677,30 @@ def hockeystatcard_gamescores(game: Game):
         return False
 
     home_team = game.home_team.team_name
-    home_abbrev = nst_abbreviation(team_name=home_team).replace('.', '')
+    home_abbrev = nst_abbreviation(team_name=home_team).replace(".", "")
     # home_abbrev = game.home_team.tri_code
     away_team = game.away_team.team_name
-    away_abbrev = nst_abbreviation(team_name=away_team).replace('.', '')
+    away_abbrev = nst_abbreviation(team_name=away_team).replace(".", "")
     # away_abbrev = game.away_team.tri_code
 
     hsc_gs = resp.json()
     home_gs = list()
     away_gs = list()
     # all_player_data = hsc_gs['playerData'] + hsc_gs['goalieData']
-    all_player_data = hsc_gs['playerData']
+    all_player_data = hsc_gs["playerData"]
 
-    home_gs = [x for x in all_player_data if x['team'] == home_abbrev or home_team.replace(' ', '_') in x['src']]
-    away_gs = [x for x in all_player_data if x['team'] == away_abbrev or away_team.replace(' ', '_') in x['src']]
+    home_gs = [
+        x for x in all_player_data if x["team"] == home_abbrev or home_team.replace(" ", "_") in x["src"]
+    ]
+    away_gs = [
+        x for x in all_player_data if x["team"] == away_abbrev or away_team.replace(" ", "_") in x["src"]
+    ]
 
     # This [:5] returns the top 5 values only - leave this out and return all for better functionality.
     # home_gs_sorted = sorted(home_gs, key = lambda i: i['GameScore'], reverse=True)[:5]
     # away_gs_sorted = sorted(away_gs, key = lambda i: i['GameScore'], reverse=True)[:5]
-    home_gs_sorted = sorted(home_gs, key = lambda i: i['GameScore'], reverse=True)
-    away_gs_sorted = sorted(away_gs, key = lambda i: i['GameScore'], reverse=True)
+    home_gs_sorted = sorted(home_gs, key=lambda i: i["GameScore"], reverse=True)
+    away_gs_sorted = sorted(away_gs, key=lambda i: i["GameScore"], reverse=True)
 
     game_scores = (home_gs_sorted, away_gs_sorted)
     return game_scores
