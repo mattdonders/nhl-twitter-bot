@@ -16,7 +16,7 @@ from hockeygamebot.core import images
 
 
 def event_mapper(event: str, event_type: str) -> object:
-    """ A function that maps events or event types to a GameEvent class. This is needed because
+    """A function that maps events or event types to a GameEvent class. This is needed because
         the NHL keeps changing these fields and its easier to have one place to manage this mapping.
         We also take event & eventTypeId so we have something to fall back on.
 
@@ -108,7 +108,7 @@ def event_mapper(event: str, event_type: str) -> object:
 
 
 def event_factory(game: Game, play: dict, livefeed: dict, new_plays: bool):
-    """ Factory method for creating a game event. Converts the JSON
+    """Factory method for creating a game event. Converts the JSON
             response into a Type-Specific Event we can parse and track.
 
     Args:
@@ -155,14 +155,20 @@ def event_factory(game: Game, play: dict, livefeed: dict, new_plays: bool):
         if not obj.video_url and should_check_content:
             logging.info("A Goal without a video has been found - check the content feed for it.")
             milestones = contentfeed.get_content_feed(game_id=game.game_id, milestones=True)
-            content_exists, highlight, video_url, mp4_url = contentfeed.search_milestones_for_id(milestones, event_id)
+            content_exists, highlight, video_url, mp4_url = contentfeed.search_milestones_for_id(
+                milestones, event_id
+            )
             if content_exists:
                 # blurb = highlight.get('blurb')
-                description = highlight.get('description')
+                description = highlight.get("description")
                 content_msg = f"NHL Video Highlight - {description}. \n\n{video_url}"
                 discord_msg = f"NHL Video Highlight - {description}. \n{video_url}"
                 social_ids = socialhandler.send(
-                    msg=content_msg, reply=obj.tweet, force_send=True, game_hashtag=True, discord_msg=discord_msg
+                    msg=content_msg,
+                    reply=obj.tweet,
+                    force_send=True,
+                    game_hashtag=True,
+                    discord_msg=discord_msg,
                 )
                 obj.tweet = social_ids.get("twitter")
                 obj.video_url = video_url
@@ -170,15 +176,11 @@ def event_factory(game: Game, play: dict, livefeed: dict, new_plays: bool):
     # If object doesn't exist, create it & add to Cache
     if obj is None:
         try:
-            logging.info(
-                "Creating %s event for Id %s / IdX %s.", object_type.__name__, event_id, event_idx
-            )
+            logging.info("Creating %s event for Id %s / IdX %s.", object_type.__name__, event_id, event_idx)
             obj = object_type(data=play, game=game)
             object_type.cache.add(obj)
         except Exception as error:
-            logging.error(
-                "Error creating %s event for Id %s. / IdX %s.", object_type, event_id, event_idx
-            )
+            logging.error("Error creating %s event for Id %s. / IdX %s.", object_type, event_id, event_idx)
             # logging.error(response)
             logging.error(error)
             logging.error(traceback.format_exc())
@@ -190,7 +192,7 @@ def event_factory(game: Game, play: dict, livefeed: dict, new_plays: bool):
 
 
 def game_event_total(object_type: object, player: str, attribute: str):
-    """ Calculates the number of events a person has for a single game.
+    """Calculates the number of events a person has for a single game.
         Mostly used for penalties and goals (hat trick, etc).
 
     Args:
@@ -208,7 +210,7 @@ def game_event_total(object_type: object, player: str, attribute: str):
 
 
 def game_scoring_totals(player: str):
-    """ Calculates the number of goals, assists, points a person has for a single game.
+    """Calculates the number of goals, assists, points a person has for a single game.
 
     Args:
         player: player name to filter on
@@ -219,12 +221,8 @@ def game_scoring_totals(player: str):
 
     items = GoalEvent.cache.entries.items()
 
-    goals = len(
-        [getattr(v, "scorer_name") for k, v in items if getattr(v, "scorer_name") == player]
-    )
-    primary = len(
-        [getattr(v, "primary_name") for k, v in items if getattr(v, "primary_name") == player]
-    )
+    goals = len([getattr(v, "scorer_name") for k, v in items if getattr(v, "scorer_name") == player])
+    primary = len([getattr(v, "primary_name") for k, v in items if getattr(v, "primary_name") == player])
     secondary = len(
         [getattr(v, "secondary_name") for k, v in items if getattr(v, "secondary_name") == player]
     )
@@ -259,8 +257,8 @@ class Cache:
 
 
 class GenericEvent:
-    """ A Generic Game event where we just store the attributes and don't
-        do anything with the object except store it.
+    """A Generic Game event where we just store the attributes and don't
+    do anything with the object except store it.
     """
 
     cache = Cache(__name__)
@@ -306,9 +304,8 @@ class GenericEvent:
         self.away_onice_num = len(self.away_onice)
         self.strength = f"{self.home_onice_num}v{self.away_onice_num}"
 
-
     def asdict(self, withsource=False):
-        """ Returns the object as a dictionary with the option of excluding the original
+        """Returns the object as a dictionary with the option of excluding the original
             dictionary used to create the objet.
 
         Args:
@@ -328,8 +325,8 @@ class GenericEvent:
 
 
 class PeriodReadyEvent(GenericEvent):
-    """ A Period Ready object contains all of period-ready-related attributes and extra methods.
-        It is a subclass of the GenericEvent class with the most basic attributes.
+    """A Period Ready object contains all of period-ready-related attributes and extra methods.
+    It is a subclass of the GenericEvent class with the most basic attributes.
     """
 
     cache = Cache(__name__)
@@ -347,16 +344,12 @@ class PeriodReadyEvent(GenericEvent):
         preferred_homeaway = self.game.preferred_team.home_away
         players = self.livefeed.get("gameData").get("players")
         on_ice = (
-            self.livefeed.get("liveData")
-            .get("boxscore")
-            .get("teams")
-            .get(preferred_homeaway)
-            .get("onIce")
+            self.livefeed.get("liveData").get("boxscore").get("teams").get(preferred_homeaway).get("onIce")
         )
         self.social_msg = self.get_lineup(on_ice, players) if on_ice else None
 
     def get_lineup(self, on_ice, players):
-        """ Generates a lineup message for a given team.
+        """Generates a lineup message for a given team.
 
         Args:
             game (Game): The current game instance.
@@ -432,8 +425,8 @@ class PeriodReadyEvent(GenericEvent):
 
 
 class PeriodStartEvent(GenericEvent):
-    """ A Period Start object contains all start of period-related attributes and extra methods.
-        It is a subclass of the GenericEvent class with the most basic attributes.
+    """A Period Start object contains all start of period-related attributes and extra methods.
+    It is a subclass of the GenericEvent class with the most basic attributes.
     """
 
     cache = Cache(__name__)
@@ -461,9 +454,7 @@ class PeriodStartEvent(GenericEvent):
             )
         # Second & Third period start events are same for all game types
         elif self.period in (2, 3):
-            self.social_msg = (
-                f"It's time for the {self.period_ordinal} period at " f"{self.game.venue}."
-            )
+            self.social_msg = f"It's time for the {self.period_ordinal} period at " f"{self.game.venue}."
         # Non-Playoff Game Period Start (3-on-3 OT)
         elif self.period == 4 and self.game.game_type in ("PR", "R"):
             self.social_msg = (
@@ -473,8 +464,7 @@ class PeriodStartEvent(GenericEvent):
         elif self.period > 3 and self.game.game_type == "P":
             ot_period = self.period - 3
             self.social_msg = (
-                f"Who will be the hero this time? "
-                f"OT{ot_period} starts now at {self.game.venue}."
+                f"Who will be the hero this time? " f"OT{ot_period} starts now at {self.game.venue}."
             )
         # Start of the Shootout (Period 5 of Non-Playoff Game)
         elif self.period == 5 and self.game.game_type in ("PR", "R"):
@@ -482,8 +472,8 @@ class PeriodStartEvent(GenericEvent):
 
 
 class PeriodEndEvent(GenericEvent):
-    """ A Period End object contains all end of period-related attributes and extra methods.
-        It is a subclass of the GenericEvent class with the most basic attributes.
+    """A Period End object contains all end of period-related attributes and extra methods.
+    It is a subclass of the GenericEvent class with the most basic attributes.
     """
 
     cache = Cache(__name__)
@@ -506,9 +496,7 @@ class PeriodEndEvent(GenericEvent):
                 raise AttributeError("Cannot generate images with an empty boxscore, try again later.")
 
             stats_image = images.stats_image(game=self.game, game_end=False, boxscore=boxscore)
-            img_filename = os.path.join(
-                IMAGES_PATH, "temp", f"Intermission-{self.period}-{game.game_id}.png"
-            )
+            img_filename = os.path.join(IMAGES_PATH, "temp", f"Intermission-{self.period}-{game.game_id}.png")
             stats_image.save(img_filename)
 
             social_ids = socialhandler.send(
@@ -520,7 +508,6 @@ class PeriodEndEvent(GenericEvent):
             social_ids = socialhandler.send(
                 msg=stat_leaders_social, reply=last_tweet, event=self, game_hashtag=True
             )
-
 
     def get_period_end_text(self):
         """ Formats the main period end text with some logic based on score & period. """
@@ -540,11 +527,7 @@ class PeriodEndEvent(GenericEvent):
             )
 
         # Non-Playoff game tied after OT - Heads to a Shootout
-        elif (
-            self.period > 3
-            and self.tied_score
-            and GameType(self.game.game_type) != GameType.PLAYOFFS
-        ):
+        elif self.period > 3 and self.tied_score and GameType(self.game.game_type) != GameType.PLAYOFFS:
             period_end_text = (
                 f"60 minutes and some overtime weren't enough to decide this game. "
                 f"{self.game.preferred_team.short_name} and {self.game.other_team.short_name} "
@@ -552,11 +535,7 @@ class PeriodEndEvent(GenericEvent):
             )
 
         # Playoff game still tied - heads to extra OT!
-        elif (
-            self.period > 3
-            and self.tied_score
-            and GameType(self.game.game_type) == GameType.PLAYOFFS
-        ):
+        elif self.period > 3 and self.tied_score and GameType(self.game.game_type) == GameType.PLAYOFFS:
             ot_period = self.period - 3
             next_ot_period = ot_period + 1
             ot_text = "overtime wasn't" if ot_period == 1 else "overtimes weren't"
@@ -621,11 +600,10 @@ class PeriodEndEvent(GenericEvent):
         if value > current_leader_value:
             stat_leaders[stat] = value
             value = utils.to_mmss(value) if stat == "timeOnIce" else value
-            stat_leaders[f'{stat}_str'] = f'{value} ({last_name})'
+            stat_leaders[f"{stat}_str"] = f"{value} ({last_name})"
 
         # Return updated stat_leaders dictionary
         return stat_leaders
-
 
     def get_stat_leaders(self):
         """ Gets stat leaders in a number of important categories. """
@@ -654,17 +632,13 @@ class PeriodEndEvent(GenericEvent):
 
         preferred_homeaway = self.game.preferred_team.home_away
         player_stats = (
-            self.livefeed.get("liveData")
-            .get("boxscore")
-            .get("teams")
-            .get(preferred_homeaway)
-            .get("players")
+            self.livefeed.get("liveData").get("boxscore").get("teams").get(preferred_homeaway).get("players")
         )
 
         for _, player in player_stats.items():
-            name = player.get('person').get('fullName')
+            name = player.get("person").get("fullName")
             last_name = " ".join(name.split()[1:])
-            stats = player.get('stats').get('skaterStats')
+            stats = player.get("stats").get("skaterStats")
             if not stats:
                 continue
             for i in stats_to_check:
@@ -675,9 +649,9 @@ class PeriodEndEvent(GenericEvent):
 
         stat_leaders_final = list()
         for i in stats_to_check:
-            desc = stat_leaders.get(f'{i}_desc')
-            value = stat_leaders.get(f'{i}_str')
-            stat_value_string = f'{desc}: {value}'
+            desc = stat_leaders.get(f"{i}_desc")
+            value = stat_leaders.get(f"{i}_str")
+            stat_value_string = f"{desc}: {value}"
             stat_leaders_final.append(stat_value_string)
 
         stat_leaders_final_string = "\n".join(stat_leaders_final)
@@ -685,10 +659,9 @@ class PeriodEndEvent(GenericEvent):
         return stat_leaders_final_string
 
 
-
 class FaceoffEvent(GenericEvent):
-    """ A Faceoff object contains all faceoff-related attributes and extra methods.
-        It is a subclass of the GenericEvent class with the most basic attributes.
+    """A Faceoff object contains all faceoff-related attributes and extra methods.
+    It is a subclass of the GenericEvent class with the most basic attributes.
     """
 
     cache = Cache(__name__)
@@ -727,8 +700,8 @@ class FaceoffEvent(GenericEvent):
 
 
 class HitEvent(GenericEvent):
-    """ A Hit object contains all hit-related attributes and extra methods.
-        It is a subclass of the GenericEvent class with the most basic attributes.
+    """A Hit object contains all hit-related attributes and extra methods.
+    It is a subclass of the GenericEvent class with the most basic attributes.
     """
 
     cache = Cache(__name__)
@@ -752,8 +725,8 @@ class HitEvent(GenericEvent):
 
 
 class StopEvent(GenericEvent):
-    """ A Stop object contains all stoppage-related attributes and extra methods.
-        It is a subclass of the GenericEvent class with the most basic attributes.
+    """A Stop object contains all stoppage-related attributes and extra methods.
+    It is a subclass of the GenericEvent class with the most basic attributes.
     """
 
     cache = Cache(__name__)
@@ -764,8 +737,8 @@ class StopEvent(GenericEvent):
 
 
 class GoalEvent(GenericEvent):
-    """ A Goal object contains all goal-related attributes and extra methods.
-        It is a subclass of the GenericEvent class with the most basic attributes.
+    """A Goal object contains all goal-related attributes and extra methods.
+    It is a subclass of the GenericEvent class with the most basic attributes.
     """
 
     cache = Cache(__name__)
@@ -813,9 +786,7 @@ class GoalEvent(GenericEvent):
         # Get Scorer Career Stats
         self.scorer_career_stats = stats.get_player_career_stats(self.scorer_id)
         self.scorer_career_goals = self.scorer_career_stats.get("goals", 0) + self.scorer_game_total
-        self.scorer_career_points = (
-            self.scorer_career_stats.get("points", 0) + self.scorer_game_total_points
-        )
+        self.scorer_career_points = self.scorer_career_stats.get("points", 0) + self.scorer_game_total_points
         print("==================== POINT TOALS SECTION ====================")
         print(f"Goal Scorer ({self.scorer_name}) Goals - {self.scorer_game_total}")
         print(f"Goal Scorer ({self.scorer_name}) Career Goals - {self.scorer_career_goals}")
@@ -843,7 +814,6 @@ class GoalEvent(GenericEvent):
         goals_list.append(self)
         self.game.all_goals.append(self)
 
-
         # Now call any functions that should be called when creating a new object
         self.goal_title_text = self.get_goal_title_text()
         self.goal_main_text = self.get_goal_main_text()
@@ -855,30 +825,41 @@ class GoalEvent(GenericEvent):
 
         # Generate the Discord Embed
         self.discord_embed = self.generate_discord_embed()
-        social_ids = socialhandler.send(msg=self.social_msg, event=self, game_hashtag=True, discord_embed=self.discord_embed)
+        social_ids = socialhandler.send(
+            msg=self.social_msg, event=self, game_hashtag=True, discord_embed=self.discord_embed
+        )
 
         # Set any social media IDs
         self.tweet = social_ids.get("twitter")
 
-
         # Now that the main goal text is sent, check for milestones
-        if hasattr(self, "scorer_career_points") and (self.scorer_career_points % 100 == 0 or self.scorer_career_points == 1):
+        if hasattr(self, "scorer_career_points") and (
+            self.scorer_career_points % 100 == 0 or self.scorer_career_points == 1
+        ):
             logging.info("Goal Scorer - Career Point Milestone - %s", self.scorer_career_points)
             self.milestone_tweet_sender(self.scorer_name, "point", self.scorer_career_points)
 
-        if hasattr(self, "primary_career_assists") and (self.primary_career_assists % 100 == 0 or self.primary_career_assists == 1):
+        if hasattr(self, "primary_career_assists") and (
+            self.primary_career_assists % 100 == 0 or self.primary_career_assists == 1
+        ):
             logging.info("Primary - Career Assist Milestone - %s", self.primary_career_assists)
             self.milestone_tweet_sender(self.primary_name, "assist", self.primary_career_assists)
 
-        if hasattr(self, "primary_career_points") and (self.primary_career_points % 100 == 0 or self.primary_career_points == 1):
+        if hasattr(self, "primary_career_points") and (
+            self.primary_career_points % 100 == 0 or self.primary_career_points == 1
+        ):
             logging.info("Primary - Career Point Milestone - %s", self.scorer_career_points)
             self.milestone_tweet_sender(self.primary_name, "point", self.primary_career_points)
 
-        if hasattr(self, "secondary_career_assists") and (self.secondary_career_assists % 100 == 0 or self.secondary_career_assists == 1):
+        if hasattr(self, "secondary_career_assists") and (
+            self.secondary_career_assists % 100 == 0 or self.secondary_career_assists == 1
+        ):
             logging.info("Secondary - Career Assist Milestone - %s", self.secondary_career_assists)
             self.milestone_tweet_sender(self.secondary_name, "assist", self.secondary_career_assists)
 
-        if hasattr(self, "secondary_career_points") and (self.secondary_career_points % 100 == 0 or self.secondary_career_points == 1):
+        if hasattr(self, "secondary_career_points") and (
+            self.secondary_career_points % 100 == 0 or self.secondary_career_points == 1
+        ):
             logging.info("Secondary - Career Point Milestone - %s", self.secondary_career_points)
             self.milestone_tweet_sender(self.secondary_name, "point", self.secondary_career_points)
 
@@ -901,17 +882,11 @@ class GoalEvent(GenericEvent):
             self.primary_career_assists = (
                 self.primary_career_stats.get("assists", 0) + self.primary_game_assists
             )
-            self.primary_career_points = (
-                self.primary_career_stats.get("points", 0) + self.primary_game_points
-            )
+            self.primary_career_points = self.primary_career_stats.get("points", 0) + self.primary_game_points
             print(f"Primary Assist ({self.primary_name}) Assists - {self.primary_game_assists}")
-            print(
-                f"Primary Assist ({self.primary_name}) Career Assists - {self.primary_career_assists}"
-            )
+            print(f"Primary Assist ({self.primary_name}) Career Assists - {self.primary_career_assists}")
             print(f"Primary Assist ({self.primary_name}) Points - {self.primary_game_points}")
-            print(
-                f"Primary Assist ({self.primary_name}) Career Points - {self.primary_career_points}"
-            )
+            print(f"Primary Assist ({self.primary_name}) Career Points - {self.primary_career_points}")
 
             self.secondary_name = assist[1].get("player").get("fullName")
             self.secondary_id = assist[1].get("player").get("id")
@@ -928,16 +903,12 @@ class GoalEvent(GenericEvent):
             self.secondary_career_points = (
                 self.secondary_career_stats.get("points", 0) + self.secondary_game_points
             )
-            print(
-                f"Secondary Assist ({self.secondary_name}) Assists - {self.secondary_game_assists}"
-            )
+            print(f"Secondary Assist ({self.secondary_name}) Assists - {self.secondary_game_assists}")
             print(
                 f"Secondary Assist ({self.secondary_name}) Career Assists - {self.secondary_career_assists}"
             )
             print(f"Secondary Assist ({self.secondary_name}) Points - {self.secondary_game_points}")
-            print(
-                f"Secondary Assist ({self.secondary_name}) Career Points - {self.secondary_career_points}"
-            )
+            print(f"Secondary Assist ({self.secondary_name}) Career Points - {self.secondary_career_points}")
 
             self.unassisted = False
         elif len(assist) == 1:
@@ -950,20 +921,12 @@ class GoalEvent(GenericEvent):
             self.primary_game_assists = self.primary_game_stats["assists"] + 1
             self.primary_game_points = self.primary_game_stats["points"] + 1
             self.primary_career_stats = stats.get_player_career_stats(self.primary_id)
-            self.primary_career_assists = (
-                self.primary_career_stats["assists"] + self.primary_game_assists
-            )
-            self.primary_career_points = (
-                self.primary_career_stats["points"] + self.primary_game_points
-            )
+            self.primary_career_assists = self.primary_career_stats["assists"] + self.primary_game_assists
+            self.primary_career_points = self.primary_career_stats["points"] + self.primary_game_points
             print(f"Primary Assist ({self.primary_name}) Assists - {self.primary_game_assists}")
-            print(
-                f"Primary Assist ({self.primary_name}) Career Assists - {self.primary_career_assists}"
-            )
+            print(f"Primary Assist ({self.primary_name}) Career Assists - {self.primary_career_assists}")
             print(f"Primary Assist ({self.primary_name}) Points - {self.primary_game_points}")
-            print(
-                f"Primary Assist ({self.primary_name}) Career Points - {self.primary_career_points}"
-            )
+            print(f"Primary Assist ({self.primary_name}) Career Points - {self.primary_career_points}")
 
             self.secondary_name = None
             self.secondry_id = None
@@ -1076,7 +1039,6 @@ class GoalEvent(GenericEvent):
 
         return goal_main_text
 
-
     def generate_discord_embed(self):
         """ Generates the custom Discord embed used for Goals. """
 
@@ -1087,13 +1049,23 @@ class GoalEvent(GenericEvent):
                     "description": self.get_goal_main_text(discordfmt=True),
                     "color": 13111342,
                     "timestamp": self.date_time,
-                    "footer": {"text": f"Period: {self.period} / Time Remaining: {self.period_time_remain_str}"},
+                    "footer": {
+                        "text": f"Period: {self.period} / Time Remaining: {self.period_time_remain_str}"
+                    },
                     # "thumbnail": {"url": "https://i.imgur.com/lCBug3D.png"},
                     # "image": {"url": "attachment://NewJerseyDevils.png"},
                     # "author": {"name": "Hockey Game Bot"},
                     "fields": [
-                        {"name": f"**{self.game.preferred_team.team_name}**", "value": f"Score: {self.pref_goals}", "inline": True},
-                        {"name": f"**{self.game.other_team.team_name}**", "value": f"Score: {self.other_goals}", "inline": True},
+                        {
+                            "name": f"**{self.game.preferred_team.team_name}**",
+                            "value": f"Score: {self.pref_goals}",
+                            "inline": True,
+                        },
+                        {
+                            "name": f"**{self.game.other_team.team_name}**",
+                            "value": f"Score: {self.other_goals}",
+                            "inline": True,
+                        },
                     ],
                 }
             ]
@@ -1101,9 +1073,8 @@ class GoalEvent(GenericEvent):
 
         return discord_embed
 
-
     def check_for_scoring_changes(self, data: dict):
-        """ Checks for scoring changes or changes in assists (or even number of assists).
+        """Checks for scoring changes or changes in assists (or even number of assists).
 
         Args:
             data: Dictionary of a Goal Event from the Live Feed allPlays endpoint
@@ -1131,9 +1102,7 @@ class GoalEvent(GenericEvent):
         if scorer_change:
             print("Old Scorer -", self.scorer_name)
             goal_scorechange_title = "The scoring on this goal has changed."
-            logging.info(
-                "Scoring change detected for event ID %s / IDX %s.", self.event_id, self.event_idx
-            )
+            logging.info("Scoring change detected for event ID %s / IDX %s.", self.event_id, self.event_idx)
             self.scorer_name = scorer[0].get("player").get("fullName")
             self.scorer_id = scorer[0].get("player").get("id")
             self.scorer_season_ttl = scorer[0].get("seasonTotal")
@@ -1144,8 +1113,7 @@ class GoalEvent(GenericEvent):
 
             if not assist:
                 goal_scorechange_text = (
-                    f"Now reads as an unassisted goal for {self.scorer_name} "
-                    f"({self.scorer_season_ttl})."
+                    f"Now reads as an unassisted goal for {self.scorer_name} " f"({self.scorer_season_ttl})."
                 )
             elif self.num_assists == 1:
                 goal_scorechange_text = (
@@ -1203,23 +1171,31 @@ class GoalEvent(GenericEvent):
 
     def was_goal_removed(self, all_plays: dict):
         """ This function checks if the goal was removed from the livefeed (usually for a Challenge). """
-        goal_still_exists = next((play for play in all_plays if play['about']['eventId'] == self.event_id), None)
+        goal_still_exists = next(
+            (play for play in all_plays if play["about"]["eventId"] == self.event_id), None
+        )
 
         # If the goal doesn't exist, check the event removal counter & then delete the event
         if not goal_still_exists and self.event_removal_counter < 5:
-            logging.warning("A GoalEvent (event ID: %s) is missing (loop #%s) - will check again.", self.event_id, self.event_removal_counter)
+            logging.warning(
+                "A GoalEvent (event ID: %s) is missing (loop #%s) - will check again.",
+                self.event_id,
+                self.event_removal_counter,
+            )
             self.event_removal_counter += 1
             return False
         elif not goal_still_exists and self.event_removal_counter == 5:
-            logging.warning("A GoalEvent (event ID: %s) has been missing for 5 checks - deleting.", self.event_id)
+            logging.warning(
+                "A GoalEvent (event ID: %s) has been missing for 5 checks - deleting.", self.event_id
+            )
             return True
         else:
             return False
 
 
 class ShotEvent(GenericEvent):
-    """ A Shot object contains all shot-related attributes and extra methods.
-        It is a subclass of the GenericEvent class with the most basic attributes.
+    """A Shot object contains all shot-related attributes and extra methods.
+    It is a subclass of the GenericEvent class with the most basic attributes.
     """
 
     cache = Cache(__name__)
@@ -1265,8 +1241,8 @@ class ShotEvent(GenericEvent):
             ids = socialhandler.send(msg=self.social_msg, event=self, game_hashtag=True)
 
     def crossbar_or_post(self):
-        """ Checks shot text to determine if the shot was by the preferred
-            team and hit the crossbar or post. """
+        """Checks shot text to determine if the shot was by the preferred
+        team and hit the crossbar or post."""
 
         # This checks if the shot was taken by the preferred team
         if self.event_team != self.game.preferred_team.team_name:
@@ -1297,8 +1273,8 @@ class ShotEvent(GenericEvent):
 
 
 class PenaltyEvent(GenericEvent):
-    """ A Faceoff object contains all faceoff-related attributes and extra methods.
-        It is a subclass of the GenericEvent class with the most basic attributes.
+    """A Faceoff object contains all faceoff-related attributes and extra methods.
+    It is a subclass of the GenericEvent class with the most basic attributes.
     """
 
     cache = Cache(__name__)
@@ -1348,13 +1324,13 @@ class PenaltyEvent(GenericEvent):
 
         self.penalty_on_name = penalty_on[0].get("player").get("fullName")
         self.penalty_on_id = penalty_on[0].get("player").get("id")
-        self.penalty_on_game_ttl = (
-            game_event_total(PenaltyEvent, self.penalty_on_name, "penalty_on_name") + 1
-        )
+        self.penalty_on_game_ttl = game_event_total(PenaltyEvent, self.penalty_on_name, "penalty_on_name") + 1
 
         # Penalty Shot Fixes
         if self.minutes == 0 and not self.drew_by_name:
-            raise ValueError("A 0-minute penalty (usually a penalty shot) requires a drewBy attribute for the shooter.")
+            raise ValueError(
+                "A 0-minute penalty (usually a penalty shot) requires a drewBy attribute for the shooter."
+            )
         elif self.minutes == 0 and self.drew_by_name:
             self.secondary_type = self.secondary_type.replace("ps - ", "")
             self.penalty_shot = True
@@ -1370,7 +1346,9 @@ class PenaltyEvent(GenericEvent):
         pref_team = self.game.preferred_team
         other_team = self.game.other_team
         penalty_team_obj = pref_team if pref_team.team_name == self.penalty_team else other_team
-        penalty_zone_info = utils.determine_event_zone(self.x, self.y, self.period, penalty_team_obj.home_away)
+        penalty_zone_info = utils.determine_event_zone(
+            self.x, self.y, self.period, penalty_team_obj.home_away
+        )
         penalty_zone = penalty_zone_info[1]
         self.penalty_zone_text = f" in the {penalty_zone} zone" if penalty_zone else ""
 
@@ -1387,7 +1365,7 @@ class PenaltyEvent(GenericEvent):
             "delaying game - puck over glass": "delay of game (puck over glass)",
             "interference - goalkeeper": "goalie interference",
             "missing key [pd_151]": "delay of game (unsuccessful challenge)",
-            "hi-sticking": "high sticking"
+            "hi-sticking": "high sticking",
         }
         return secondarty_types.get(original_type, original_type)
 
@@ -1435,9 +1413,7 @@ class PenaltyEvent(GenericEvent):
             elif pref_skaters == 4 and other_skaters == 5:
                 penalty_text_skaters = f"{pref_short_name} are headed to the penalty kill!"
             elif pref_skaters == 3 and other_skaters == 5:
-                penalty_text_skaters = (
-                    f"{pref_short_name} will have to kill off a two-man advantage!"
-                )
+                penalty_text_skaters = f"{pref_short_name} will have to kill off a two-man advantage!"
             elif pref_skaters == 3 and other_skaters == 5:
                 penalty_text_skaters = f"{pref_short_name} will have a 4-on-3 penalty to kill!"
         else:
@@ -1477,9 +1453,7 @@ class PenaltyEvent(GenericEvent):
         penalty_on_short_name = self.penalty_on_team.short_name
         penalty_on_stat = penalty_on_stats[0]
         penalty_on_rank = penalty_on_stats[1]
-        penalty_on_rankstat_text = (
-            f"{penalty_on_short_name} PK: {penalty_on_stat}% ({penalty_on_rank})"
-        )
+        penalty_on_rankstat_text = f"{penalty_on_short_name} PK: {penalty_on_stat}% ({penalty_on_rank})"
 
         penalty_draw_stats = self.penalty_draw_team.get_stat_and_rank("powerPlayPercentage")
         penalty_draw_short_name = self.penalty_draw_team.short_name
@@ -1507,17 +1481,17 @@ class PenaltyEvent(GenericEvent):
 
 
 class ChallengeEvent(GenericEvent):
-    """ A Challenge object contains all challenge-related attributes and extra methods.
-        It is a subclass of the GenericEvent class with the most basic attributes.
-        This event needs to be aware of events around it so it can understand reversals.
+    """A Challenge object contains all challenge-related attributes and extra methods.
+    It is a subclass of the GenericEvent class with the most basic attributes.
+    This event needs to be aware of events around it so it can understand reversals.
     """
 
     cache = Cache(__name__)
 
 
 class ShootoutEvent(GenericEvent):
-    """ A Shootout object contains all shootout-related attributes and extra methods.
-        It is a subclass of the GenericEvent class with the most basic attributes.
+    """A Shootout object contains all shootout-related attributes and extra methods.
+    It is a subclass of the GenericEvent class with the most basic attributes.
     """
 
     cache = Cache(__name__)
@@ -1526,9 +1500,17 @@ class ShootoutEvent(GenericEvent):
         super().__init__(data, game)
 
         # Check if the event is actual shootout event
-        non_shootout_events = ["PERIOD_START", "SHOOTOUT_COMPLETE", "PERIOD_END", "PERIOD_OFFICIAL", "GAME_OFFICIAL"]
+        non_shootout_events = [
+            "PERIOD_START",
+            "SHOOTOUT_COMPLETE",
+            "PERIOD_END",
+            "PERIOD_OFFICIAL",
+            "GAME_OFFICIAL",
+        ]
         if self.event_type in non_shootout_events:
-            logging.info("A non-tracking shootout event (%s) detected - just return & skip this.", self.event_type)
+            logging.info(
+                "A non-tracking shootout event (%s) detected - just return & skip this.", self.event_type
+            )
             return
 
         if self.event_type == "PERIOD_READY":
@@ -1553,10 +1535,7 @@ class ShootoutEvent(GenericEvent):
         self.goalie_id = goalie[0].get("player").get("id") if goalie else None
 
         shootout_tracking_emoji = "✅" if self.event_type == "GOAL" else "❌"
-        logging.info(
-            "Shootout event (%s) detected for %s.",
-            self.event_type, self.event_team
-        )
+        logging.info("Shootout event (%s) detected for %s.", self.event_type, self.event_team)
 
         # Preferred Team Shoots
         if self.event_team == game.preferred_team.team_name:
@@ -1565,7 +1544,8 @@ class ShootoutEvent(GenericEvent):
             if self.event_type == "GOAL":
                 self.shootout_event_text = f"{self.shooter_name} shoots & scores! 🚨"
             elif self.event_type == "SHOT":
-                self.shootout_event_text = f"{self.shooter_name}'s shot saved by {self.goalie_name}. 😠"
+                goalie_string = f" by {self.goalie_name}." if self.goalie_name else "."
+                self.shootout_event_text = f"{self.shooter_name}'s shot saved{goalie_string} 😠"
             elif hit_crossbar_post:
                 self.shootout_event_text = f"{self.shooter_name} shoots & hits the {hit_crossbar_post}. 😠"
             else:
@@ -1578,7 +1558,8 @@ class ShootoutEvent(GenericEvent):
             if self.event_type == "GOAL":
                 self.shootout_event_text = f"{self.shooter_name} shoots & scores. 👎🏻"
             elif self.event_type == "SHOT":
-                self.shootout_event_text = f"{self.shooter_name}'s shot saved by {self.goalie_name}! 🛑"
+                goalie_string = f" by {self.goalie_name}!" if self.goalie_name else "!"
+                self.shootout_event_text = f"{self.shooter_name}'s shot saved{goalie_string} 🛑"
             elif hit_crossbar_post:
                 self.shootout_event_text = f"{self.shooter_name} shoots & hits the {hit_crossbar_post}! 🛎"
             else:
@@ -1617,9 +1598,9 @@ class ShootoutEvent(GenericEvent):
 
 
 class GameEndEvent(GenericEvent):
-    """ A Game End object contains all game end related attributes and extra methods.
-        It is a subclass of the GenericEvent class with the most basic attributes.
-        # TODO: Determine if we need this or if the game goes FINAL as this event is posted
+    """A Game End object contains all game end related attributes and extra methods.
+    It is a subclass of the GenericEvent class with the most basic attributes.
+    # TODO: Determine if we need this or if the game goes FINAL as this event is posted
     """
 
     cache = Cache(__name__)
