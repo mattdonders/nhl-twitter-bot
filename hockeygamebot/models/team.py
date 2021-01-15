@@ -130,7 +130,7 @@ class Team(object):
             self.pp_time_stats = {"5v4": {}, "5v3": {}, "4v3": {}}
             for i in ("5v4", "5v3", "4v3"):
                 self.pp_time_stats[i] = {
-                    k.replace(i, ""): v for (k, v) in self.pp_time_stats.items() if i in k
+                    k.replace(i, ""): v for (k, v) in pp_time_resp.items() if i in k
                 }
         except (IndexError, KeyError) as e:
             logging.warning("Error getting Power Play time stats - %s", e)
@@ -150,7 +150,7 @@ class Team(object):
             self.pk_time_stats = {"4v5": {}, "3v5": {}, "3v4": {}}
             for i in ("4v5", "3v5", "3v4"):
                 self.pk_time_stats[i] = {
-                    k.replace(i, ""): v for (k, v) in self.pk_time_stats.items() if i in k
+                    k.replace(i, ""): v for (k, v) in pk_time_resp.items() if i in k
                 }
         except (IndexError, KeyError) as e:
             self.pk_time_stats = None
