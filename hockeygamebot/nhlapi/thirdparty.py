@@ -39,7 +39,13 @@ def thirdparty_request(url, headers=None):
     # Setup a Fake User Agent (simulates a real visit)
     ua = UserAgent(cache=False)
     ua_header = {"User-Agent": str(ua.chrome)}
-    headers = ua_header if not headers else headers
+    if headers:
+        headers.update(ua_header)
+    else:
+        headers = ua_header
+    # headers = ua_header if not headers else headers
+    # headers = headers.update(ua_header)
+    # print(headers)
 
     try:
         logging.info("Sending Third Party URL Request - %s", url)
@@ -531,7 +537,8 @@ def dailyfaceoff_goalies(pref_team, other_team, pref_homeaway, game_date):
     df_linecombos_url = urls["endpoints"]["df_line_combos"]
 
     logging.info("Trying to get starting goalie information via Daily Faceoff.")
-    resp = thirdparty_request(df_goalies_url)
+    cache_headers = {"cache-control": "max-age=0"}
+    resp = thirdparty_request(df_goalies_url, headers=cache_headers)
 
     # If we get a bad response from the function above, return False
     if resp is None:
