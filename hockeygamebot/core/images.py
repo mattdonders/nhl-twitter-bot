@@ -748,7 +748,7 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
     bg_w, bg_h = bg.size
 
     pref_team = game.preferred_team.team_name.replace(" ", "")
-    other_team = game.home_team.team_name.replace(" ", "")
+    other_team = game.other_team.team_name.replace(" ", "")
     pref_logo = Image.open(os.path.join(PROJECT_ROOT, f"resources/logos/{pref_team}.png"))
     other_logo = Image.open(os.path.join(PROJECT_ROOT, f"resources/logos/{other_team}.png"))
 
@@ -784,11 +784,11 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
     # fmt:off
     center_text(
         draw=draw, left=COORDS_PREF_X + LOGO_SCORE_SPACING, top=LOGO_Y, width=190,
-        text=str(game.home_team.score), color=Colors.WHITE, font=FONT_SCORE, vertical=True, height=FontSizes.SCORE
+        text=str(game.preferred_team.score), color=Colors.WHITE, font=FONT_SCORE, vertical=True, height=FontSizes.SCORE
     )
     center_text(
         draw=draw, left=COORDS_OTHER_X + LOGO_SCORE_SPACING, top=LOGO_Y, width=190,
-        text=str(game.away_team.score), color=Colors.WHITE, font=FONT_SCORE, vertical=True, height=FontSizes.SCORE
+        text=str(game.other_team.score), color=Colors.WHITE, font=FONT_SCORE, vertical=True, height=FontSizes.SCORE
     )
     # fmt: on
 
