@@ -235,7 +235,13 @@ def parse_nst_oistats(oi_sva):
 
         cf = float(items[3].text)
         ca = float(items[4].text)
+        cfpct = float(items[5].text)
         corsi_diff = round(cf - ca, 2)
+
+        ff = float(items[7].text)
+        fa = float(items[8].text)
+        ffpct = float(items[9].text)
+        fenwick_diff = round(ff - fa, 2)
 
         sf = float(items[11].text)
         sa = float(items[12].text)
@@ -243,6 +249,7 @@ def parse_nst_oistats(oi_sva):
 
         xgf = float(items[19].text)
         xga = float(items[20].text)
+        xgpct = float(items[21].text)
         xg_diff = round(xgf - xga, 2)
 
         hdcf = float(items[27].text)
@@ -254,12 +261,18 @@ def parse_nst_oistats(oi_sva):
             "toi": toi,
             "cf": cf,
             "ca": ca,
+            "cfpct": cfpct,
             "corsi_diff": corsi_diff,
+            "ff": ff,
+            "fa": fa,
+            "ffpct": ffpct,
+            "fenwick_diff": fenwick_diff,
             "sa": sa,
             "sf": sf,
             "shots_diff": shots_diff,
             "xgf": xgf,
             "xga": xga,
+            "xgpct": xgpct,
             "xg_diff": xg_diff,
             "hdcf": xgf,
             "hdca": xga,
@@ -759,6 +772,181 @@ def charts_fwds_def(game_title, team, fwd_sva_stats, def_sva_stats):
     return fwds_def_fig
 
 
+def charts_cfpct_xgpct_scatter(game_title, team_name, oi_sva_stats):
+    # Generates Two Scatter Plots (Quality vs Quantity & xG Rate / 60)
+    plt.clf()
+
+    # Convert Game Title
+    team_name_mathtext = rf"$\bf{{{team_name}}}$".replace(" ", "\ ")
+    game_title = game_title.replace(team_name, team_name_mathtext)
+
+    CORNER_FONTSIZE = 8
+
+    # Convert OI SVA Stats to DataFrame & Caclulate xGF / 60 and xGA / 60
+    df_oi_scatter = pd.DataFrame(oi_sva_stats)
+
+    df_oi_scatter["xgf60"] = (df_oi_scatter["xgf"] * 60) / df_oi_scatter["toi"]
+    df_oi_scatter["xga60"] = (df_oi_scatter["xga"] * 60) / df_oi_scatter["toi"]
+    df_oi_scatter["last_name"] = df_oi_scatter["player"].str.split().str[1:].str.join(" ")
+    df_oi_scatter = df_oi_scatter[["player", "last_name", "toi", "cfpct", "xgpct", "xgf60", "xga60"]]
+
+    # Calculate ColorBar (for use later)
+    color_map = plt.cm.get_cmap("Blues")
+    df_oi_scatter_toi = df_oi_scatter["toi"]
+    max_scatter_toi = max(df_oi_scatter_toi)
+    oi_scatter_color = df_oi_scatter_toi / float(max_scatter_toi)
+    oi_scatter_colormap = color_map(oi_scatter_color)
+
+    # Start Generating Quality vs. Quantity Graph (xGF% vs CF%)
+    oi_cfpct_xgpct_fig, ax1 = plt.subplots(1, 1, figsize=(10, 8))
+    df_oi_scatter.plot(kind="scatter", ax=ax1, x="xgpct", y="cfpct", color=oi_scatter_colormap)
+
+    ax1.axvline(x=50, color="black", linewidth=0.5)
+    ax1.axhline(y=50, color="black", linewidth=0.5)
+
+    for row in df_oi_scatter.itertuples():
+        ax1.annotate(
+            row.last_name,
+            (row.xgpct, row.cfpct),
+            textcoords="offset points",
+            xytext=(0, 5),
+            ha="center",
+            fontsize=10,
+        )
+
+    xmin, xmax = ax1.get_xlim()
+    ymin, ymax = ax1.get_ylim()
+
+    ax1.set_xlabel("xGF%", labelpad=10)
+    ax1.set_ylabel("CF%", labelpad=10)
+
+    ax1.text(xmin + 0.5, ymax - 1, "MORE QUANTITY", fontsize=CORNER_FONTSIZE, fontweight="bold", ha="left")
+    ax1.text(xmin + 0.5, ymin + 1, "BAD", fontsize=CORNER_FONTSIZE, fontweight="bold", ha="left")
+    ax1.text(xmax - 0.5, ymax - 1, "VERY GOOD", fontsize=CORNER_FONTSIZE, fontweight="bold", ha="right")
+    ax1.text(xmax - 0.5, ymin + 1, "MORE QUALITY", fontsize=CORNER_FONTSIZE, fontweight="bold", ha="right")
+    ax1.text(xmax, ymax + 0.1, "Chart Ref: @tyler_viducic", fontsize=CORNER_FONTSIZE, ha="right", va="bottom")
+
+    oi_cfpct_xgpct_fig.tight_layout(rect=[0, 0, 1, 0.92], pad=2)
+    oi_cfpct_xgpct_fig.suptitle(
+        f"{game_title}\nQuality vs. Quantity - 5v5 (SVA)\nData Courtesy: Natural Stat Trick",
+        # "On-Ice Quality vs. Quantity - 5v5 (SVA)\nData Courtesy: Natural Stat Trick",
+        x=0.45,
+        fontsize=14,
+    )
+
+    oi_cfpct_xgpct_fig.subplots_adjust(right=0.8, left=0)
+    cbar_ax = oi_cfpct_xgpct_fig.add_axes([0, 0.1, 1, 0.75])
+    cbar_ax.axis("off")
+
+    cbar_norm = mpl.colors.Normalize(vmin=0, vmax=1)
+    cbar_sm = plt.cm.ScalarMappable(cmap=color_map, norm=cbar_norm)
+    cbar_sm.set_array([])
+    fig_cbar = plt.colorbar(cbar_sm, ax=cbar_ax)
+
+    tick_locator = ticker.MaxNLocator(nbins=4)
+    fig_cbar.locator = tick_locator
+    fig_cbar.update_ticks()
+    fig_cbar.ax.set_yticklabels(["0:00", "", "", "", toi_to_mmss(max_scatter_toi)])
+    fig_cbar.set_label("Time on Ice", rotation=90)
+
+    return oi_cfpct_xgpct_fig
+
+
+def charts_xgrate60_scatter(game_title, team_name, oi_sva_stats, xg_avg):
+    CORNER_FONTSIZE = 8
+
+    # Convert Game Title
+    team_name_mathtext = rf"$\bf{{{team_name}}}$".replace(" ", "\ ")
+    game_title = game_title.replace(team_name, team_name_mathtext)
+
+    # Convert OI SVA Stats to DataFrame & Caclulate xGF / 60 and xGA / 60
+    df_oi_scatter = pd.DataFrame(oi_sva_stats)
+
+    df_oi_scatter["xgf60"] = (df_oi_scatter["xgf"] * 60) / df_oi_scatter["toi"]
+    df_oi_scatter["xga60"] = (df_oi_scatter["xga"] * 60) / df_oi_scatter["toi"]
+    df_oi_scatter["last_name"] = df_oi_scatter["player"].str.split().str[1:].str.join(" ")
+    df_oi_scatter = df_oi_scatter[["player", "last_name", "toi", "cfpct", "xgpct", "xgf60", "xga60"]]
+
+    # Calculate ColorBar (for use later)
+    color_map = plt.cm.get_cmap("Blues")
+    df_oi_scatter_toi = df_oi_scatter["toi"]
+    max_scatter_toi = max(df_oi_scatter_toi)
+    oi_scatter_color = df_oi_scatter_toi / float(max_scatter_toi)
+    oi_scatter_colormap = color_map(oi_scatter_color)
+
+    # Generate xG Rate / 60 Graph (xGF/60 vs xGA/60)
+    plt.clf()
+    oi_xgf_xga_fig, ax2 = plt.subplots(1, 1, figsize=(10, 8))
+
+    df_oi_scatter.plot(kind="scatter", ax=ax2, x="xgf60", y="xga60", color=oi_scatter_colormap)
+
+    for row in df_oi_scatter.itertuples():
+        ax2.annotate(
+            row.last_name,
+            (row.xgf60, row.xga60),
+            textcoords="offset points",
+            xytext=(0, 5),
+            ha="center",
+            fontsize=10,
+        )
+
+    xmin, xmax = ax2.get_xlim()
+    ymin, ymax = ax2.get_ylim()
+
+    # Set new Limits (Better Fitting Labels)
+    LABEL_FITTING = 0.5
+    new_xmin = max(math.floor(xmin), xmin - LABEL_FITTING)
+    new_xmax = min(math.ceil(xmax), xmax + LABEL_FITTING)
+    new_ymin = max(math.floor(ymin), ymin - LABEL_FITTING)
+    new_ymax = min(math.ceil(ymax), ymax + LABEL_FITTING)
+    ax2.set_xlim(new_xmin, new_xmax)
+    ax2.set_ylim(new_ymin, new_ymax)
+
+    x_mid = (new_xmax + new_xmin) / 2
+    y_mid = (new_ymax + new_ymin) / 2
+
+    ax2.axvline(x=xg_avg, color="black", linewidth=0.5)
+    ax2.axhline(y=xg_avg, color="black", linewidth=0.5)
+
+    ax2.set_xlabel("xGF/60", labelpad=10)
+    ax2.set_ylabel("xGA/60", labelpad=10)
+
+    ax2.text(new_xmin + 0.1, new_ymax - 0.1, "BAD", fontsize=CORNER_FONTSIZE, fontweight="bold", ha="left")
+    ax2.text(new_xmin + 0.1, new_ymin + 0.1, "DULL", fontsize=CORNER_FONTSIZE, fontweight="bold", ha="left")
+    ax2.text(
+        new_xmax - 0.1, new_ymax - 0.1, "HIGH EVENT", fontsize=CORNER_FONTSIZE, fontweight="bold", ha="right"
+    )
+    ax2.text(
+        new_xmax - 0.1, new_ymin + 0.1, "VERY GOOD", fontsize=CORNER_FONTSIZE, fontweight="bold", ha="right"
+    )
+
+    oi_xgf_xga_fig.tight_layout(rect=[0, 0, 1, 0.92], pad=2)
+    oi_xgf_xga_fig.suptitle(
+        f"{game_title}\nOn-Ice Expected Goals Rate / 60 - 5v5 (SVA)\nData Courtesy: Natural Stat Trick",
+        x=0.45,
+        fontsize=14,
+    )
+
+    ax2.invert_yaxis()
+
+    oi_xgf_xga_fig.subplots_adjust(right=0.8, left=0)
+    cbar_ax = oi_xgf_xga_fig.add_axes([0, 0.1, 1, 0.75])
+    cbar_ax.axis("off")
+
+    cbar_norm = mpl.colors.Normalize(vmin=0, vmax=1)
+    cbar_sm = plt.cm.ScalarMappable(cmap=color_map, norm=cbar_norm)
+    cbar_sm.set_array([])
+    fig_cbar = plt.colorbar(cbar_sm, ax=cbar_ax)
+
+    tick_locator = ticker.MaxNLocator(nbins=4)
+    fig_cbar.locator = tick_locator
+    fig_cbar.update_ticks()
+    fig_cbar.ax.set_yticklabels(["0:00", "", "", "", toi_to_mmss(max_scatter_toi)])
+    fig_cbar.set_label("Time on Ice", rotation=90)
+
+    return oi_xgf_xga_fig
+
+
 def charts_overview(game, game_title, overview_stats):
     # Get the Team Colors (for the split / stacked bars)
     colors_dict = images.both_team_colors_compared(game.preferred_team.team_name, game.other_team.team_name)
@@ -822,6 +1010,7 @@ def charts_overview(game, game_title, overview_stats):
 def generate_all_charts(game: Game):
     # This is our return value, which is a list of file paths.
     list_of_charts = list()
+    all_charts = {"overview": None, "barcharts": list(), "scatters": list()}
 
     nst_report_url = get_nst_report_url(game, full=True)
     logging.info("NST Report URL: %s", nst_report_url)
@@ -851,6 +1040,7 @@ def generate_all_charts(game: Game):
     # flipped_game_title = f"{flipped_game_title[1]} vs. {flipped_game_title[0]}"
     title_separator = "vs" if game.preferred_team.home_away == "home" else "@"
     preferred_game_title = f"{game.preferred_team.team_name} {title_separator} {game.other_team.team_name}"
+
     overview_chart = charts_overview(game, preferred_game_title, ov_sva_final_stats)
     overview_chart_path = os.path.join(IMAGES_PATH, "temp", f"allcharts-overview-{game.game_id_shortid}.png")
     logging.info("Image Path: %s", overview_chart_path)
@@ -858,6 +1048,17 @@ def generate_all_charts(game: Game):
 
     # Add the overview image path to our list
     list_of_charts.append(overview_chart_path)
+    all_charts["overview"] = overview_chart_path
+
+    # Calculate average xG /60
+    toi_mmss = ov_sva_stats["home"]["Final"]["TOI"]
+    [toi_m, toi_s] = [int(x) for x in toi_mmss.split(":")]
+    toi = timedelta(minutes=toi_m, seconds=toi_s).seconds / 60
+
+    xgf = float(ov_sva_stats["home"]["Final"]["xGF"])
+    xga = float(ov_sva_stats["home"]["Final"]["xGA"])
+    xg_avg = (xgf + xga) / 2
+    xg_avg60 = (xg_avg * 60) / toi
 
     # Generate team specific charts (2x per team)
     teams = [game.preferred_team, game.other_team]
@@ -906,12 +1107,34 @@ def generate_all_charts(game: Game):
         fwd_sva_stats = parse_nst_fwdstats(fwd_sva)
         def_sva_stats = parse_nst_defstats(soup, def_player_ids, def_players_dict)
 
-        # oppo_toi, oppo_cfwith = parse_nst_opposition(team_abbrev, soup, all_players_ids, all_players_dict)
-        # linemate_toi, linemate_cfwith = parse_nst_linemate(team_abbrev, soup, all_players_ids, all_players_dict)
+        oppo_toi, oppo_cfwith = parse_nst_opposition(team_abbrev, soup, all_players_ids, all_players_dict)
+        linemate_toi, linemate_cfwith = parse_nst_linemate(
+            team_abbrev, soup, all_players_ids, all_players_dict
+        )
 
         # Now create all necessary graphs, charts, heatmaps, etc
-        # heatmap = charts_heatmap_oppo_lm(game_title, team.short_name, oppo_toi, oppo_cfwith, linemate_toi, linemate_cfwith)
-        # heatmap.savefig(f'{PROJECT_ROOT}/allcharts-heatmaps-{team_abbrev}-{game.game_id_shortid}.png')
+        heatmap = charts_heatmap_oppo_lm(
+            game_title, team.short_name, oppo_toi, oppo_cfwith, linemate_toi, linemate_cfwith
+        )
+        heatmap.savefig(
+            os.path.join(IMAGES_PATH, "temp", f"allcharts-heatmaps-{team_abbrev}-{game.game_id_shortid}.png")
+        )
+
+        logging.info("Generating Quality vs Quantity chart for %s.", team.team_name)
+        oi_cfpct_xgpct_chart = charts_cfpct_xgpct_scatter(game_title, team.team_name, oi_sva_stats)
+        oi_cfpct_xgpct_chart_path = os.path.join(
+            IMAGES_PATH, "temp", f"allcharts-oi-cfpct-xgpct-{team_abbrev}-{game.game_id_shortid}.png"
+        )
+        logging.info("Image Path: %s", oi_cfpct_xgpct_chart_path)
+        oi_cfpct_xgpct_chart.savefig(oi_cfpct_xgpct_chart_path, bbox_inches="tight")
+
+        logging.info("Generating xG Rate / 60 chart for %s.", team.team_name)
+        oi_xgrate60_chart = charts_xgrate60_scatter(game_title, team.team_name, oi_sva_stats, xg_avg60)
+        oi_xgrate60_chart_path = os.path.join(
+            IMAGES_PATH, "temp", f"allcharts-oi-xgrate60-{team_abbrev}-{game.game_id_shortid}.png"
+        )
+        logging.info("Image Path: %s", oi_xgrate60_chart_path)
+        oi_xgrate60_chart.savefig(oi_xgrate60_chart_path, bbox_inches="tight")
 
         logging.info("Generating Individual / On-Ice charts for %s.", team.team_name)
         ind_onice_chart = charts_toi_individual(
@@ -933,8 +1156,16 @@ def generate_all_charts(game: Game):
 
         list_of_charts.append(ind_onice_chart_path)
         list_of_charts.append(fwds_def_chart_path)
+        list_of_charts.append(oi_cfpct_xgpct_chart)
+        list_of_charts.append(oi_xgrate60_chart_path)
 
-    return list_of_charts
+        all_charts["barcharts"].append(ind_onice_chart_path)
+        all_charts["barcharts"].append(fwds_def_chart_path)
+
+        all_charts["scatters"].append(oi_cfpct_xgpct_chart_path)
+        all_charts["scatters"].append(oi_xgrate60_chart_path)
+
+    return all_charts
 
 
 def team_season_rank(df: pd.DataFrame, stat, team_name):

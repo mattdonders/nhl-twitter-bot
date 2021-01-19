@@ -29,7 +29,7 @@ from hockeygamebot.social import socialhandler
 
 
 def start_game_loop(game: Game):
-    """ The main game loop - tracks game state & calls all relevant functions.
+    """The main game loop - tracks game state & calls all relevant functions.
 
     Args:
         game: Current Game object
@@ -54,7 +54,9 @@ def start_game_loop(game: Game):
             # We should tweet it - this means it happened after the game was scheduled
             if game.game_state_code == GameStateCode.POSTPONED.value:
                 logging.warning("This game was originally scheduled, but is now postponed.")
-                social_msg = f"⚠️ The {game.preferred_team.team_name} game scheduled for today has been postponed."
+                social_msg = (
+                    f"⚠️ The {game.preferred_team.team_name} game scheduled for today has been postponed."
+                )
                 socialhandler.send(social_msg)
                 end_game_loop(game)
 
@@ -141,8 +143,7 @@ def start_game_loop(game: Game):
                             if penalty_situation.penalty_killed:
                                 logging.info("***** PENALTY KILLED NOTIFICATION *****")
                                 shots_taken = (
-                                    penalty_situation.pp_team.shots
-                                    - penalty_situation.pp_team_shots_start
+                                    penalty_situation.pp_team.shots - penalty_situation.pp_team_shots_start
                                 )
                                 logging.info("PP Shots Taken: %s", shots_taken)
                                 game.penalty_situation = PenaltySituation()
@@ -180,17 +181,13 @@ def start_game_loop(game: Game):
                     len(game.preferred_team.onice),
                     game.preferred_team.onice,
                 )
-                logging.info(
-                    "Other On Ice: %s - %s", len(game.other_team.onice), game.other_team.onice
-                )
+                logging.info("Other On Ice: %s - %s", len(game.other_team.onice), game.other_team.onice)
 
                 # Penalty Killed Status
                 penalty_situation = game.penalty_situation
                 if penalty_situation.penalty_killed:
                     logging.info("***** PENALTY KILLED NOTIFICATION *****")
-                    shots_taken = (
-                        penalty_situation.pp_team.shots - penalty_situation.pp_team_shots_start
-                    )
+                    shots_taken = penalty_situation.pp_team.shots - penalty_situation.pp_team_shots_start
                     logging.info("PP Shots Taken: %s", shots_taken)
                     game.penalty_situation = PenaltySituation()
 
@@ -226,9 +223,7 @@ def start_game_loop(game: Game):
             time.sleep(live_sleep_time)
 
         elif game.game_state == GameState.FINAL.value:
-            logging.info(
-                "Game is now over & 'Final' - run end of game functions with increased sleep time."
-            )
+            logging.info("Game is now over & 'Final' - run end of game functions with increased sleep time.")
 
             livefeed_resp = livefeed.get_livefeed(game.game_id)
             game.update_game(livefeed_resp)
@@ -236,9 +231,7 @@ def start_game_loop(game: Game):
             # If (for some reason) the bot was started after the end of the game
             # We need to re-run the live loop once to parse all of the events
             if not game.events:
-                logging.info(
-                    "Bot started after game ended, pass livefeed into event factory to fill events."
-                )
+                logging.info("Bot started after game ended, pass livefeed into event factory to fill events.")
                 live.live_loop(livefeed=livefeed_resp, game=game)
 
             # shotmaps.generate_shotmaps(game=game)
@@ -262,14 +255,13 @@ def start_game_loop(game: Game):
 
             if not game.nst_charts.final_charts:
                 logging.info("NST Charts not yet sent - check if it's ready for us to scrape.")
-                nst_ready = (
-                    nst.is_nst_ready(game.preferred_team.short_name) if not args.date else True
-                )
+                nst_ready = nst.is_nst_ready(game.preferred_team.short_name) if not args.date else True
                 if nst_ready:
-                    list_of_charts = nst.generate_all_charts(game=game)
+                    all_charts = nst.generate_all_charts(game=game)
                     # Chart at Position 0 is the Overview Chart & 1-4 are the existing charts
-                    overview_chart = list_of_charts[0]
-                    team_charts = list_of_charts[1:]
+                    overview_chart = all_charts["overview"]
+                    team_charts = all_charts["barcharts"]
+                    scatter_charts = all_charts["scatters"]
 
                     overview_chart_msg = (
                         f"Team Overview stat percentages - 5v5 (SVA) at the "
@@ -288,7 +280,18 @@ def start_game_loop(game: Game):
                         charts_msg,
                         media=team_charts,
                         game_hashtag=True,
-                        reply=ov_social_ids["twitter"],
+                        # reply=ov_social_ids["twitter"],
+                    )
+
+                    charts_msg = (
+                        f"Quality vs. Quantity & Expected Goals Rate / 60 at the"
+                        " end of the game (via @NatStatTrick)."
+                    )
+                    social_ids = socialhandler.send(
+                        charts_msg,
+                        media=scatter_charts,
+                        game_hashtag=True,
+                        # reply=ov_social_ids["twitter"],
                     )
                     game.nst_charts.final_charts = True
 
@@ -318,8 +321,8 @@ def start_game_loop(game: Game):
 
 
 def end_game_loop(game: Game):
-    """ A function that is run once the game is finally over. Nothing fancy - just denotes a logical place
-        to end the game, log one last section & end the script."""
+    """A function that is run once the game is finally over. Nothing fancy - just denotes a logical place
+    to end the game, log one last section & end the script."""
     pref_team = game.preferred_team
     other_team = game.other_team
 
@@ -364,9 +367,7 @@ def run():
     if args.docker:
         logging.info("Running in a Docker container - environment variables parsed.")
     logging.info("TIME: %s", datetime.now())
-    logging.info(
-        "ARGS - notweets: %s, console: %s, teamoverride: %s", args.notweets, args.console, args.team
-    )
+    logging.info("ARGS - notweets: %s, console: %s, teamoverride: %s", args.notweets, args.console, args.team)
     logging.info(
         "ARGS - debug: %s, debugsocial: %s, overridelines: %s",
         args.debug,
@@ -438,9 +439,7 @@ def run():
                     condensed_msg = f"📺 {condensed_blurb}.\n\n{condensed_video_url}"
                     socialhandler.send(condensed_msg)
                 except Exception as e:
-                    logging.error(
-                        "Error getting Condensed Game from NHL & YouTube - skip this today. %s", e
-                    )
+                    logging.error("Error getting Condensed Game from NHL & YouTube - skip this today. %s", e)
 
             # Generate the Season Overview charts
             game_result_str = "defeat" if pref_score > other_score else "lose to"
@@ -454,9 +453,7 @@ def run():
             team_season_fig = nst.generate_team_season_charts(team_name, "sva")
             team_season_fig_last10 = nst.generate_team_season_charts(team_name, "sva", lastgames=10)
             team_season_fig_all = nst.generate_team_season_charts(team_name, "all")
-            team_season_fig_last10_all = nst.generate_team_season_charts(
-                team_name, "all", lastgames=10
-            )
+            team_season_fig_last10_all = nst.generate_team_season_charts(team_name, "all", lastgames=10)
             team_season_charts = [
                 team_season_fig,
                 team_season_fig_last10,
