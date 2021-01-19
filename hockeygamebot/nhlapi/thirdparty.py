@@ -424,6 +424,13 @@ def scouting_the_refs(game, pref_team):
     Returns:
         Tuple: dictionary {goalie string, goalie confirmed}
     """
+
+    def calculate_total_games(ref_info):
+        # Takes a referee dictionary & returns number of total games (centralizes logic)
+        career_games_str = ref_info.get("careergames", "0")
+        total_games = sum([int(x) for x in career_games_str.split(" / ")])
+        return total_games
+
     # Initialized return dictionary
     return_dict = dict()
     return_dict["confirmed"] = False
@@ -493,6 +500,8 @@ def scouting_the_refs(game, pref_team):
             ref_dict["seasongames"] = ref_season_games
             ref_dict["careergames"] = ref_career_games
             ref_dict["penaltygame"] = ref_penalty_game
+            ref_dict["totalgames"] = calculate_total_games(ref_dict)
+            print(ref_dict)
             return_referees.append(ref_dict)
 
     linesmen = game_details.find_all("tr")[21].find_all("td")
@@ -507,6 +516,8 @@ def scouting_the_refs(game, pref_team):
             linesman_dict["name"] = linesman_name
             linesman_dict["seasongames"] = linesman_season_games
             linesman_dict["careergames"] = linesman_career_games
+            linesman_dict["totalgames"] = calculate_total_games(linesman_dict)
+            print(linesman_dict)
             return_linesmen.append(linesman_dict)
 
     return_dict["referees"] = return_referees
