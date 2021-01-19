@@ -17,7 +17,7 @@ from hockeygamebot.social import socialhandler
 
 
 def live_loop(livefeed: dict, game: Game):
-    """ The master live-game loop. All logic spawns from here.
+    """The master live-game loop. All logic spawns from here.
 
     Args:
         livefeed: Live Feed API response
@@ -78,14 +78,12 @@ def live_loop(livefeed: dict, game: Game):
                 goal.cache.remove(goal)
                 del goal
     except Exception as e:
-        logging.error(
-            "Encounted an exception trying to detect if a goal is no longer in the livefeed."
-        )
+        logging.error("Encounted an exception trying to detect if a goal is no longer in the livefeed.")
         logging.error(e)
 
 
 def intermission_loop(game: Game):
-    """ The live-game intermission loop. Things to do during an intermission
+    """The live-game intermission loop. Things to do during an intermission
 
     Args:
         game: Game Object
@@ -109,8 +107,8 @@ def intermission_loop(game: Game):
             try:
                 list_of_charts = nst.generate_all_charts(game=game)
                 # Chart at Position 0 is the Overview Chart & 1-4 are the existing charts
-                overview_chart = list_of_charts[0]
-                team_charts = list_of_charts[1:]
+                overview_chart = list_of_charts["overview"]
+                team_charts = list_of_charts["barcharts"]
 
                 overview_chart_msg = (
                     f"Team Overview stat percentages - 5v5 (SVA) after the "
@@ -132,9 +130,7 @@ def intermission_loop(game: Game):
                 game.nst_charts.charts_by_period[game.period.current] = True
 
             except Exception as e:
-                logging.error(
-                    "Error creating Natural Stat Trick charts (%s) - sleep for a bit longer.", e
-                )
+                logging.error("Error creating Natural Stat Trick charts (%s) - sleep for a bit longer.", e)
 
     # Check if our shotmap was RT'd & if not try to search for it and send it out
     shotmap_retweet_sent = game.period.shotmap_retweet
@@ -150,9 +146,7 @@ def intermission_loop(game: Game):
         )
     else:
         live_sleep_time = game.period.intermission_remaining
-        logging.info(
-            "Sleeping for remaining intermission time (%ss).", game.period.intermission_remaining
-        )
+        logging.info("Sleeping for remaining intermission time (%ss).", game.period.intermission_remaining)
 
     return live_sleep_time
 
