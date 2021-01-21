@@ -161,14 +161,16 @@ def event_factory(game: Game, play: dict, livefeed: dict, new_plays: bool):
             if content_exists:
                 # blurb = highlight.get('blurb')
                 description = highlight.get("description")
+                video_path = utils.download_file(mp4_url)
                 content_msg = f"NHL Video Highlight - {description}. \n\n{video_url}"
-                discord_msg = f"NHL Video Highlight - {description}. \n{video_url}"
+                discord_msg = f"🎥 **NHL Video Highlight**\n{description}.\n{mp4_url}"
                 social_ids = socialhandler.send(
                     msg=content_msg,
                     reply=obj.tweet,
                     force_send=True,
                     game_hashtag=True,
                     discord_msg=discord_msg,
+                    video=video_path,
                 )
                 obj.tweet = social_ids.get("twitter")
                 obj.video_url = video_url
