@@ -14,7 +14,7 @@ from hockeygamebot.social import discord, slack, twitter
 
 @utils.check_social_timeout
 def send(msg, **kwargs):
-    """ The handler function that takes a message and a set of key-value arguments
+    """The handler function that takes a message and a set of key-value arguments
         to be routed to social media functions.
 
     Args:
@@ -58,6 +58,7 @@ def send(msg, **kwargs):
         tweet_id = twitter.send_tweet(
             msg,
             media=kwargs.get("media"),
+            video=kwargs.get("video"),
             reply=kwargs.get("reply"),
             hashtags=kwargs.get("hashtags"),
             team_hashtag=kwargs.get("team_hashtag"),

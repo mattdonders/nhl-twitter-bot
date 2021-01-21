@@ -3,11 +3,39 @@ This module handles all interactions with Twitter.
 """
 
 import logging
+import time
 
 import tweepy
+from twython import Twython  # TODO: REMOVE ONCE TWEEPY SUPPORTS CHUNKED VIDEO
 
 from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.models.hashtag import Hashtag
+
+
+def get_twython_api():
+    """
+    Returns an Authorized session of the Twython API.
+    This is only used until Tweepy supports Chunked Video uploads.
+
+    Input:
+        None
+
+    Output:
+        twython_session - authorized twitter session that can send a tweet.
+    """
+    args = arguments.get_arguments()
+
+    twitterenv = "debug" if args.debugsocial else "prod"
+    twitter_config = utils.load_config()["twitter"][twitterenv]
+
+    consumer_key = twitter_config["consumer_key"]
+    consumer_secret = twitter_config["consumer_secret"]
+    access_token = twitter_config["access_token"]
+    access_secret = twitter_config["access_secret"]
+
+    twython_session = Twython(consumer_key, consumer_secret, access_token, access_secret)
+
+    return twython_session
 
 
 def get_api():
@@ -38,9 +66,9 @@ def get_api():
 
 
 def send_tweet(
-    tweet_text, media=None, reply=None, hashtags=None, team_hashtag=None, game_hashtag=None
+    tweet_text, video=None, media=None, reply=None, hashtags=None, team_hashtag=None, game_hashtag=None
 ):
-    """ Generic tweet function that uses logic to call other specific functions.
+    """Generic tweet function that uses logic to call other specific functions.
 
     Args:
         tweet_text: The text to send as a tweet (may contain URL at end to qote tweet).
@@ -71,6 +99,36 @@ def send_tweet(
     if game_hashtag:
         tweet_text = f"{tweet_text}\n\n{Hashtag.game_hashtag}"
 
+    # Only use this function for upload highlight videos.
+    # Single use case & we know the exact path that triggers this
+    if video is not None:
+        try:
+            logging.info("Video was detected - using chunked video upload to download & send.")
+            twython_api = get_twython_api()
+
+            logging.info("Uploading the video file using chunked upload to Twitter.")
+            video_file = open(video, "rb")
+            upload_response = twython_api.upload_video(
+                media=video_file, media_type="video/mp4", media_category="tweet_video", check_progress=True
+            )
+            processing_info = upload_response["processing_info"]
+            state = processing_info["state"]
+            wait = processing_info.get("check_after_secs", 1)
+
+            if state == "pending" or state == "in_progress":
+                logging.info(f"Upload not done - waiting %s seconds.", wait)
+                time.sleep(wait)
+
+            logging.info("Upload completed - sending tweet now.")
+            # If we have gotten this far, remove the URL from the tweet text.
+            tweet_text = tweet_text.split("\n")[0]
+            tweet_text = f"@{twitter_handle} {tweet_text}"
+            status = twython_api.update_status(status=tweet_text, media_ids=[upload_response["media_id"]])
+            return status.get("id_str")
+        except Exception as e:
+            logging.error("There was an error uploading and sending the embedded video - send with a link.")
+            logging.error(e)
+
     try:
         if not reply and not media:
             status = api.update_status(status=tweet_text)
@@ -91,9 +149,7 @@ def send_tweet(
                     status=tweet_text, media_ids=media_ids, in_reply_to_status_id=reply
                 )
             else:
-                status = api.update_with_media(
-                    status=tweet_text, filename=media, in_reply_to_status_id=reply
-                )
+                status = api.update_with_media(status=tweet_text, filename=media, in_reply_to_status_id=reply)
 
         return status.id_str
 
@@ -104,7 +160,7 @@ def send_tweet(
 
 
 def search_twitter(search_term, num_items):
-    """ Searches Twitter for a specified search term and returns a number of results.
+    """Searches Twitter for a specified search term and returns a number of results.
 
     Args:
         search_term: What to search Twitter for
