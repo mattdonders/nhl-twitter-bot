@@ -7,10 +7,12 @@ import functools
 import logging
 import math
 import os
+import shutil
 import time
 from datetime import datetime, timezone
 
 import dateutil.parser
+import requests
 import yaml
 
 from hockeygamebot.definitions import CONFIG_PATH, IMAGES_PATH, LOGS_PATH, URLS_PATH
@@ -413,6 +415,19 @@ def to_mmss(time_input):
     return time.strftime("%M:%S", time.gmtime(time_input))
 
 
+def download_file(url):
+    """ Downloads a remote file to the IMAGES_PATH/temp directory. """
+    local_filename = url.split("/")[-1]
+    local_path = os.path.join(IMAGES_PATH, "temp", local_filename)
+
+    logging.info("Downloading file & storing into filename - %s.", local_filename)
+    with requests.get(url, stream=True) as r:
+        with open(local_path, "wb") as f:
+            shutil.copyfileobj(r.raw, f)
+
+    return local_path
+
+
 def empty_images_temp():
     """ Empties the temporary image directory after the bot is done running."""
     temp_path = os.path.join(IMAGES_PATH, "temp")
@@ -421,4 +436,7 @@ def empty_images_temp():
 
     for item in temp_images:
         if item.endswith(".png"):
+            os.remove(os.path.join(temp_path, item))
+
+        if item.endswith(".mp4"):
             os.remove(os.path.join(temp_path, item))
