@@ -1291,6 +1291,11 @@ class PenaltyEvent(GenericEvent):
         self.minutes = results.get("penaltyMinutes")
         self.penalty_length_ss = 60 * self.minutes
 
+        # If penalty secondaryType is 'minor' (seems to be a recent bug) - skip, dump & try again next loop
+        if self.secondary_type == "minor":
+            logging.warning("BAD Secondary Type Found: %s", results)
+            raise ValueError("A penalty can not have a secondary type of 'minor' - skip & try again.")
+
         # Assign Penalty Team
         self.penalty_team = data.get("team").get("name")
         if self.penalty_team == self.game.preferred_team.team_name:
@@ -1442,7 +1447,7 @@ class PenaltyEvent(GenericEvent):
             penalty_text_players = (
                 f"{self.penalty_on_name} takes a {self.minutes}-minute {self.severity} penalty"
                 f"{self.penalty_zone_text} for {self.secondary_type} and heads to the "
-                f"penalty box with  {self.period_time_remain} remaining in the {self.period_ordinal} period. "
+                f"penalty box with {self.period_time_remain} remaining in the {self.period_ordinal} period. "
                 # f"That's his {utils.ordinal(self.penalty_on_game_ttl)} penalty of the game. "
                 f"{penalty_text_skaters}"
             )
