@@ -123,7 +123,9 @@ def send_tweet(
             # If we have gotten this far, remove the URL from the tweet text.
             tweet_text = tweet_text.split("\n")[0]
             tweet_text = f"@{twitter_handle} {tweet_text}"
-            status = twython_api.update_status(status=tweet_text, media_ids=[upload_response["media_id"]])
+            status = twython_api.update_status(
+                status=tweet_text, in_reply_to_status_id=reply, media_ids=[upload_response["media_id"]]
+            )
             return status.get("id_str")
         except Exception as e:
             logging.error("There was an error uploading and sending the embedded video - send with a link.")
