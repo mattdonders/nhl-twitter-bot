@@ -646,7 +646,7 @@ def charts_fwds_def(game_title, team, fwd_sva_stats, def_sva_stats):
     # Only Take the 3 Highest TOI Pairings
     df_fwd = df_fwd.tail(4)
     df_def = df_def.tail(3)
-    df_all_lines = pd.concat([df_fwd, df_def], sort=True)
+    df_all_lines = pd.concat([df_fwd, df_def], sort=True, ignore_index=True)
 
     # (AX1) COMING SOON TEXT
     # ax1.text(0.2, 0.5, 'MORE DATA COMING SOON!', style='italic', weight="bold",
@@ -789,6 +789,7 @@ def charts_cfpct_xgpct_scatter(game_title, team_name, oi_sva_stats):
     df_oi_scatter["xga60"] = (df_oi_scatter["xga"] * 60) / df_oi_scatter["toi"]
     df_oi_scatter["last_name"] = df_oi_scatter["player"].str.split().str[1:].str.join(" ")
     df_oi_scatter = df_oi_scatter[["player", "last_name", "toi", "cfpct", "xgpct", "xgf60", "xga60"]]
+    df_oi_scatter["toi_marker"] = df_oi_scatter["toi"] * 5
 
     # Calculate ColorBar (for use later)
     color_map = plt.cm.get_cmap("Blues")
@@ -799,7 +800,9 @@ def charts_cfpct_xgpct_scatter(game_title, team_name, oi_sva_stats):
 
     # Start Generating Quality vs. Quantity Graph (xGF% vs CF%)
     oi_cfpct_xgpct_fig, ax1 = plt.subplots(1, 1, figsize=(10, 8))
-    df_oi_scatter.plot(kind="scatter", ax=ax1, x="xgpct", y="cfpct", color=oi_scatter_colormap)
+    df_oi_scatter.plot(
+        kind="scatter", ax=ax1, x="xgpct", y="cfpct", s="toi_marker", color=oi_scatter_colormap
+    )
 
     ax1.axvline(x=50, color="black", linewidth=0.5)
     ax1.axhline(y=50, color="black", linewidth=0.5)
@@ -866,6 +869,7 @@ def charts_xgrate60_scatter(game_title, team_name, oi_sva_stats, xg_avg):
     df_oi_scatter["xga60"] = (df_oi_scatter["xga"] * 60) / df_oi_scatter["toi"]
     df_oi_scatter["last_name"] = df_oi_scatter["player"].str.split().str[1:].str.join(" ")
     df_oi_scatter = df_oi_scatter[["player", "last_name", "toi", "cfpct", "xgpct", "xgf60", "xga60"]]
+    df_oi_scatter["toi_marker"] = df_oi_scatter["toi"] * 5
 
     # Calculate ColorBar (for use later)
     color_map = plt.cm.get_cmap("Blues")
@@ -878,7 +882,9 @@ def charts_xgrate60_scatter(game_title, team_name, oi_sva_stats, xg_avg):
     plt.clf()
     oi_xgf_xga_fig, ax2 = plt.subplots(1, 1, figsize=(10, 8))
 
-    df_oi_scatter.plot(kind="scatter", ax=ax2, x="xgf60", y="xga60", color=oi_scatter_colormap)
+    df_oi_scatter.plot(
+        kind="scatter", ax=ax2, x="xgf60", y="xga60", s="toi_marker", color=oi_scatter_colormap
+    )
 
     for row in df_oi_scatter.itertuples():
         ax2.annotate(
