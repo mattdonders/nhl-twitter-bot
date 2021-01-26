@@ -953,6 +953,129 @@ def charts_xgrate60_scatter(game_title, team_name, oi_sva_stats, xg_avg):
     return oi_xgf_xga_fig
 
 
+def charts_shift_report(game_title, team_abbrev, team_name, soup):
+    # Clear the figure (as always)
+    plt.clf()
+
+    # Convert Game Title
+    team_name_mathtext = rf"$\bf{{{team_name}}}$".replace(" ", "\ ")
+    game_title = game_title.replace(team_name, team_name_mathtext)
+
+    # Define the full shift dictionary (holds all shift data)
+    shift_dict = dict()
+
+    situations = [
+        {"code": "all", "name": "All Situations"},
+        {"code": "5v5", "name": "5v5"},
+        {"code": "pp", "name": "5v4 Power Play"},
+        {"code": "pk", "name": "4v5 Penalty Kill"},
+    ]
+
+    for sit in situations:
+        sit_code = sit["code"]
+        shift_dict[sit_code] = dict()
+        this_dict = shift_dict[sit_code]
+        soup_shift_chart = soup.find(id=f"tb{team_abbrev}sh{sit_code}").find("tbody").find_all("tr")
+
+        this_dict["toi"] = dict()
+        this_dict["total"] = dict()
+        this_dict["xs"] = dict()
+        this_dict["s"] = dict()
+        this_dict["average"] = dict()
+        this_dict["l"] = dict()
+        this_dict["xl"] = dict()
+
+        for player in soup_shift_chart:
+            items = player.find_all("td")
+            name = items[0].text.replace("\xa0", " ")
+            if name.lower() in ["forwards", "defense"]:
+                continue
+
+            name = " ".join(name.split()[1:])
+            position = items[1].text
+
+            toi = float(items[2].text)
+            num_shifts = int(items[3].text)
+            short_shifts = float(items[6].text)
+            long_shifts = float(items[7].text)
+            x_short_shifts = float(items[8].text)
+            x_long_shifts = float(items[9].text)
+
+            normal_shifts = num_shifts - short_shifts - long_shifts - x_long_shifts - x_short_shifts
+
+            toi_str = toi_to_mmss(toi)
+            name = f"{name} ({toi_str} / {num_shifts} Shifts)"
+
+            this_dict["toi"][name] = toi
+            this_dict["total"][name] = num_shifts
+            this_dict["s"][name] = short_shifts
+            this_dict["l"][name] = long_shifts
+            this_dict["average"][name] = normal_shifts
+            this_dict["xs"][name] = x_short_shifts
+            this_dict["xl"][name] = x_long_shifts
+
+    shift_fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(18, 12))
+    # AX1 = ALL, AX2 = 5v5
+    # AX3 = PP, AX4 = PK
+    axes = [ax1, ax2, ax3, ax4]
+
+    for idx, sit in enumerate(situations):
+        axis = axes[idx]
+        sit_code = sit["code"]
+        sit_name = sit["name"]
+        sit_shift_dict = shift_dict[sit_code]
+
+        df = pd.DataFrame(sit_shift_dict).sort_values("toi", ascending=True)
+        max_shifts = df["total"].max()
+        df = df.drop(columns=["toi", "total"])
+        df.plot(
+            kind="barh",
+            stacked=True,
+            ax=axis,
+            color=["green", "limegreen", "cornflowerblue", "orange", "red"],
+        )
+
+        minor_ticks = np.arange(0, max_shifts, 1)
+        axis.set_xticks(minor_ticks, minor=True)
+
+        axis.grid(True, which="major", axis="x", linestyle="dashed", color=(0.5, 0.5, 0.5))
+        axis.grid(True, which="minor", axis="x", linestyle="dashed", color=(0.9, 0.9, 0.9))
+
+        axis.set_axisbelow(True)
+        axis.xaxis.get_major_locator().set_params(integer=True)
+        axis.title.set_text(sit_name)
+
+        axis.legend(labels=["Extra Short", "Short", "Average", "Long", "Extra Long"])
+
+        axis.spines["right"].set_visible(False)
+        axis.spines["top"].set_visible(False)
+
+        axis.xaxis.set_tick_params(size=0)
+        axis.yaxis.set_tick_params(size=0)
+
+        # tweak the axis labels
+        xlab = axis.xaxis.get_label()
+        ylab = axis.yaxis.get_label()
+
+        xlab.set_text("Number of Shifts")
+        xlab.set_style("italic")
+        xlab.set_size(10)
+
+        # tweak the title
+        ttl = axis.title
+        ttl.set_weight("bold")
+
+    # Tight Layout (Making Space for Title)
+    shift_fig.tight_layout(rect=[0, 0.0, 1, 0.92], pad=2)
+    shift_fig.suptitle(
+        f"{game_title}\nShift Length Breakdowns\nData Courtesy: Natural Stat Trick",
+        x=0.5,
+        fontsize=14,
+    )
+
+    return shift_fig
+
+
 def charts_overview(game, game_title, overview_stats):
     # Get the Team Colors (for the split / stacked bars)
     colors_dict = images.both_team_colors_compared(game.preferred_team.team_name, game.other_team.team_name)
@@ -1160,6 +1283,14 @@ def generate_all_charts(game: Game):
         logging.info("Image Path: %s", fwds_def_chart_path)
         fwds_def_chart.savefig(fwds_def_chart_path, bbox_inches="tight")
 
+        logging.info("Generating Shift Report Breakdown chart for %s.", team.team_name)
+        shift_chart = charts_shift_report(game_title, team_abbrev, team.team_name, soup)
+        shift_chart_path = os.path.join(
+            IMAGES_PATH, "temp", f"allcharts-shift-report-{team_abbrev}-{game.game_id_shortid}.png"
+        )
+        logging.info("Image Path: %s", shift_chart_path)
+        shift_chart.savefig(shift_chart_path, bbox_inches="tight")
+
         list_of_charts.append(ind_onice_chart_path)
         list_of_charts.append(fwds_def_chart_path)
         list_of_charts.append(oi_cfpct_xgpct_chart)
@@ -1170,6 +1301,8 @@ def generate_all_charts(game: Game):
 
         all_charts["scatters"].append(oi_cfpct_xgpct_chart_path)
         all_charts["scatters"].append(oi_xgrate60_chart_path)
+
+        all_charts["shift"] = shift_chart_path
 
     return all_charts
 
