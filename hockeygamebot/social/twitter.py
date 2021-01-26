@@ -122,9 +122,12 @@ def send_tweet(
             logging.info("Upload completed - sending tweet now.")
             # If we have gotten this far, remove the URL from the tweet text.
             tweet_text = tweet_text.split("\n")[0]
-            tweet_text = f"@{twitter_handle} {tweet_text}"
+            # tweet_text = f"@{twitter_handle} {tweet_text}"
             status = twython_api.update_status(
-                status=tweet_text, in_reply_to_status_id=reply, media_ids=[upload_response["media_id"]]
+                status=tweet_text,
+                in_reply_to_status_id=reply,
+                auto_populate_reply_metadata=True,
+                media_ids=[upload_response["media_id"]],
             )
             return status.get("id_str")
         except Exception as e:
@@ -141,14 +144,19 @@ def send_tweet(
             else:
                 status = api.update_with_media(status=tweet_text, filename=media)
         elif reply and not media:
-            tweet_text = f"@{twitter_handle} {tweet_text}"
-            status = api.update_status(status=tweet_text, in_reply_to_status_id=reply)
+            # tweet_text = f"@{twitter_handle} {tweet_text}"
+            status = api.update_status(
+                status=tweet_text, in_reply_to_status_id=reply, auto_populate_reply_metadata=True
+            )
         elif reply and media:
-            tweet_text = f"@{twitter_handle} {tweet_text}"
+            # tweet_text = f"@{twitter_handle} {tweet_text}"
             if isinstance(media, list):
                 media_ids = [api.media_upload(i).media_id_string for i in media]
                 status = api.update_status(
-                    status=tweet_text, media_ids=media_ids, in_reply_to_status_id=reply
+                    status=tweet_text,
+                    media_ids=media_ids,
+                    in_reply_to_status_id=reply,
+                    auto_populate_reply_metadata=True,
                 )
             else:
                 status = api.update_with_media(status=tweet_text, filename=media, in_reply_to_status_id=reply)
