@@ -262,6 +262,7 @@ def start_game_loop(game: Game):
                     overview_chart = all_charts["overview"]
                     team_charts = all_charts["barcharts"]
                     scatter_charts = all_charts["scatters"]
+                    shift_chart = all_charts["shift"]
 
                     overview_chart_msg = (
                         f"Team Overview stat percentages - 5v5 (SVA) at the "
@@ -279,6 +280,14 @@ def start_game_loop(game: Game):
                     social_ids = socialhandler.send(
                         charts_msg,
                         media=team_charts,
+                        game_hashtag=True,
+                        # reply=ov_social_ids["twitter"],
+                    )
+
+                    charts_msg = f"Shift length breakdown at the end of the game (via @NatStatTrick)."
+                    social_ids = socialhandler.send(
+                        charts_msg,
+                        media=shift_chart,
                         game_hashtag=True,
                         # reply=ov_social_ids["twitter"],
                     )
