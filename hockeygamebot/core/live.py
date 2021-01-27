@@ -109,7 +109,7 @@ def intermission_loop(game: Game):
                 # Chart at Position 0 is the Overview Chart & 1-4 are the existing charts
                 overview_chart = list_of_charts["overview"]
                 team_charts = list_of_charts["barcharts"]
-                shift_chart = all_charts["shift"]
+                shift_chart = list_of_charts["shift"]
 
                 overview_chart_msg = (
                     f"Team Overview stat percentages - 5v5 (SVA) after the "
@@ -124,11 +124,8 @@ def intermission_loop(game: Game):
                     f"Individual, on-ice, forward lines & defensive pairs after the "
                     f"{game.period.current_ordinal} period (via @NatStatTrick)."
                 )
-                social_ids = socialhandler.send(
-                    charts_msg,
-                    media=team_charts,
-                    game_hashtag=True
-                    # charts_msg, media=team_charts, game_hashtag=True, reply=ov_social_ids["twitter"]
+                ind_social_ids = socialhandler.send(
+                    charts_msg, media=team_charts, game_hashtag=True, reply=ov_social_ids["twitter"]
                 )
 
                 charts_msg = (
@@ -136,11 +133,9 @@ def intermission_loop(game: Game):
                     f"{game.period.current_ordinal} period (via @NatStatTrick)."
                 )
                 social_ids = socialhandler.send(
-                    charts_msg,
-                    media=shift_chart,
-                    game_hashtag=True,
+                    charts_msg, media=shift_chart, game_hashtag=True, reply=ind_social_ids["twitter"]
                 )
-                # nst_chart_period_sent = social_ids.get("twitter")
+
                 game.nst_charts.charts_by_period[game.period.current] = True
 
             except Exception as e:
