@@ -19,7 +19,7 @@ from hockeygamebot.core import images
 
 
 def final_score(livefeed: dict, game: Game):
-    """ Takes the livefeed response from the NHL API and sets the status & key of this attribute
+    """Takes the livefeed response from the NHL API and sets the status & key of this attribute
         in the EndOfGame socials class.
 
     Args:
@@ -106,9 +106,7 @@ def final_score(livefeed: dict, game: Game):
             next_opponent = next_game_home_name
 
         next_game_venue = next_game["venue"]["name"]
-        next_game_text = (
-            f"Next Game: {next_game_string} vs. {next_opponent}" f" (at {next_game_venue})!"
-        )
+        next_game_text = f"Next Game: {next_game_string} vs. {next_opponent} (at {next_game_venue})!"
     except Exception as e:
         logging.warning("Error getting next game via the schedule endpoint.")
         logging.error(e)
@@ -128,7 +126,7 @@ def final_score(livefeed: dict, game: Game):
 
 
 def three_stars(livefeed: dict, game: Game):
-    """ Takes the livefeed response from the NHL API and sets the status & key of the three-stars
+    """Takes the livefeed response from the NHL API and sets the status & key of the three-stars
         attribute in the EndOfGame socials class.
 
     Args:
@@ -171,7 +169,8 @@ def three_stars(livefeed: dict, game: Game):
         logging.info("3-stars have not yet posted - try again in next iteration.")
         return
 
-    socialhandler.send(three_stars_msg)
+    discord_color = images.discord_color(game.preferred_team.team_name)
+    socialhandler.send(three_stars_msg, discord_title="FINAL: Three Stars", discord_color=discord_color)
 
     # Set the final score message & status in the EndOfGame Social object
     game.final_socials.three_stars_msg = three_stars_msg
@@ -179,7 +178,7 @@ def three_stars(livefeed: dict, game: Game):
 
 
 def hockeystatcards(game: Game):
-    """ Uses the Hockey Stat Cards API to retrieve gamescores for the current game.
+    """Uses the Hockey Stat Cards API to retrieve gamescores for the current game.
         Generates an image based on those values & sends the socials.
 
     Args:

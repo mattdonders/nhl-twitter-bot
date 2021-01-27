@@ -127,8 +127,13 @@ def generate_game_preview(game: Game):
 
     # logging.info(preview_tweet_text)
     # logging.info(season_series_tweet_text)
+    discord_color = images.discord_color(game.preferred_team.team_name)
     social_dict = socialhandler.send(
-        msg=season_series_tweet_text, reply=game.pregame_lasttweet, force_send=True
+        msg=season_series_tweet_text,
+        reply=game.pregame_lasttweet,
+        force_send=True,
+        discord_title="PREVIEW: Season Series",
+        discord_color=discord_color,
     )
 
     game.pregame_lasttweet = social_dict["twitter"]
@@ -202,9 +207,13 @@ def game_preview_others(game: Game):
                         f"Career (vs. {other_team.short_name}): {goalie_hr_pref}\n\n"
                         f"{pref_hashtag} {game.game_hashtag}"
                     )
-
+                    discord_color = images.discord_color(game.preferred_team.team_name)
                     social_dict = socialhandler.send(
-                        msg=pref_goalie_tweet_text, reply=game.pregame_lasttweet, force_send=True
+                        msg=pref_goalie_tweet_text,
+                        reply=game.pregame_lasttweet,
+                        force_send=True,
+                        discord_title="PREVIEW: Goalie Start",
+                        discord_color=discord_color,
                     )
                     game.pregame_lasttweet = social_dict["twitter"]
                     game.preview_socials.goalies_pref_sent = True

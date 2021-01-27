@@ -9,8 +9,8 @@ from hockeygamebot.helpers import arguments
 from hockeygamebot.helpers.config import config
 
 
-def send_discord(msg, embed=None, media=None):
-    """ Sends a text-only Discord message.
+def send_discord(msg, title=None, color=16777215, embed=None, media=None):
+    """Sends a text-only Discord message.
 
     Args:
         msg: Message to send to the channel.
@@ -37,8 +37,12 @@ def send_discord(msg, embed=None, media=None):
         linebreak_msg = f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n{msg}"
         payload = {"content": linebreak_msg}
 
-        if not media:
-            response = requests.post(url, json=payload)
+        if title:
+            embed_msg = {"embeds": [{"title": title, "description": msg, "color": color}]}
+            response = requests.post(url, json=embed_msg)
+        elif not title and not media:
+            embed_msg = {"embeds": [{"title": "Game Bot Update", "description": msg, "color": color}]}
+            response = requests.post(url, json=embed_msg)
         else:
             if isinstance(media, list):
                 files = dict()
