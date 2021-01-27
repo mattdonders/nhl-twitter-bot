@@ -6,6 +6,7 @@ from non NHL APIs & websites (ex - lineups, officials, etc).
 import logging
 from datetime import datetime, timedelta
 
+import lxml
 import requests
 from bs4 import BeautifulSoup
 from dateutil.parser import parse
