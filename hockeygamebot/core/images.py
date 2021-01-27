@@ -267,7 +267,7 @@ def team_colors(team_name):
     return team_colors_dict[team_name]
 
 
-def rgb_to_hex(value1, value2=None, value3=None):
+def rgb_to_hex(value1, value2=None, value3=None, discord=False):
     """
     Convert RGB value (as three numbers each ranges from 0 to 255) to hex format.
     """
@@ -281,8 +281,20 @@ def rgb_to_hex(value1, value2=None, value3=None):
     for value in (value1, value2, value3):
         if not 0 <= value <= 255:
             raise ValueError("Value each slider must be ranges from 0 to 255")
-    return "#{0:02X}{1:02X}{2:02X}".format(value1, value2, value3)
 
+    hex_string = "#{0:02X}{1:02X}{2:02X}".format(value1, value2, value3)
+    if discord:
+        hex_string = hex_string.replace("#", "")
+        return int(hex_string, 16)
+
+    return hex_string
+
+def discord_color(team_name):
+    """Takes a team name and returns a base-16 string for Discord embeds."""
+
+    team_color = team_colors(team_name)["primary"]["bg"]
+    discord_color = rgb_to_hex(team_color, discord=True)
+    return discord_color
 
 def center_text(draw, left, top, width, text, color, font, vertical=False, height=None):
     """Draws text (at least) horizontally centered in a specified width. Can also

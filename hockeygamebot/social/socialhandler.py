@@ -68,7 +68,13 @@ def send(msg, **kwargs):
 
     if social_config["discord"]:
         msg = kwargs.get("discord_msg", msg)
-        discord.send_discord(msg, embed=kwargs.get("discord_embed"), media=kwargs.get("media"))
+        discord.send_discord(
+            msg,
+            embed=kwargs.get("discord_embed"),
+            title=kwargs.get("discord_title"),
+            color=kwargs.get("discord_color"),
+            media=kwargs.get("media"),
+        )
 
     if social_config["slack"]:
         pass
