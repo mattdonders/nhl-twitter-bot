@@ -1139,7 +1139,7 @@ def charts_overview(game, game_title, overview_stats):
 def generate_all_charts(game: Game):
     # This is our return value, which is a list of file paths.
     list_of_charts = list()
-    all_charts = {"overview": None, "barcharts": list(), "scatters": list()}
+    all_charts = {"overview": None, "barcharts": list(), "scatters": list(), "shift": list()}
 
     nst_report_url = get_nst_report_url(game, full=True)
     logging.info("NST Report URL: %s", nst_report_url)
@@ -1302,7 +1302,7 @@ def generate_all_charts(game: Game):
         all_charts["scatters"].append(oi_cfpct_xgpct_chart_path)
         all_charts["scatters"].append(oi_xgrate60_chart_path)
 
-        all_charts["shift"] = shift_chart_path
+        all_charts["shift"].append(shift_chart_path)
 
     return all_charts
 
