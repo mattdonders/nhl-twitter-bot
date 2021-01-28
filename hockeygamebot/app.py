@@ -277,30 +277,30 @@ def start_game_loop(game: Game):
                         f"Individual, on-ice, forward lines & defensive pairs at the "
                         f"end of the game (via @NatStatTrick)."
                     )
-                    social_ids = socialhandler.send(
+                    ind_social_ids = socialhandler.send(
                         charts_msg,
                         media=team_charts,
                         game_hashtag=True,
-                        # reply=ov_social_ids["twitter"],
+                        reply=ov_social_ids["twitter"],
                     )
 
                     charts_msg = f"Shift length breakdown at the end of the game (via @NatStatTrick)."
-                    social_ids = socialhandler.send(
+                    shift_social_ids = socialhandler.send(
                         charts_msg,
                         media=shift_chart,
                         game_hashtag=True,
-                        # reply=ov_social_ids["twitter"],
+                        reply=ind_social_ids["twitter"],
                     )
 
                     charts_msg = (
                         f"Quality vs. Quantity & Expected Goals Rate / 60 at the"
                         " end of the game (via @NatStatTrick)."
                     )
-                    social_ids = socialhandler.send(
+                    xg60_social_ids = socialhandler.send(
                         charts_msg,
                         media=scatter_charts,
                         game_hashtag=True,
-                        # reply=ov_social_ids["twitter"],
+                        reply=shift_social_ids["twitter"],
                     )
                     game.nst_charts.final_charts = True
 

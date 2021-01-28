@@ -161,7 +161,7 @@ def send_tweet(
             else:
                 status = api.update_with_media(status=tweet_text, filename=media, in_reply_to_status_id=reply)
 
-        return status.id_str
+        return status.id
 
     except Exception as e:
         logging.error("Failed to send tweet : %s", tweet_text)
