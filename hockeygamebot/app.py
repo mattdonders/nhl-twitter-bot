@@ -264,44 +264,51 @@ def start_game_loop(game: Game):
                     scatter_charts = all_charts["scatters"]
                     shift_chart = all_charts["shift"]
 
-                    overview_chart_msg = (
-                        f"Team Overview stat percentages - 5v5 (SVA) at the "
-                        f"end of the game (via @NatStatTrick)."
-                    )
+                    last_chart_socials = None
 
-                    ov_social_ids = socialhandler.send(
-                        overview_chart_msg, media=overview_chart, game_hashtag=True
-                    )
+                    if overview_chart:
+                        overview_chart_msg = (
+                            f"Team Overview stat percentages - 5v5 (SVA) at the "
+                            f"end of the game (via @NatStatTrick)."
+                        )
 
-                    charts_msg = (
-                        f"Individual, on-ice, forward lines & defensive pairs at the "
-                        f"end of the game (via @NatStatTrick)."
-                    )
-                    ind_social_ids = socialhandler.send(
-                        charts_msg,
-                        media=team_charts,
-                        game_hashtag=True,
-                        reply=ov_social_ids["twitter"],
-                    )
+                        last_chart_socials = socialhandler.send(
+                            overview_chart_msg, media=overview_chart, game_hashtag=True
+                        )
 
-                    charts_msg = f"Shift length breakdown at the end of the game (via @NatStatTrick)."
-                    shift_social_ids = socialhandler.send(
-                        charts_msg,
-                        media=shift_chart,
-                        game_hashtag=True,
-                        reply=ind_social_ids["twitter"],
-                    )
+                    if team_charts:
+                        charts_msg = (
+                            f"Individual, on-ice, forward lines & defensive pairs at the "
+                            f"end of the game (via @NatStatTrick)."
+                        )
+                        last_chart_socials = socialhandler.send(
+                            charts_msg,
+                            media=team_charts,
+                            game_hashtag=True,
+                            reply=last_chart_socials["twitter"],
+                        )
 
-                    charts_msg = (
-                        f"Quality vs. Quantity & Expected Goals Rate / 60 at the"
-                        " end of the game (via @NatStatTrick)."
-                    )
-                    xg60_social_ids = socialhandler.send(
-                        charts_msg,
-                        media=scatter_charts,
-                        game_hashtag=True,
-                        reply=shift_social_ids["twitter"],
-                    )
+                    if shift_chart:
+                        charts_msg = f"Shift length breakdown at the end of the game (via @NatStatTrick)."
+                        last_chart_socials = socialhandler.send(
+                            charts_msg,
+                            media=shift_chart,
+                            game_hashtag=True,
+                            reply=last_chart_socials["twitter"],
+                        )
+
+                    if scatter_charts:
+                        charts_msg = (
+                            f"Quality vs. Quantity & Expected Goals Rate / 60 at the"
+                            " end of the game (via @NatStatTrick)."
+                        )
+                        last_chart_socials = socialhandler.send(
+                            charts_msg,
+                            media=scatter_charts,
+                            game_hashtag=True,
+                            reply=last_chart_socials["twitter"],
+                        )
+
                     game.nst_charts.final_charts = True
 
             # If we have exceeded the number of retries, stop pinging NST
