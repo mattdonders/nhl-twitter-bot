@@ -111,30 +111,35 @@ def intermission_loop(game: Game):
                 team_charts = list_of_charts["barcharts"]
                 shift_chart = list_of_charts["shift"]
 
-                overview_chart_msg = (
-                    f"Team Overview stat percentages - 5v5 (SVA) after the "
-                    f"{game.period.current_ordinal} period (via @NatStatTrick)."
-                )
+                last_chart_socials = None
 
-                ov_social_ids = socialhandler.send(
-                    overview_chart_msg, media=overview_chart, game_hashtag=True
-                )
+                if overview_chart:
+                    overview_chart_msg = (
+                        f"Team Overview stat percentages - 5v5 (SVA) after the "
+                        f"{game.period.current_ordinal} period (via @NatStatTrick)."
+                    )
 
-                charts_msg = (
-                    f"Individual, on-ice, forward lines & defensive pairs after the "
-                    f"{game.period.current_ordinal} period (via @NatStatTrick)."
-                )
-                ind_social_ids = socialhandler.send(
-                    charts_msg, media=team_charts, game_hashtag=True, reply=ov_social_ids["twitter"]
-                )
+                    last_chart_socials = socialhandler.send(
+                        overview_chart_msg, media=overview_chart, game_hashtag=True
+                    )
 
-                charts_msg = (
-                    f"Shift length breakdown after the "
-                    f"{game.period.current_ordinal} period (via @NatStatTrick)."
-                )
-                social_ids = socialhandler.send(
-                    charts_msg, media=shift_chart, game_hashtag=True, reply=ind_social_ids["twitter"]
-                )
+                if team_charts:
+                    charts_msg = (
+                        f"Individual, on-ice, forward lines & defensive pairs after the "
+                        f"{game.period.current_ordinal} period (via @NatStatTrick)."
+                    )
+                    last_chart_socials = socialhandler.send(
+                        charts_msg, media=team_charts, game_hashtag=True, reply=last_chart_socials["twitter"]
+                    )
+
+                if shift_chart:
+                    charts_msg = (
+                        f"Shift length breakdown after the "
+                        f"{game.period.current_ordinal} period (via @NatStatTrick)."
+                    )
+                    last_chart_socials = socialhandler.send(
+                        charts_msg, media=shift_chart, game_hashtag=True, reply=last_chart_socials["twitter"]
+                    )
 
                 game.nst_charts.charts_by_period[game.period.current] = True
 

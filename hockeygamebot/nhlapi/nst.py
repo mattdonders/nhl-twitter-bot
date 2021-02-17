@@ -1025,6 +1025,29 @@ def charts_shift_report(game_title, team_abbrev, team_name, soup):
         sit_name = sit["name"]
         sit_shift_dict = shift_dict[sit_code]
 
+        # If there are no shifts of a certain kind when the report is generated, we need to skip that situation
+        # And indicate it with text and an empty "customized" grid.
+        if not sit_shift_dict["toi"]:
+            axis.text(
+                0.5,
+                0.5,
+                "NO SHIFTS",
+                horizontalalignment="center",
+                verticalalignment="center",
+                fontsize=20,
+                color="gray",
+                fontweight="bold",
+            )
+
+            # tweak the title
+            axis.title.set_text(sit_name)
+            ttl = axis.title
+            ttl.set_weight("bold")
+
+            axis.set_xticks([])
+            axis.set_yticks([])
+            continue
+
         df = pd.DataFrame(sit_shift_dict).sort_values("toi", ascending=True)
         max_shifts = df["total"].max()
         df = df.drop(columns=["toi", "total"])
@@ -1170,14 +1193,16 @@ def generate_all_charts(game: Game):
     title_separator = "vs" if game.preferred_team.home_away == "home" else "@"
     preferred_game_title = f"{game.preferred_team.team_name} {title_separator} {game.other_team.team_name}"
 
-    overview_chart = charts_overview(game, preferred_game_title, ov_sva_final_stats)
-    overview_chart_path = os.path.join(IMAGES_PATH, "temp", f"allcharts-overview-{game.game_id_shortid}.png")
-    logging.info("Image Path: %s", overview_chart_path)
-    overview_chart.savefig(overview_chart_path, bbox_inches="tight")
-
-    # Add the overview image path to our list
-    list_of_charts.append(overview_chart_path)
-    all_charts["overview"] = overview_chart_path
+    try:
+        overview_chart = charts_overview(game, preferred_game_title, ov_sva_final_stats)
+        overview_chart_path = os.path.join(
+            IMAGES_PATH, "temp", f"allcharts-overview-{game.game_id_shortid}.png"
+        )
+        logging.info("Image Path: %s", overview_chart_path)
+        overview_chart.savefig(overview_chart_path, bbox_inches="tight")
+        all_charts["overview"] = overview_chart_path
+    except Exception as e:
+        logging.error("There was a problem generating Team Overview Chart. ERROR: %s", e)
 
     # Calculate average xG /60
     toi_mmss = ov_sva_stats["home"]["Final"]["TOI"]
@@ -1249,60 +1274,80 @@ def generate_all_charts(game: Game):
             os.path.join(IMAGES_PATH, "temp", f"allcharts-heatmaps-{team_abbrev}-{game.game_id_shortid}.png")
         )
 
-        logging.info("Generating Quality vs Quantity chart for %s.", team.team_name)
-        oi_cfpct_xgpct_chart = charts_cfpct_xgpct_scatter(game_title, team.team_name, oi_sva_stats)
-        oi_cfpct_xgpct_chart_path = os.path.join(
-            IMAGES_PATH, "temp", f"allcharts-oi-cfpct-xgpct-{team_abbrev}-{game.game_id_shortid}.png"
-        )
-        logging.info("Image Path: %s", oi_cfpct_xgpct_chart_path)
-        oi_cfpct_xgpct_chart.savefig(oi_cfpct_xgpct_chart_path, bbox_inches="tight")
+        try:
+            logging.info("Generating Quality vs Quantity chart for %s.", team.team_name)
+            oi_cfpct_xgpct_chart = charts_cfpct_xgpct_scatter(game_title, team.team_name, oi_sva_stats)
+            oi_cfpct_xgpct_chart_path = os.path.join(
+                IMAGES_PATH, "temp", f"allcharts-oi-cfpct-xgpct-{team_abbrev}-{game.game_id_shortid}.png"
+            )
+            logging.info("Image Path: %s", oi_cfpct_xgpct_chart_path)
+            oi_cfpct_xgpct_chart.savefig(oi_cfpct_xgpct_chart_path, bbox_inches="tight")
+            all_charts["scatters"].append(oi_cfpct_xgpct_chart_path)
+        except Exception as e:
+            logging.error("There was a problem generating the Quality vs Quantity chart. ERROR: %s", e)
 
-        logging.info("Generating xG Rate / 60 chart for %s.", team.team_name)
-        oi_xgrate60_chart = charts_xgrate60_scatter(game_title, team.team_name, oi_sva_stats, xg_avg60)
-        oi_xgrate60_chart_path = os.path.join(
-            IMAGES_PATH, "temp", f"allcharts-oi-xgrate60-{team_abbrev}-{game.game_id_shortid}.png"
-        )
-        logging.info("Image Path: %s", oi_xgrate60_chart_path)
-        oi_xgrate60_chart.savefig(oi_xgrate60_chart_path, bbox_inches="tight")
+        try:
+            logging.info("Generating xG Rate / 60 chart for %s.", team.team_name)
+            oi_xgrate60_chart = charts_xgrate60_scatter(game_title, team.team_name, oi_sva_stats, xg_avg60)
+            oi_xgrate60_chart_path = os.path.join(
+                IMAGES_PATH, "temp", f"allcharts-oi-xgrate60-{team_abbrev}-{game.game_id_shortid}.png"
+            )
+            logging.info("Image Path: %s", oi_xgrate60_chart_path)
+            oi_xgrate60_chart.savefig(oi_xgrate60_chart_path, bbox_inches="tight")
+            all_charts["scatters"].append(oi_xgrate60_chart_path)
+        except Exception as e:
+            logging.error("There was a problem generating the xG Rate / 60 chart. ERROR: %s", e)
 
-        logging.info("Generating Individual / On-Ice charts for %s.", team.team_name)
-        ind_onice_chart = charts_toi_individual(
-            game_title, team.short_name, toi_dict, ind_stats, oi_sva_stats
-        )
-        ind_onice_chart_path = os.path.join(
-            IMAGES_PATH, "temp", f"allcharts-ind-onice-{team_abbrev}-{game.game_id_shortid}.png"
-        )
-        logging.info("Image Path: %s", ind_onice_chart_path)
-        ind_onice_chart.savefig(ind_onice_chart_path, bbox_inches="tight")
+        try:
+            logging.info("Generating Individual / On-Ice charts for %s.", team.team_name)
+            ind_onice_chart = charts_toi_individual(
+                game_title, team.short_name, toi_dict, ind_stats, oi_sva_stats
+            )
+            ind_onice_chart_path = os.path.join(
+                IMAGES_PATH, "temp", f"allcharts-ind-onice-{team_abbrev}-{game.game_id_shortid}.png"
+            )
+            logging.info("Image Path: %s", ind_onice_chart_path)
+            ind_onice_chart.savefig(ind_onice_chart_path, bbox_inches="tight")
+            all_charts["barcharts"].append(ind_onice_chart_path)
+        except Exception as e:
+            logging.error("There was a problem generating the Individual / On-Ice charts. ERROR: %s", e)
 
-        logging.info("Generating Forwards Lines / Defensive Pairing charts for %s.", team.team_name)
-        fwds_def_chart = charts_fwds_def(game_title, team.short_name, fwd_sva_stats, def_sva_stats)
-        fwds_def_chart_path = os.path.join(
-            IMAGES_PATH, "temp", f"allcharts-fwd-def-{team_abbrev}-{game.game_id_shortid}.png"
-        )
-        logging.info("Image Path: %s", fwds_def_chart_path)
-        fwds_def_chart.savefig(fwds_def_chart_path, bbox_inches="tight")
+        try:
+            logging.info("Generating Forwards Lines / Defensive Pairing charts for %s.", team.team_name)
+            fwds_def_chart = charts_fwds_def(game_title, team.short_name, fwd_sva_stats, def_sva_stats)
+            fwds_def_chart_path = os.path.join(
+                IMAGES_PATH, "temp", f"allcharts-fwd-def-{team_abbrev}-{game.game_id_shortid}.png"
+            )
+            logging.info("Image Path: %s", fwds_def_chart_path)
+            fwds_def_chart.savefig(fwds_def_chart_path, bbox_inches="tight")
+            all_charts["barcharts"].append(fwds_def_chart_path)
+        except Exception as e:
+            logging.error("There was a problem generating the FWD / DEF charts. ERROR: %s", e)
 
-        logging.info("Generating Shift Report Breakdown chart for %s.", team.team_name)
-        shift_chart = charts_shift_report(game_title, team_abbrev, team.team_name, soup)
-        shift_chart_path = os.path.join(
-            IMAGES_PATH, "temp", f"allcharts-shift-report-{team_abbrev}-{game.game_id_shortid}.png"
-        )
-        logging.info("Image Path: %s", shift_chart_path)
-        shift_chart.savefig(shift_chart_path, bbox_inches="tight")
+        try:
+            logging.info("Generating Shift Report Breakdown chart for %s.", team.team_name)
+            shift_chart = charts_shift_report(game_title, team_abbrev, team.team_name, soup)
+            shift_chart_path = os.path.join(
+                IMAGES_PATH, "temp", f"allcharts-shift-report-{team_abbrev}-{game.game_id_shortid}.png"
+            )
+            logging.info("Image Path: %s", shift_chart_path)
+            shift_chart.savefig(shift_chart_path, bbox_inches="tight")
+            all_charts["shift"].append(shift_chart_path)
+        except Exception as e:
+            logging.error("There was a problem generating the shift report charts. ERROR: %s", e)
 
-        list_of_charts.append(ind_onice_chart_path)
-        list_of_charts.append(fwds_def_chart_path)
-        list_of_charts.append(oi_cfpct_xgpct_chart)
-        list_of_charts.append(oi_xgrate60_chart_path)
+        # list_of_charts.append(ind_onice_chart_path)
+        # list_of_charts.append(fwds_def_chart_path)
+        # list_of_charts.append(oi_cfpct_xgpct_chart)
+        # list_of_charts.append(oi_xgrate60_chart_path)
 
-        all_charts["barcharts"].append(ind_onice_chart_path)
-        all_charts["barcharts"].append(fwds_def_chart_path)
+        # # all_charts["barcharts"].append(ind_onice_chart_path)
+        # # all_charts["barcharts"].append(fwds_def_chart_path)
 
-        all_charts["scatters"].append(oi_cfpct_xgpct_chart_path)
-        all_charts["scatters"].append(oi_xgrate60_chart_path)
+        # all_charts["scatters"].append(oi_cfpct_xgpct_chart_path)
+        # all_charts["scatters"].append(oi_xgrate60_chart_path)
 
-        all_charts["shift"].append(shift_chart_path)
+        # all_charts["shift"].append(shift_chart_path)
 
     return all_charts
 

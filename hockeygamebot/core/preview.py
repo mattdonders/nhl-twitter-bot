@@ -247,8 +247,13 @@ def game_preview_others(game: Game):
                         f"{other_hashtag} {game.game_hashtag}"
                     )
 
+                    discord_color = images.discord_color(game.preferred_team.team_name)
                     social_dict = socialhandler.send(
-                        msg=other_goalie_tweet_text, reply=game.pregame_lasttweet, force_send=True
+                        msg=other_goalie_tweet_text,
+                        reply=game.pregame_lasttweet,
+                        force_send=True,
+                        discord_title="PREVIEW: Goalie Start",
+                        discord_color=discord_color,
                     )
 
                     game.pregame_lasttweet = social_dict["twitter"]
