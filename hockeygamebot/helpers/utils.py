@@ -152,7 +152,7 @@ def ordinal(n):
     Returns:
         nth: ordinal respresentation of passed integer
     """
-    nth = "%d%s" % (n, "tsnrhtdd"[(n / 10 % 10 != 1) * (n % 10 < 4) * n % 10 :: 4])
+    nth = "%d%s" % (n, "tsnrhtdd"[(n // 10 % 10 != 1) * (n % 10 < 4) * n % 10 :: 4])
     return nth
 
 
