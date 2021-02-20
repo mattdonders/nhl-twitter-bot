@@ -62,8 +62,7 @@ if [ "$TOTALMEM" -lt "1024" ]; then
         "$OTHERARGS" \
         mattdonders/nhl-twitter-bot:latest
 else
-    docker run --memory="500m" --memory-swap="-1" -d \
-        --name hgb-"$TEAMNAME" -e TZ="$TIMEZONE" \
+    docker run -d --name hgb-"$TEAMNAME" -e TZ="$TIMEZONE" \
         -v "$CONFIG":/app/hockeygamebot/config/config.yaml \
         "$OTHERARGS" \
         mattdonders/nhl-twitter-bot:latest
