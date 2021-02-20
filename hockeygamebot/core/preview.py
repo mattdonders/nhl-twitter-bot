@@ -278,7 +278,7 @@ def game_preview_others(game: Game):
             officials_confirmed = officials.get("confirmed")
 
             if officials_confirmed:
-                officials_tweet_text = f"The officials for {game.game_hashtag} are -\n(via @ScoutingTheRefs)"
+                officials_tweet_text = f"The officials (via @ScoutingTheRefs) for {game.game_hashtag} are -\n"
                 for key, attrs in officials.items():
                     if key == "confirmed":
                         continue

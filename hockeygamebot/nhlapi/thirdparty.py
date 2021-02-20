@@ -486,12 +486,35 @@ def scouting_the_refs(game, pref_team):
     return_referees = list()
     return_linesmen = list()
 
-    refs = game_details.find_all("tr")[1].find_all("td")
-    refs_season_games = game_details.find_all("tr")[2].find_all("td")
-    refs_career_games = game_details.find_all("tr")[3].find_all("td")
-    refs_penalty_game = game_details.find_all("tr")[8].find_all("td")
+    # This Section uses List Comprehension & Indeces to Keep Track of Row Values
+    idx_ref = next(
+        i for i, x in enumerate(game_details.find_all("tr")) if x.text.lower().strip() == "referees"
+    )
+    idx_ref_names = idx_ref + 1
+
+    idx_line = next(
+        i for i, x in enumerate(game_details.find_all("tr")) if x.text.lower().strip() == "linesmen"
+    )
+    idx_line_names = idx_line + 1
+
+    idx_season_gms = [i for i, x in enumerate(game_details.find_all("tr")) if "20-21" in x.text.lower()]
+    idx_season_gms_ref = idx_season_gms[0]
+    idx_season_gms_line = idx_season_gms[1]
+
+    idx_career_gms = [
+        i for i, x in enumerate(game_details.find_all("tr")) if "career games" in x.text.lower()
+    ]
+    idx_career_gms_ref = idx_career_gms[0]
+    idx_career_gms_line = idx_career_gms[1]
+
+    idx_penalty_gm = next(i for i, x in enumerate(game_details.find_all("tr")) if "penl/gm" in x.text.lower())
+
+    refs = game_details.find_all("tr")[idx_ref_names].find_all("td")
+    refs_season_games = game_details.find_all("tr")[idx_season_gms_ref].find_all("td")
+    refs_career_games = game_details.find_all("tr")[idx_career_gms_ref].find_all("td")
+    refs_penalty_game = game_details.find_all("tr")[idx_penalty_gm].find_all("td")
     for i, ref in enumerate(refs):
-        ref_name = ref.text.replace("\n", "")
+        ref_name = ref.text.strip()
         ref_season_games = refs_season_games[i].text
         ref_career_games = refs_career_games[i].text
         ref_penalty_game = refs_penalty_game[i].text.split(" (")[0]
@@ -505,11 +528,11 @@ def scouting_the_refs(game, pref_team):
             print(ref_dict)
             return_referees.append(ref_dict)
 
-    linesmen = game_details.find_all("tr")[21].find_all("td")
-    linesmen_season_games = game_details.find_all("tr")[22].find_all("td")
-    linesmen_career_games = game_details.find_all("tr")[23].find_all("td")
+    linesmen = game_details.find_all("tr")[idx_line_names].find_all("td")
+    linesmen_season_games = game_details.find_all("tr")[idx_season_gms_line].find_all("td")
+    linesmen_career_games = game_details.find_all("tr")[idx_career_gms_line].find_all("td")
     for i, linesman in enumerate(linesmen):
-        linesman_name = linesman.text.replace("\n", "")
+        linesman_name = linesman.text.strip()
         linesman_season_games = linesmen_season_games[i].text
         linesman_career_games = linesmen_career_games[i].text
         if linesman_name:
