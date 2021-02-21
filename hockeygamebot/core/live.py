@@ -110,6 +110,7 @@ def intermission_loop(game: Game):
                 overview_chart = list_of_charts["overview"]
                 team_charts = list_of_charts["barcharts"]
                 shift_chart = list_of_charts["shift"]
+                heatmap_charts = list_of_charts["heatmaps"]
 
                 last_chart_socials = None
 
@@ -130,6 +131,18 @@ def intermission_loop(game: Game):
                     )
                     last_chart_socials = socialhandler.send(
                         charts_msg, media=team_charts, game_hashtag=True, reply=last_chart_socials["twitter"]
+                    )
+
+                if heatmap_charts:
+                    charts_msg = (
+                        f"Linemate & Opposition Data (TOI, CF% and xGF%) after the "
+                        f"{game.period.current_ordinal} period (via @NatStatTrick)."
+                    )
+                    last_chart_socials = socialhandler.send(
+                        charts_msg,
+                        media=heatmap_charts,
+                        game_hashtag=True,
+                        reply=last_chart_socials["twitter"],
                     )
 
                 if shift_chart:

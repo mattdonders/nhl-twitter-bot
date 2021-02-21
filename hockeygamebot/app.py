@@ -263,6 +263,7 @@ def start_game_loop(game: Game):
                     team_charts = all_charts["barcharts"]
                     scatter_charts = all_charts["scatters"]
                     shift_chart = all_charts["shift"]
+                    heatmap_charts = all_charts["heatmaps"]
 
                     last_chart_socials = None
 
@@ -284,6 +285,18 @@ def start_game_loop(game: Game):
                         last_chart_socials = socialhandler.send(
                             charts_msg,
                             media=team_charts,
+                            game_hashtag=True,
+                            reply=last_chart_socials["twitter"],
+                        )
+
+                    if heatmap_charts:
+                        charts_msg = (
+                            f"Linemate & Opposition Data (TOI, CF% and xGF%) at the "
+                            f"end of the game (via @NatStatTrick)."
+                        )
+                        last_chart_socials = socialhandler.send(
+                            charts_msg,
+                            media=heatmap_charts,
                             game_hashtag=True,
                             reply=last_chart_socials["twitter"],
                         )
