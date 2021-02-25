@@ -422,6 +422,8 @@ def parse_nst_opposition(team_abbrev, soup, players_ids, players_dict):
             items = oppo.find_all("td")
             name = items[0].text.replace("\xa0", " ")
             last_name = " ".join(name.split()[1:])
+            position = items[1].text.replace("R", "F").replace("L", "F").replace("C", "F")
+            last_name = f"{last_name} ({position})"
             toi = float(items[2].text)
 
             oppo_toi[player_name][last_name] = toi
@@ -451,6 +453,8 @@ def parse_nst_linemate(team_abbrev, soup, players_ids, players_dict):
             items = linemate.find_all("td")
             name = items[0].text.replace("\xa0", " ")
             last_name = " ".join(name.split()[1:])
+            position = items[1].text.replace("R", "F").replace("L", "F").replace("C", "F")
+            last_name = f"{last_name} ({position})"
             toi = float(items[2].text)
             linemate_toi[player_name][last_name] = toi
 
@@ -461,6 +465,20 @@ def parse_nst_linemate(team_abbrev, soup, players_ids, players_dict):
             linemate_xgwith[player_name][last_name] = xgwith / 100
 
     return linemate_toi, linemate_cfwith, linemate_xgwith
+
+
+def create_player_position_dict(ind_5v5):
+    player_position = dict()
+
+    for player in ind_5v5:
+        items = player.find_all("td")
+        name = items[0].text.replace("\xa0", " ")
+        last_name = " ".join(name.split()[1:])
+        position = items[1].text
+        last_name_position = f"{last_name} ({position})"
+        player_position[name] = last_name_position
+
+    return player_position
 
 
 ###################################################
@@ -486,14 +504,23 @@ def calculate_xticks(spacing, df_min, df_max):
     return (xtick_min, xtick_max)
 
 
-def charts_heatmap_linemates(game_title, linemate_toi, linemate_cfwith, linemate_xgwith):
+def charts_heatmap_linemates(game_title, team_name, linemate_toi, linemate_cfwith, linemate_xgwith):
     """ Generates a heatmap style chart for linemates annotated with TOI & CF%. """
 
     colormap = "Blues"
 
+    # Convert Game Title
+    team_name_mathtext = rf"$\bf{{{team_name}}}$".replace(" ", "\ ")
+    game_title = game_title.replace(team_name, team_name_mathtext)
+
     # Create DataFrame of Linemate & TOI Data
     linemate_df = pd.DataFrame(linemate_toi).T
     linemate_df = linemate_df.sort_index().sort_index(axis=1)
+    linemate_df["Total"] = linemate_df.sum(axis=1)
+    linemate_df.loc["Total"] = linemate_df.sum()
+    linemate_df = linemate_df.sort_values(by="Total", ascending=False)
+    linemate_df = linemate_df.sort_values(by="Total", axis=1)
+    linemate_df = linemate_df.drop("Total").drop("Total", axis=1)
 
     # Then fillNA with actual "N/A" string (to support annotation)
     linemate_toi_df = linemate_df.apply(lambda x: pd.to_datetime(x, unit="m").dt.strftime("%M:%S"))
@@ -502,18 +529,25 @@ def charts_heatmap_linemates(game_title, linemate_toi, linemate_cfwith, linemate
 
     # Create DataFrame of Linemate & CF Data & convert to actual percentage
     linemate_cf_df = pd.DataFrame(linemate_cfwith).T.fillna(0)
-    linemate_cf_df_pct = linemate_cf_df.apply(lambda x: x * 100).applymap("CF {:.1f}%".format)
-    linemate_cf_df_pct = linemate_cf_df_pct.sort_index().sort_index(axis=1)
+    linemate_cf_df_pct = linemate_cf_df.apply(lambda x: round(x * 100)).applymap("CF {:.0f}".format)
+    # linemate_cf_df_pct = linemate_cf_df_pct.sort_index().sort_index(axis=1)
+    linemate_cf_df_pct = linemate_cf_df_pct.reindex(linemate_df.index)
+    linemate_cf_df_pct = linemate_cf_df_pct.reindex(linemate_df.columns.tolist(), axis="columns")
 
     # Create DataFrame of Linemate & xG Data & convert to actual percentage
     linemate_xg_df = pd.DataFrame(linemate_xgwith).T.fillna(0)
-    linemate_xg_df_pct = linemate_xg_df.apply(lambda x: x * 100).applymap("xGF {:.1f}%".format)
-    linemate_xg_df_pct = linemate_xg_df_pct.sort_index().sort_index(axis=1)
+    linemate_xg_df_pct = linemate_xg_df.apply(lambda x: round(x * 100)).applymap("xGF {:.0f}".format)
+    # linemate_xg_df_pct = linemate_xg_df_pct.sort_index().sort_index(axis=1)
+    linemate_xg_df_pct = linemate_xg_df_pct.reindex(linemate_df.index)
+    linemate_xg_df_pct = linemate_xg_df_pct.reindex(linemate_df.columns.tolist(), axis="columns")
 
     # Create a combination of the two above DataFrames (used for annoation)
-    annot_df = pd.concat([linemate_toi_df, linemate_cf_df_pct, linemate_xg_df_pct], join="inner", axis=1)
+    # annot_df = pd.concat([linemate_toi_df, linemate_cf_df_pct, linemate_xg_df_pct], join="inner", axis=1)
+    annot_df = pd.concat([linemate_cf_df_pct, linemate_xg_df_pct], join="inner", axis=1)
     annot_df = annot_df.groupby(level=0, axis=1).apply(lambda x: x.apply(sjoin, axis=1))
-    annot_df = annot_df.sort_index().sort_index(axis=1)
+    # annot_df = annot_df.sort_index().sort_index(axis=1)
+    annot_df = annot_df.reindex(linemate_df.index)
+    annot_df = annot_df.reindex(linemate_df.columns.tolist(), axis="columns")
 
     # Generate a (larger) figure so the boxes are easy to see on Twitter / Discord
     heatmap_linemates_fig, ax1 = plt.subplots(1, 1, figsize=(15, 10))
@@ -525,13 +559,13 @@ def charts_heatmap_linemates(game_title, linemate_toi, linemate_cfwith, linemate
         annot=annot_df,
         linewidths=0.5,
         cmap=colormap,
-        annot_kws={"size": 7},
+        annot_kws={"size": 9},
         cbar_kws={"label": "Time on Ice"},
     )
 
     heatmap_linemates_fig.tight_layout(rect=[0, 0.0, 1, 0.92], pad=2)
     heatmap_linemates_fig.suptitle(
-        f"{game_title}\nLinemates Data (5v5) with TOI, CF% and xGF%\nData Courtesy: Natural Stat Trick",
+        f"Linemates Data (5v5) Colored by TOI w/ CF% and xGF%\n{game_title}\nData Courtesy: Natural Stat Trick",
         x=0.45,
         fontsize=14,
     )
@@ -539,34 +573,51 @@ def charts_heatmap_linemates(game_title, linemate_toi, linemate_cfwith, linemate
     return heatmap_linemates_fig
 
 
-def charts_heatmap_opposition(game_title, oppo_toi, oppo_cfwith, oppo_xgwith):
+def charts_heatmap_opposition(game_title, team_name, oppo_toi, oppo_cfwith, oppo_xgwith):
     """ Generates a heatmap style chart for linemates annotated with TOI & CF%. """
 
     colormap = "Blues"
+
+    # Convert Game Title
+    team_name_mathtext = rf"$\bf{{{team_name}}}$".replace(" ", "\ ")
+    game_title = game_title.replace(team_name, team_name_mathtext)
 
     # Create DataFrame of Linemate & TOI Data
     oppo_df = pd.DataFrame(oppo_toi).T
     oppo_df = oppo_df.sort_index().sort_index(axis=1)
 
+    oppo_df["Total"] = oppo_df.sum(axis=1)
+    oppo_df.loc["Total"] = oppo_df.sum()
+    oppo_df = oppo_df.sort_values(by="Total", ascending=False)
+    oppo_df = oppo_df.sort_values(by="Total", axis=1)
+    oppo_df = oppo_df.drop("Total").drop("Total", axis=1)
+
     # Then fillNA with actual "N/A" string (to support annotation)
     oppo_toi_df = oppo_df.apply(lambda x: pd.to_datetime(x, unit="m").dt.strftime("%M:%S"))
     oppo_toi_df = oppo_toi_df.fillna("N/A")
-    oppo_toi_df = oppo_toi_df.sort_index().sort_index(axis=1)
+    # oppo_toi_df = oppo_toi_df.sort_index().sort_index(axis=1)
 
     # Create DataFrame of Linemate & CF Data & convert to actual percentage
     oppo_cf_df = pd.DataFrame(oppo_cfwith).T.fillna(0)
-    oppo_cf_df_pct = oppo_cf_df.apply(lambda x: x * 100).applymap("CF {:.1f}%".format)
-    oppo_cf_df_pct = oppo_cf_df_pct.sort_index().sort_index(axis=1)
+    oppo_cf_df_pct = oppo_cf_df.apply(lambda x: round(x * 100)).applymap("CF {:.0f}".format)
+    # oppo_cf_df_pct = oppo_cf_df_pct.sort_index().sort_index(axis=1)
+    oppo_cf_df_pct = oppo_cf_df_pct.reindex(oppo_df.index)
+    oppo_cf_df_pct = oppo_cf_df_pct.reindex(oppo_df.columns.tolist(), axis="columns")
 
     # Create DataFrame of Linemate & xG Data & convert to actual percentage
     oppo_xg_df = pd.DataFrame(oppo_xgwith).T.fillna(0)
-    oppo_xg_df_pct = oppo_xg_df.apply(lambda x: x * 100).applymap("xGF {:.1f}%".format)
-    oppo_xg_df_pct = oppo_xg_df_pct.sort_index().sort_index(axis=1)
+    oppo_xg_df_pct = oppo_xg_df.apply(lambda x: round(x * 100)).applymap("xGF {:.0f}".format)
+    # oppo_xg_df_pct = oppo_xg_df_pct.sort_index().sort_index(axis=1)
+    oppo_xg_df_pct = oppo_xg_df_pct.reindex(oppo_df.index)
+    oppo_xg_df_pct = oppo_xg_df_pct.reindex(oppo_df.columns.tolist(), axis="columns")
 
     # Create a combination of the two above DataFrames (used for annoation)
-    annot_df = pd.concat([oppo_toi_df, oppo_cf_df_pct, oppo_xg_df_pct], join="inner", axis=1)
+    # annot_df = pd.concat([oppo_toi_df, oppo_cf_df_pct, oppo_xg_df_pct], join="inner", axis=1)
+    annot_df = pd.concat([oppo_cf_df_pct, oppo_xg_df_pct], join="inner", axis=1)
     annot_df = annot_df.groupby(level=0, axis=1).apply(lambda x: x.apply(sjoin, axis=1))
-    annot_df = annot_df.sort_index().sort_index(axis=1)
+    # annot_df = annot_df.sort_index().sort_index(axis=1)
+    annot_df = annot_df.reindex(oppo_df.index)
+    annot_df = annot_df.reindex(oppo_df.columns.tolist(), axis="columns")
 
     # Generate a (larger) figure so the boxes are easy to see on Twitter / Discord
     heatmap_oppo_fig, ax1 = plt.subplots(1, 1, figsize=(15, 10))
@@ -578,13 +629,16 @@ def charts_heatmap_opposition(game_title, oppo_toi, oppo_cfwith, oppo_xgwith):
         annot=annot_df,
         linewidths=0.5,
         cmap=colormap,
-        annot_kws={"size": 7},
+        annot_kws={"size": 9},
         cbar_kws={"label": "Time on Ice"},
     )
 
+    ax1.set_ylabel("Player FOR (xGF% and CF%)")
+    ax1.set_xlabel("Opposing Player")
+
     heatmap_oppo_fig.tight_layout(rect=[0, 0.0, 1, 0.92], pad=2)
     heatmap_oppo_fig.suptitle(
-        f"{game_title}\nOpposition Data (5v5) with TOI, CF% and xGF%\nData Courtesy: Natural Stat Trick",
+        f"Opposition Data (5v5) Colored by TOI w/ CF% and xGF%\n{game_title}\nData Courtesy: Natural Stat Trick",
         x=0.45,
         fontsize=14,
     )
@@ -1279,7 +1333,7 @@ def generate_all_charts(game: Game):
     teams = [game.preferred_team, game.other_team]
     for team in teams:
         team_abbrev = nst_abbreviation(team.team_name).replace(".", "")
-        logging.info("%s (%s)", team.team_name, team_abbrev)
+        logging.info("Generating all charts for Team / Situation: %s (%s).", team.team_name, team_abbrev)
 
         # Find Game Title (For Chart Header)
         game_title = soup.find("h1").text
@@ -1303,9 +1357,15 @@ def generate_all_charts(game: Game):
         ]
 
         team_dropdown = soup.find(id=f"s{team_abbrev}lb").find_next_sibling("ul").find_all("li")
+        player_position_dict = create_player_position_dict(ind_5v5)
+
         all_players_ids = [x.label.attrs["for"][2:] for x in team_dropdown]
+        # all_players_dict = {
+        #     x.label.attrs["for"][2:]: " ".join(x.text.replace("\xa0", " ").split()[1:]) for x in team_dropdown
+        # }
         all_players_dict = {
-            x.label.attrs["for"][2:]: " ".join(x.text.replace("\xa0", " ").split()[1:]) for x in team_dropdown
+            x.label.attrs["for"][2:]: player_position_dict.get(x.text.replace("\xa0", " "))
+            for x in team_dropdown
         }
         def_player_ids = [
             x.label.attrs["for"][2:] for x in team_dropdown if x.text.replace("\xa0", " ") in defense
@@ -1332,7 +1392,7 @@ def generate_all_charts(game: Game):
         try:
             logging.info("Generating Linemate Heatmap chart for %s.", team.team_name)
             heatmap_linemate_chart = charts_heatmap_linemates(
-                game_title, linemate_toi, linemate_cfwith, linemate_xgwith
+                game_title, team.team_name, linemate_toi, linemate_cfwith, linemate_xgwith
             )
             heatmap_linemate_chart_path = os.path.join(
                 IMAGES_PATH, "temp", f"allcharts-heatmap_linemate-{team_abbrev}-{game.game_id_shortid}.png"
@@ -1345,7 +1405,9 @@ def generate_all_charts(game: Game):
 
         try:
             logging.info("Generating Opposition Heatmap chart for %s.", team.team_name)
-            heatmap_oppo_chart = charts_heatmap_opposition(game_title, oppo_toi, oppo_cfwith, oppo_xgwith)
+            heatmap_oppo_chart = charts_heatmap_opposition(
+                game_title, team.team_name, oppo_toi, oppo_cfwith, oppo_xgwith
+            )
             heatmap_oppo_chart_path = os.path.join(
                 IMAGES_PATH, "temp", f"allcharts-heatmap_opposition-{team_abbrev}-{game.game_id_shortid}.png"
             )
@@ -1559,7 +1621,7 @@ def generate_team_season_charts(team_name, situation, lastgames=False):
     # Add the Figure Title
     last_games_title = "Season Stats" if not lastgames else f"Last {lastgames} Games"
     sit_label = "5v5 (SVA)" if situation == "sva" else "All Situations"
-    print(situation, sit_label)
+
     ax1.title.set_text(f"{team_name} {last_games_title} - {sit_label}\nData Courtesy: Natural Stat Trick")
 
     # Draw the text labels on each of the corresponding bars
