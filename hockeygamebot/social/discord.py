@@ -37,11 +37,20 @@ def send_discord(msg, title=None, color=16777215, embed=None, media=None):
         linebreak_msg = f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n{msg}"
         payload = {"content": linebreak_msg}
 
-        if title:
-            embed_msg = {"embeds": [{"title": title, "description": msg, "color": color}]}
+        if "https://" in msg:
+            title = title or "Game Bot Update"
+            logging.debug("This discord has a URL in it - strip on the \n and send two messages.")
+            non_url_msg = "\n".join(msg.split("\n")[:-1])
+            url_msg = msg.split("\n")[-1]
+
+            embed_msg = {"embeds": [{"title": title, "description": non_url_msg, "color": color}]}
             response = requests.post(url, json=embed_msg)
-        elif not title and not media:
-            embed_msg = {"embeds": [{"title": "Game Bot Update", "description": msg, "color": color}]}
+
+            payload = {"content": url_msg}
+            response = requests.post(url, json=payload)
+        elif not media:
+            title = title or "Game Bot Update"
+            embed_msg = {"embeds": [{"title": title, "description": msg, "color": color}]}
             response = requests.post(url, json=embed_msg)
         else:
             if isinstance(media, list):
