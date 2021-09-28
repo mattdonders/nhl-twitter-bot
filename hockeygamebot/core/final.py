@@ -54,11 +54,14 @@ def final_score(livefeed: dict, game: Game):
     if linescore_period == 5 and (score_pref == score_other):
         logging.info("A shootout caused the final score to be tied - checke the shootoutInfo key")
         shootout_info = linescore["shootoutInfo"]
+        logging.info("Shootout Info: %s", shootout_info)
         pref_so_goals = shootout_info[game.preferred_team.home_away]["scores"]
         other_so_goals = shootout_info[game.other_team.home_away]["scores"]
         if pref_so_goals > other_so_goals:
+            logging.info("Preferred Team scored more shootout goals, increment score by 1.")
             score_pref = score_pref + 1
         else:
+            logging.info("Other Team scored more shootout goals, increment score by 1.")
             score_other = score_other + 1
 
         # Set Team Objects New Score

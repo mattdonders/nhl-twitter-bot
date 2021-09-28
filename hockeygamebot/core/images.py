@@ -234,6 +234,10 @@ def team_colors(team_name):
             "primary": {"bg": (0, 98, 114), "text": (255, 255, 255)},
             "secondary": {"bg": (229, 114, 0), "text": (0, 0, 0)},
         },
+        "Seattle Kraken": {
+            "primary": {"bg": (0, 22, 40), "text": (255, 255, 255)},
+            "secondary": {"bg": (153, 217, 217), "text": (0, 0, 0)},
+        },
         "St. Louis Blues": {
             "primary": {"bg": (0, 48, 135), "text": (255, 255, 255)},
             "secondary": {"bg": (4, 30, 66), "text": (0, 0, 0)},

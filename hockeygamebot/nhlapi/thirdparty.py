@@ -38,8 +38,11 @@ def thirdparty_request(url, headers=None):
     session.mount("http://", retries)
 
     # Setup a Fake User Agent (simulates a real visit)
-    ua = UserAgent(cache=False)
-    ua_header = {"User-Agent": str(ua.chrome)}
+    # ua = UserAgent(cache=False)
+    # ua_header = {"User-Agent": str(ua.chrome)}
+    ua_header = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36"
+    }
     if headers:
         headers.update(ua_header)
     else:
@@ -114,6 +117,7 @@ def nst_abbreviation(team_name: str) -> str:
         "Philadelphia Flyers": "PHI",
         "Pittsburgh Penguins": "PIT",
         "San Jose Sharks": "S.J",
+        "Seattle Kraken": "SEA",
         "St. Louis Blues": "STL",
         "Tampa Bay Lightning": "T.B",
         "Toronto Maple Leafs": "TOR",
@@ -335,8 +339,11 @@ def dailyfaceoff_lines(game, team):
     df_linecombos_url = urls["endpoints"]["df_line_combos"]
 
     # Setup a Fake User Agent (simulates a real visit)
-    ua = UserAgent(cache=False)
-    ua_header = {"User-Agent": str(ua.chrome)}
+    # ua = UserAgent(cache=False)
+    # ua_header = {"User-Agent": str(ua.chrome)}
+    ua_header = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36"
+    }
 
     df_team_encoded = team.team_name.replace(" ", "-").replace("é", "e").replace(".", "").lower()
     df_lines_url = df_linecombos_url.replace("TEAMNAME", df_team_encoded)
@@ -347,7 +354,7 @@ def dailyfaceoff_lines(game, team):
 
     # Grab the last update line from Daily Faceoff
     # If Update Time != Game Date, return not confirmed
-    soup_update = soup.find("div", class_="team-lineup-last-updated")
+    soup_update = soup.find("div", class_="team-line-combination-last-updated")
     last_update = soup_update.text.replace("\n", "").strip().split(": ")[1]
     last_update_date = parse(last_update)
     game_day = parse(game.game_date_local)
