@@ -18,14 +18,14 @@ from hockeygamebot.nhlapi import schedule, thirdparty
 
 
 class Backgrounds:
-    """ Paths to background images & files used in the imaging module. """
+    """Paths to background images & files used in the imaging module."""
 
     PREGAME = os.path.join(IMAGES_PATH, "BG2019-Gameday-Pregame.png")
     STATS = os.path.join(IMAGES_PATH, "BG2019-Gameday-ScoreReport.png")
 
 
 class Colors:
-    """ Specifies commonly used colors. """
+    """Specifies commonly used colors."""
 
     WHITE = (255, 255, 255)
     GRAY = (128, 128, 128)
@@ -33,14 +33,14 @@ class Colors:
 
 
 class FontFiles:
-    """ Paths to font files used in the imaging module. """
+    """Paths to font files used in the imaging module."""
 
     BITTER_REGULAR = os.path.join(PROJECT_ROOT, "resources/fonts/Bitter-Regular.ttf")
     BITTER_BOLD = os.path.join(PROJECT_ROOT, "resources/fonts/Bitter-Bold.ttf")
 
 
 class FontSizes:
-    """ Font sizes used in the imaging module. """
+    """Font sizes used in the imaging module."""
 
     TITLE = 80
     DETAIL_LARGE = 56
@@ -61,7 +61,7 @@ class FontSizes:
 
 
 class Constants:
-    """ Constant chart-based values. """
+    """Constant chart-based values."""
 
     SIMILAR_THRESHOLD = 6
     CHART_START_X = 35
@@ -79,7 +79,7 @@ class Constants:
 
 
 class StatTypes(Enum):
-    """ Stat types used in our stat-bar image type. """
+    """Stat types used in our stat-bar image type."""
 
     SHOTS = 0
     BLOCKED_SHOTS = 1
@@ -90,12 +90,12 @@ class StatTypes(Enum):
 
 
 def luminance(pixel):
-    """ Calculates the luminance of an (R,G,B) color."""
+    """Calculates the luminance of an (R,G,B) color."""
     return 0.299 * pixel[0] + 0.587 * pixel[1] + 0.114 * pixel[2]
 
 
 def is_similar(pixel_a, pixel_b, threshold):
-    """ Takes two (R, G, B) colors and determines if they are similar. """
+    """Takes two (R, G, B) colors and determines if they are similar."""
     difference = abs(luminance(pixel_a) - luminance(pixel_b))
     return difference < threshold
 
@@ -235,8 +235,9 @@ def team_colors(team_name):
             "secondary": {"bg": (229, 114, 0), "text": (0, 0, 0)},
         },
         "Seattle Kraken": {
-            "primary": {"bg": (0, 22, 40), "text": (255, 255, 255)},
-            "secondary": {"bg": (153, 217, 217), "text": (0, 0, 0)},
+            "primary": {"bg": (53, 84, 100), "text": (255, 255, 255)},
+            # "primary": {"bg": (153, 217, 217), "text": (0, 0, 0)},
+            "secondary": {"bg": (0, 22, 40), "text": (255, 255, 255)},
         },
         "St. Louis Blues": {
             "primary": {"bg": (0, 48, 135), "text": (255, 255, 255)},
@@ -293,12 +294,14 @@ def rgb_to_hex(value1, value2=None, value3=None, discord=False):
 
     return hex_string
 
+
 def discord_color(team_name):
     """Takes a team name and returns a base-16 string for Discord embeds."""
 
     team_color = team_colors(team_name)["primary"]["bg"]
     discord_color = rgb_to_hex(team_color, discord=True)
     return discord_color
+
 
 def center_text(draw, left, top, width, text, color, font, vertical=False, height=None):
     """Draws text (at least) horizontally centered in a specified width. Can also

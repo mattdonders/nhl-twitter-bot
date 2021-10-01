@@ -251,7 +251,13 @@ def start_game_loop(game: Game):
                 game.final_socials.shotmap_retweet = common.search_send_shotmap(game=game)
 
             if not game.final_socials.hsc_sent:
-                final.hockeystatcards(game=game)
+                try:
+                    final.hockeystatcards(game=game)
+                except Exception as e:
+                    logging.error("Error generating Hockey Stat Cards - setting HSC finals to true.")
+                    # Set the end of game social attributes
+                    game.final_socials.hsc_msg = None
+                    game.final_socials.hsc_sent = True
 
             if not game.nst_charts.final_charts:
                 logging.info("NST Charts not yet sent - check if it's ready for us to scrape.")
@@ -376,7 +382,7 @@ def end_game_loop(game: Game):
 
 
 def run():
-    """ The main script runner - everything starts here! """
+    """The main script runner - everything starts here!"""
     config = utils.load_config()
     args = arguments.get_arguments()
 

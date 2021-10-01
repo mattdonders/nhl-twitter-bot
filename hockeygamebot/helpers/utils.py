@@ -266,7 +266,7 @@ def team_hashtag(team, game_type=None):
         "Philadelphia Flyers": "#AnytimeAnywhere",
         "Pittsburgh Penguins": "#LetsGoPens",
         "San Jose Sharks": "#SJSharks",
-        "Seattle Kraken": "SeaKraken",
+        "Seattle Kraken": "#SeaKraken",
         "St. Louis Blues": "#STLBlues",
         "Tampa Bay Lightning": "#GoBolts",
         "Toronto Maple Leafs": "#LeafsForever",
