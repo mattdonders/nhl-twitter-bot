@@ -172,14 +172,15 @@ def intermission_loop(game: Game):
             config["script"]["intermission_sleep_time"],
         )
     else:
-        live_sleep_time = game.period.intermission_remaining
+        # Adds a MAX function here to avoid sleeping 0s between calls
+        live_sleep_time = max(game.period.intermission_remaining, 5)
         logging.info("Sleeping for remaining intermission time (%ss).", game.period.intermission_remaining)
 
     return live_sleep_time
 
 
 def minute_remaining_check(game: Game):
-    """ A function to check if there is approximately a minute remaining in the period. """
+    """A function to check if there is approximately a minute remaining in the period."""
 
     if game.period.time_remaining == "END":
         game.period.current_oneminute_sent = True
