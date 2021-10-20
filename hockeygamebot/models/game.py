@@ -100,6 +100,8 @@ class Game:
             "shotmap": False,
         }
 
+        self.last_goalie_pull_text = None
+
         self.preview_socials = StartOfGameSocial()
         self.final_socials = EndOfGameSocial()
         self.nst_charts = NSTChartSocial()
@@ -143,7 +145,7 @@ class Game:
 
     @classmethod
     def from_json_and_teams(cls, resp: dict, home_team: Team, away_team: Team) -> "Game":
-        """ A class method that creates a Game object from a combination of the argument fields
+        """A class method that creates a Game object from a combination of the argument fields
             including a JSON livefeed response & the two Team objects (home & away).
 
         Args:
@@ -180,8 +182,8 @@ class Game:
 
     # Instance Functions
     def update_game(self, response):
-        """ Use the livefeed to update game attributes.
-            Including: game state, period attributes, etc.
+        """Use the livefeed to update game attributes.
+        Including: game state, period attributes, etc.
         """
 
         logging.info("Updating all Game object attributes.")
@@ -192,10 +194,7 @@ class Game:
         # Don't update the game state if its final since we might have manually set it this way.
         lf_game_state = response.get("gameData").get("status").get("abstractGameState")
 
-        if (
-            lf_game_state == GameState.FINAL.value
-            and not models.gameevent.GameEndEvent.cache.entries
-        ):
+        if lf_game_state == GameState.FINAL.value and not models.gameevent.GameEndEvent.cache.entries:
             logging.warning(
                 "Game State is FINAL, but no GameEndEvent recorded - don't update thie game state yet."
             )
@@ -244,8 +243,8 @@ class Game:
         # )
 
     def goalie_pull_updater(self, response):
-        """ Use the livefeed to determine if the goalie of either team has been pulled.
-            And keep the attribute updated in each team object.
+        """Use the livefeed to determine if the goalie of either team has been pulled.
+        And keep the attribute updated in each team object.
         """
         try:
             linescore = response.get("liveData").get("linescore")
@@ -289,9 +288,7 @@ class Game:
                 logging.debug("Home goalie in net - check & update goalie attribute.")
                 away_goalie_pulled = self.away_team.goalie_pulled_setter(away_goalie_current)
             elif self.away_team.goalie_pulled and isinstance(last_tracked_event, event_filter_list):
-                logging.info(
-                    "Away goalie previously pulled, but important event detected - update & check."
-                )
+                logging.info("Away goalie previously pulled, but important event detected - update & check.")
                 away_goalie_pulled = self.home_team.goalie_pulled_setter(away_goalie_current)
             else:
                 logging.info(
@@ -312,7 +309,7 @@ class Game:
             )
 
     def goalie_pull_social(self, team_name, trailing_score):
-        """ Sends a message to social media about the goalie for a team being pulled.
+        """Sends a message to social media about the goalie for a team being pulled.
 
         Args:
             self: current game instance
@@ -328,7 +325,14 @@ class Game:
             f"{self.period.time_remaining} left in the {self.period.current_ordinal} period."
         )
 
+        if goalie_pull_text == self.last_goalie_pull_text:
+            logging.info("Goalie pull detected, but the text is same - skipping this social send.")
+            return
+
         socialhandler.send(msg=goalie_pull_text, force_send=True)
+
+        # Keep track of goalie pull text within the Game object
+        self.last_goalie_pull_text = goalie_pull_text
 
     def custom_game_date(self, dt_format):
         """Returns the game date in any format."""
@@ -369,7 +373,7 @@ class Game:
 
     @property
     def game_date_local(self):
-        """ Returns the game as Y-m-d format in local time zone. """
+        """Returns the game as Y-m-d format in local time zone."""
         game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
         game_date_local = game_date + self.tz_offset
         game_date_local_api = game_date_local.strftime("%Y-%m-%d")
@@ -377,7 +381,7 @@ class Game:
 
     @property
     def game_date_mmddyyyy(self):
-        """ Returns the game as Y-m-d format in local time zone. """
+        """Returns the game as Y-m-d format in local time zone."""
         game_date = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
         game_date_local = game_date + self.tz_offset
         game_date_local_mmddyyyy = game_date_local.strftime("%m/%d/%Y")
@@ -431,7 +435,7 @@ class Game:
 
 
 class PenaltySituation:
-    """ A class used to track in-game penalty situations. """
+    """A class used to track in-game penalty situations."""
 
     def __init__(self):
         self.in_situation = False
@@ -491,7 +495,7 @@ class PenaltySituation:
 
 
 class StartOfGameSocial:
-    """ A class that holds all end of game social media messages & statuses."""
+    """A class that holds all end of game social media messages & statuses."""
 
     def __init__(self):
         self.counter = 0
@@ -523,14 +527,14 @@ class StartOfGameSocial:
 
     @property
     def all_social_sent(self):
-        """ Returns True / False depending on if all final socials were sent. """
+        """Returns True / False depending on if all final socials were sent."""
         pregame_kv = self.__dict__.items()
         all_pregame_social = [v for k, v in pregame_kv if "sent" in k and k != "starters_sent"]
         all_pregame_social_sent = all(all_pregame_social)
         return all_pregame_social_sent
 
     def check_for_changed_lines(self, prefother):
-        """ Returns True every hour after the game bot starts to check for changed lines. """
+        """Returns True every hour after the game bot starts to check for changed lines."""
 
         resent = self.pref_lines_resent if prefother == "preferred" else self.other_lines_resent
         if not resent:
@@ -539,7 +543,7 @@ class StartOfGameSocial:
         return False
 
     def did_lines_change(self, prefother, lines):
-        """ Checks if the lines changed for the indicated team & updates the message if so. """
+        """Checks if the lines changed for the indicated team & updates the message if so."""
 
         original_lines = self.pref_lines_msg if prefother == "preferred" else self.other_lines_msg
         lines_sent = self.pref_lines_sent if prefother == "preferred" else self.other_lines_sent
@@ -560,7 +564,7 @@ class StartOfGameSocial:
 
 
 class NSTChartSocial:
-    """ A class that holds the state of all NST chart social media messages & statuses."""
+    """A class that holds the state of all NST chart social media messages & statuses."""
 
     def __init__(self):
         self.charts_by_period = dict()
@@ -568,7 +572,7 @@ class NSTChartSocial:
 
 
 class EndOfGameSocial:
-    """ A class that holds all end of game social media messages & statuses."""
+    """A class that holds all end of game social media messages & statuses."""
 
     def __init__(self):
         self.retry_count = 0
@@ -590,7 +594,7 @@ class EndOfGameSocial:
 
     @property
     def all_social_sent(self):
-        """ Returns True / False depending on if all final socials were sent. """
+        """Returns True / False depending on if all final socials were sent."""
 
         all_final_social = [v for k, v in self.__dict__.items() if "sent" in k]
         all_final_social_sent = all(all_final_social)
@@ -598,5 +602,5 @@ class EndOfGameSocial:
 
     @property
     def retries_exeeded(self):
-        """ Returns True if the number of retires (3 = default) has been exceeded. """
+        """Returns True if the number of retires (3 = default) has been exceeded."""
         return bool(self.retry_count >= 3)
