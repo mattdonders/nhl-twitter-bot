@@ -203,7 +203,7 @@ def hockeystatcards(game: Game):
 
     hsc_social_text = (
         f"{game.preferred_team.short_name} & {game.other_team.short_name} Game Score leaderboard."
-        f"\n\n(via @cepvi0 @NatStatTrick @domluszczyszyn)"
+        f"\n\n(via @hockeystatcards @NatStatTrick @domluszczyszyn)"
     )
 
     socialhandler.send(msg=hsc_social_text, media=hsc_charts)

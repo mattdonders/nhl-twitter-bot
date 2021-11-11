@@ -1037,7 +1037,7 @@ def hockeystatcards_charts(game: Game, home_gs: dict, away_gs: dict):
 
         ax.title.set_text(
             f"{team_name} GameScore - {game.game_date_short}\n"
-            f"Data Courtesy: Cole Palmer (@cepvi0) & Natural Stat Trick\n"
+            f"Data Courtesy: Cole Palmer (@hockeystatcards) & Natural Stat Trick\n"
             f"GameScore Formula: Dom Luszczyszyn (@domluszczyszyn)\n"
         )
 
