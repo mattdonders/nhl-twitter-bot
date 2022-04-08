@@ -355,8 +355,9 @@ def dailyfaceoff_lines(game, team):
     # Grab the last update line from Daily Faceoff
     # If Update Time != Game Date, return not confirmed
     soup_update = soup.find("div", class_="team-line-combination-last-updated")
-    last_update = soup_update.text.replace("\n", "").strip().split(": ")[1]
-    last_update_date = parse(last_update)
+    last_update = last_update = [x for x in soup_update.text.split("\n") if x][0]
+    last_update_cleaned = last_update.strip().split(": ")[1].replace("@", "")
+    last_update_date = parse(last_update_cleaned)
     game_day = parse(game.game_date_local)
 
     confirmed = bool(last_update_date.date() == game_day.date())
