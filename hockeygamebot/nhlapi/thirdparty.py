@@ -739,12 +739,15 @@ def hockeystatcard_gamescores(game: Game):
     # all_player_data = hsc_gs['playerData'] + hsc_gs['goalieData']
     all_player_data = hsc_gs["playerData"]
 
-    home_gs = [
-        x for x in all_player_data if x["team"] == home_abbrev or home_team.replace(" ", "_") in x["src"]
-    ]
-    away_gs = [
-        x for x in all_player_data if x["team"] == away_abbrev or away_team.replace(" ", "_") in x["src"]
-    ]
+    # home_gs = [
+    #     x for x in all_player_data if x["team"] == home_abbrev or home_team.replace(" ", "_") in x["src"]
+    # ]
+    # away_gs = [
+    #     x for x in all_player_data if x["team"] == away_abbrev or away_team.replace(" ", "_") in x["src"]
+    # ]
+
+    home_gs = [x for x in all_player_data if x["team"] == home_abbrev]
+    away_gs = [x for x in all_player_data if x["team"] == away_abbrev]
 
     # This [:5] returns the top 5 values only - leave this out and return all for better functionality.
     # home_gs_sorted = sorted(home_gs, key = lambda i: i['GameScore'], reverse=True)[:5]

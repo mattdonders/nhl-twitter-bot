@@ -33,7 +33,7 @@ from hockeygamebot.nhlapi import thirdparty
 
 
 def sjoin(x):
-    """ Pandas DataFrame string join two columns but with a new line. """
+    """Pandas DataFrame string join two columns but with a new line."""
     return "\n".join(x[x.notnull()].astype(str))
 
 
@@ -506,7 +506,7 @@ def calculate_xticks(spacing, df_min, df_max):
 
 
 def charts_heatmap_linemates(game_title, team_name, linemate_toi, linemate_cfwith, linemate_xgwith):
-    """ Generates a heatmap style chart for linemates annotated with TOI & CF%. """
+    """Generates a heatmap style chart for linemates annotated with TOI & CF%."""
 
     colormap = "Blues"
 
@@ -575,7 +575,7 @@ def charts_heatmap_linemates(game_title, team_name, linemate_toi, linemate_cfwit
 
 
 def charts_heatmap_opposition(game_title, team_name, oppo_toi, oppo_cfwith, oppo_xgwith):
-    """ Generates a heatmap style chart for linemates annotated with TOI & CF%. """
+    """Generates a heatmap style chart for linemates annotated with TOI & CF%."""
 
     colormap = "Blues"
 
@@ -1497,7 +1497,7 @@ def generate_all_charts(game: Game):
 
 
 def team_season_rank(df: pd.DataFrame, stat, team_name):
-    """ Takes a dataframe, a stat & a team name and finds the "rank" of that team in the DataFrame. """
+    """Takes a dataframe, a stat & a team name and finds the "rank" of that team in the DataFrame."""
 
     # Sort the dataframe and find the team index
     # Add 1 because a Dataframe is 0-index
