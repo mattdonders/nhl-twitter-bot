@@ -9,7 +9,7 @@ from hockeygamebot.nhlapi import api
 
 
 def get_content_feed(game_id, milestones=False):
-    """ Queries the NHL Content Feed API to get media items (photos, videos, etc)
+    """Queries the NHL Content Feed API to get media items (photos, videos, etc)
 
     Args:
         game_id (int) - The unique identifier of the Game.
@@ -24,12 +24,13 @@ def get_content_feed(game_id, milestones=False):
     response = api.nhl_api(api_endpoint).json()
 
     # Calculate milestones if argument is True
-    response = response if not milestones else response["media"]["milestones"]["items"]
+    # response = response if not milestones else response["media"]["milestones"]["items"]
+    response = response if not milestones else response["highlights"]["scoreboard"]["items"]
     return response
 
 
 def search_milestones_for_id(milestones, event_id):
-    """ Searches the milestones list for an item that matches the statsEventID passed in.
+    """Searches the milestones list for an item that matches the statsEventID passed in.
 
     Args:
         event_id (int): NHL Game Event ID
@@ -42,13 +43,28 @@ def search_milestones_for_id(milestones, event_id):
     # If mile
     if not milestones:
         return False, None, None
-    event = next(filter(lambda obj: obj.get("statsEventId") == str(event_id), milestones), None)
+
+    str_event_id = str(event_id)
+    stats_event_dict = {"type": "statsEventId", "value": str_event_id, "displayName": str_event_id}
+
+    # Iterate over "Milestones" & Check for Our Event ID
+    # When Found, Break out of the Loop & Continue Processing
+    event = None
+
+    for i in milestones:
+        has_our_event = [x for x in i["keywords"] if x == stats_event_dict]
+        if has_our_event:
+            event = i
+            break
+
+    # event = next(filter(lambda obj: obj.get("statsEventId") == str(event_id), milestones), None)
 
     if not event:
         return False, None, None
 
     try:
-        highlight = event.get("highlight")
+        # highlight = event.get("highlight")
+        highlight = event
         video_id = highlight.get("id")
 
         if not video_id:
@@ -69,7 +85,7 @@ def search_milestones_for_id(milestones, event_id):
 
 
 def get_game_recap(content_feed):
-    """ Searches the content feed for the game recap.
+    """Searches the content feed for the game recap.
 
     Args:
         content_feed (dict): NHL Content Feed
@@ -89,7 +105,7 @@ def get_game_recap(content_feed):
 
 
 def get_condensed_game(content_feed):
-    """ Searches the content feed for the condensed game / extended highlights.
+    """Searches the content feed for the condensed game / extended highlights.
 
     Args:
         content_feed (dict): NHL Content Feed
