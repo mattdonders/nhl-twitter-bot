@@ -1642,7 +1642,7 @@ def generate_team_season_charts(team_name, situation, lastgames=False):
         ax2.text(
             float(v) - 2,
             i,
-            str(v),
+            str(round(v, 2)),
             va="center",
             ha="right",
             color=team_color_text,
@@ -1650,7 +1650,9 @@ def generate_team_season_charts(team_name, situation, lastgames=False):
         )
 
     for i, v in enumerate(pref_df_T["AGAINST"].values):
-        ax2.text(100 - 2, i, str(v), va="center", ha="right", color=team_color_text, fontweight="bold")
+        ax2.text(
+            100 - 2, i, str(round(v, 2)), va="center", ha="right", color=team_color_text, fontweight="bold"
+        )
 
     last_games_file = "" if not lastgames else f"-last{lastgames}-"
     overview_fig_path = os.path.join(
