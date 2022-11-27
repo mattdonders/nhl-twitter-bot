@@ -246,7 +246,7 @@ def parse_nst_oistats(oi_sva):
 
         ff = float(items[7].text)
         fa = float(items[8].text)
-        ffpct = float(items[9].text)
+        ffpct = float(items[9].text.replace("-", "0"))
         fenwick_diff = round(ff - fa, 2)
 
         sf = float(items[11].text)
@@ -255,7 +255,7 @@ def parse_nst_oistats(oi_sva):
 
         xgf = float(items[19].text)
         xga = float(items[20].text)
-        xgpct = float(items[21].text)
+        xgpct = float(items[21].text.replace("-", "0"))
         xg_diff = round(xgf - xga, 2)
 
         hdcf = float(items[27].text)
