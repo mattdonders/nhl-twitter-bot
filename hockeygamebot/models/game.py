@@ -320,6 +320,11 @@ class Game:
             None
         """
 
+        # This check avoids sending goalie pull notifications for delayed penalties.
+        if trailing_score < 1:
+            logging.info("%s not actually trailing - skipping this social send.", team_name)
+            return
+
         goalie_pull_text = (
             f"The {team_name} have pulled their goalie trailing by {trailing_score} with "
             f"{self.period.time_remaining} left in the {self.period.current_ordinal} period."
