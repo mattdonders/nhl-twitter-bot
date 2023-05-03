@@ -5,6 +5,7 @@ This module contains all functions pertaining to a game in Preview State.
 """
 
 import logging
+import sys
 import time
 import os
 
@@ -52,8 +53,26 @@ def generate_game_preview(game: Game):
 
     # If the game is a playoff game, our preview text changes slightly
     if GameType(game.game_type) == GameType.PLAYOFFS:
+        playoff_info = schedule.get_playoff_info(pref_team.team_id, game.season)
+        Game.playoff_info = playoff_info
+
+        round_number = playoff_info["seriesNumber"]
+
+        matchup_teams = playoff_info["matchupTeams"]
+        pref_playoff_info = [x for x in matchup_teams if x["team"]["name"] == pref_team.team_name][0]
+        pref_playoff_series = pref_playoff_info["seriesRecord"]
+        pref_playoff_wins = pref_playoff_series["wins"]
+        pref_playoff_losses = pref_playoff_series["losses"]
+        pref_team.playoff_series_record = f"W: {pref_playoff_wins} | L: {pref_playoff_losses}"
+
+        other_playoff_info = [x for x in matchup_teams if x["team"]["name"] == other_team.team_name][0]
+        other_playoff_series = other_playoff_info["seriesRecord"]
+        other_playoff_wins = other_playoff_series["wins"]
+        other_playoff_losses = other_playoff_series["losses"]
+        other_team.playoff_series_record = f"W: {other_playoff_wins} | L: {other_playoff_losses}"
+
         preview_text_teams = (
-            f"Tune in {game.game_time_of_day} for Game #{game.game_id_playoff_game} when the "
+            f"Tune in {game.game_time_of_day} for Round #{round_number} / Game #{game.game_id_playoff_game} when the "
             f"{pref_team.team_name} take on the {other_team.team_name} at {game.venue}."
         )
     else:
@@ -430,10 +449,10 @@ def game_preview_others(game: Game):
 
 
 def get_starters(game: Game):
-    """ Uses the NHL Roster Report to get the starting lineup. """
+    """Uses the NHL Roster Report to get the starting lineup."""
 
     def get_players_name(score_rpt_row):
-        """ Very specific function to only return the player's last name from the roster report. """
+        """Very specific function to only return the player's last name from the roster report."""
         player_name = score_rpt_row.find_all("td")[2].text
         return " ".join(player_name.replace(" (A)", "").replace(" (C)", "").title().split()[1:])
 

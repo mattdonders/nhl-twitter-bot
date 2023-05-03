@@ -15,6 +15,7 @@ from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.models.game import Game
 from hockeygamebot.models.gameevent import GoalEvent
 from hockeygamebot.nhlapi import schedule, thirdparty
+from hockeygamebot.models.gametype import GameType
 
 
 class Backgrounds:
@@ -401,24 +402,42 @@ def pregame_image(game: Game):
 
     # Generate records, venue & other strings
     # If this is the first team, game then no streak
-    home_pts = game.home_team.points
-    home_record_str = f"{home_pts} PTS • {game.home_team.current_record}"
-    home_streak_last10 = (
-        f"{game.home_team.streak} • LAST 10: {game.home_team.last_ten}" if game.home_team.games > 0 else ""
-    )
+    if GameType(game.game_type) == GameType.PLAYOFFS:
+        home_pts = ""
+        home_record_str = game.home_team.playoff_series_record
+        home_streak_last10 = ""
 
-    away_pts = game.away_team.points
-    away_record_str = f"{away_pts} PTS • {game.away_team.current_record}"
-    away_streak_last10 = (
-        f"{game.away_team.streak} • LAST 10: {game.away_team.last_ten}" if game.away_team.games > 0 else ""
-    )
+        away_pts = ""
+        away_record_str = game.away_team.playoff_series_record
+        away_streak_last10 = ""
 
-    num_games = schedule.get_number_games(
-        season=game.season, team_id=game.preferred_team.team_id, game_type_code=game.game_type
-    )
-    text_gamenumber = (
-        "PRESEASON" if game.game_type == "PR" else f"{game.preferred_team.games + 1} OF {num_games}"
-    )
+        playoff_info = Game.playoff_info
+        round_number = playoff_info["round"]["number"]
+        game_number = playoff_info["currentGame"]["seriesSummary"]["gameNumber"]
+        text_gamenumber = f"RD#{round_number} / GM#{game_number}"
+    else:
+        home_pts = game.home_team.points
+        home_record_str = f"{home_pts} PTS • {game.home_team.current_record}"
+        home_streak_last10 = (
+            f"{game.home_team.streak} • LAST 10: {game.home_team.last_ten}"
+            if game.home_team.games > 0
+            else ""
+        )
+
+        away_pts = game.away_team.points
+        away_record_str = f"{away_pts} PTS • {game.away_team.current_record}"
+        away_streak_last10 = (
+            f"{game.away_team.streak} • LAST 10: {game.away_team.last_ten}"
+            if game.away_team.games > 0
+            else ""
+        )
+
+        num_games = schedule.get_number_games(
+            season=game.season, team_id=game.preferred_team.team_id, game_type_code=game.game_type
+        )
+        text_gamenumber = (
+            "PRESEASON" if game.game_type == "PR" else f"{game.preferred_team.games + 1} OF {num_games}"
+        )
 
     text_datetime = f"{game.game_date_short} • {game.game_time_local}"
     text_hashtags = (

@@ -437,7 +437,10 @@ def scouting_the_refs(game, pref_team):
     def calculate_total_games(ref_info):
         # Takes a referee dictionary & returns number of total games (centralizes logic)
         career_games_str = ref_info.get("careergames", "0")
-        total_games = sum([int(x) for x in career_games_str.split(" / ")])
+        if "|" in career_games_str:
+            total_games = sum([int(x) for x in career_games_str.split(" | ")])
+        else:
+            total_games = sum([int(x) for x in career_games_str.split(" / ")])
         return total_games
 
     # Initialized return dictionary
@@ -505,7 +508,7 @@ def scouting_the_refs(game, pref_team):
     )
     idx_line_names = idx_line + 1
 
-    idx_season_gms = [i for i, x in enumerate(game_details.find_all("tr")) if "20-21" in x.text.lower()]
+    idx_season_gms = [i for i, x in enumerate(game_details.find_all("tr")) if "22-23" in x.text.lower()]
     idx_season_gms_ref = idx_season_gms[0]
     idx_season_gms_line = idx_season_gms[1]
 

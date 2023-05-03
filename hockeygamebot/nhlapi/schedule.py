@@ -437,3 +437,27 @@ def season_series(game_id, pref_team, other_team, last_season=False):
         points_leader_str = "Points Leaders: {} with {} each.".format(point_leaders_joined, leader_points)
 
     return season_series_str, points_leader_str, toi_leader_str
+
+
+def get_playoff_info(pref_team_id, season):
+    """Queries the NHL Tournament API to get information about playoff series."""
+
+    url = f"/tournaments/playoffs?expand=round.series,schedule.game.seriesSummary&season={season}"
+    response = api.nhl_api(url)
+
+    if not response:
+        return False
+
+    playoffs = response.json()
+    default_round = playoffs["defaultRound"]
+    current_round = [x for x in playoffs["rounds"] if x["code"] == default_round][0]
+
+    current_round_series = current_round["series"]
+    for i in current_round_series:
+        matchup_teams = i["matchupTeams"]
+        for team in matchup_teams:
+            if team["team"]["id"] == pref_team_id:
+                current_round_series_pref = i
+                break
+
+    return current_round_series_pref
