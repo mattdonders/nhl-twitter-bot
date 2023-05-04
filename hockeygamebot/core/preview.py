@@ -56,7 +56,7 @@ def generate_game_preview(game: Game):
         playoff_info = schedule.get_playoff_info(pref_team.team_id, game.season)
         Game.playoff_info = playoff_info
 
-        round_number = playoff_info["seriesNumber"]
+        round_number = playoff_info["round"]["number"]
 
         matchup_teams = playoff_info["matchupTeams"]
         pref_playoff_info = [x for x in matchup_teams if x["team"]["name"] == pref_team.team_name][0]
