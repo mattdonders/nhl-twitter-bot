@@ -5,12 +5,14 @@ Functions pertaining to the NHL schedule (via API).
 # pylint: disable=redefined-builtin
 
 import logging
+import sys
 import time
 from datetime import datetime, timedelta
 from dateutil.parser import parse
 
 from hockeygamebot.helpers import arguments, process
 from hockeygamebot.nhlapi import api, roster
+from hockeygamebot.definitions import VERSION
 
 
 def get_team_id(team_name):
@@ -24,28 +26,29 @@ def get_team_id(team_name):
     """
 
     team_name = team_name.lower()
-    endpoint = "/teams"
-    response = api.nhl_api(endpoint)
+    endpoint = "/"
+    response = api.nhl_rpt(endpoint)
 
     if not response:
         raise ConnectionError("An invalid response was returned from the NHL Teams API.")
 
     teams_json = response.json()
-    teams = teams_json["teams"]
+    teams = teams_json["data"]
 
     team_id = None
     for team in teams:
-        if team["name"].lower() == team_name:
+        if team["fullName"].lower() == team_name:
             team_id = team["id"]
+            tri_code = team["triCode"].lower()
             break
 
     if not team_id:
         raise ValueError("{} is not a valid NHL team. Check your configuraiton file!".format(team_name))
 
-    return team_id
+    return team_id, tri_code
 
 
-def is_game_today(team_id, date):
+def is_game_today(team_tri_code, date):
     """Queries the NHL Schedule API to determine if there is a game today.
 
     Args:
@@ -57,39 +60,41 @@ def is_game_today(team_id, date):
         games_info (dict) - A dictionary from the Schedule API that describes game information.
     """
     args = arguments.get_arguments()
+    endpoint = f"/club-schedule-season/{team_tri_code}/now"
 
-    url = "/schedule?teamId={id}&expand=" "schedule.broadcasts,schedule.teams&date={date:%Y-%m-%d}".format(
-        id=team_id, date=date
-    )
-
-    response = api.nhl_api(url)
+    response = api.nhl_api(endpoint)
     if response:
         schedule = response.json()
-        games_total = schedule["totalItems"]
     else:
         return False, None
 
-    if games_total == 1:
-        games_info = schedule["dates"][0]["games"][0]
+    date_only = date.strftime("%Y-%m-%d")
+    games = schedule["games"]
+    games_today = [x for x in games if x["gameDate"] == date_only]
+
+    if len(games_today) == 1:
+        games_info = games_today[0]
         return True, games_info
 
-    if games_total == 2:
-        if args.split is False:
-            logging.info("Split Squad - spawning a second process to pick up second game.")
-            game_index = 0
-            process.spawn_another_process()
-            time.sleep(10)
-        else:
-            game_index = 1
-            logging.info("Split Squad - this is the process to pick up second game (sleep 5 seconds).")
-            time.sleep(5)
+    if len(games_today) == 2:
+        logging.info("GameBot V%s doesn't currently support split squad games.", VERSION)
+        return False, None
+        # if args.split is False:
+        #     logging.info("Split Squad - spawning a second process to pick up second game.")
+        #     game_index = 0
+        #     process.spawn_another_process()
+        #     time.sleep(10)
+        # else:
+        #     game_index = 1
+        #     logging.info("Split Squad - this is the process to pick up second game (sleep 5 seconds).")
+        #     time.sleep(5)
 
         games_info = schedule["dates"][0]["games"][game_index]
         return True, games_info
 
     date_string = date.date() if args.date else "today"
     logging.info("There are no games scheduled for %s, SAD!", date_string)
-    return False, schedule
+    return False, None
 
 
 def was_game_yesterday(team_id, date):
@@ -144,6 +149,25 @@ def get_broadcasts(resp):
         broadcasts["away"] = "TBD"
 
     return broadcasts
+
+
+def get_broadcasts_from_gamecenter(gamecenter):
+    broadcasts = gamecenter["tvBroadcasts"]
+
+    home_broadcast = [x for x in broadcasts if x["market"] == "H"]
+    away_broadcast = [x for x in broadcasts if x["market"] == "A"]
+    national_broadcasts = [x for x in broadcasts if x["market"] == "N"]
+
+    national_broadcast = national_broadcasts[0] if national_broadcasts else "N/A"
+    home_broadcast = home_broadcast[0] if home_broadcast else national_broadcast
+    away_broadcast = away_broadcast[0] if away_broadcast else national_broadcast
+    broadcasts_dict = {"home": home_broadcast, "away": away_broadcast, "national": national_broadcast}
+
+    return broadcasts_dict
+
+
+def get_team_timezone(team_tri_code):
+    endpoint = f"scoreboard/{team_tri_code}/now"
 
 
 def get_next_game(today_game_date: datetime, team_id: int) -> dict:

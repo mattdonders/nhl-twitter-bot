@@ -24,8 +24,10 @@ from hockeygamebot.models.game import Game, PenaltySituation
 from hockeygamebot.models.gamestate import GameState, GameStateCode
 from hockeygamebot.models.globalgame import GlobalGame
 from hockeygamebot.models.team import Team
-from hockeygamebot.nhlapi import contentfeed, livefeed, nst, roster, schedule, youtube
+from hockeygamebot.nhlapi import contentfeed, livefeed, nst, roster, schedule, youtube, standings
 from hockeygamebot.social import socialhandler
+
+SEASON_ID_OVERRIDE = "20222023"
 
 
 def start_game_loop(game: Game):
@@ -421,8 +423,11 @@ def run():
     # Check if there is a game scheduled for today -
     # If there is no game, exit the script.
     date = utils.date_parser(args.date) if args.date else datetime.now()
-    team_id = schedule.get_team_id(team_name)
-    game_today, game_info = schedule.is_game_today(team_id, date)
+    team_id, team_tri_code = schedule.get_team_id(team_name)
+    logging.info("[NEWAPI] Team ID: %s / Team TriCode: %s", team_id, team_tri_code)
+
+    game_today, game_info = schedule.is_game_today(team_tri_code, date)
+
     if not game_today:
         game_yesterday, prev_game = schedule.was_game_yesterday(team_id, date)
         if game_yesterday:
@@ -501,12 +506,65 @@ def run():
 
         sys.exit()
 
-    # For debugging purposes, print all game_info
-    logging.debug("%s", game_info)
+        game_id = game_info["id"]
 
-    # Create the Home & Away Team objects
-    away_team = Team.from_json(game_info, "away")
-    home_team = Team.from_json(game_info, "home")
+    logging.info("[NEWAPI] Game Today: %s", game_today)
+    logging.info("[NEWAPI] Game Info: %s", game_info)
+
+    # Get Game ID from Game Info
+    game_id = game_info["id"]
+
+    home_team_abbreviation = game_info["homeTeam"]["abbrev"]
+    home_standings = standings.get_standings(home_team_abbreviation)
+    home_team_name = home_standings["teamName"]
+    home_team_record = standings.get_record(home_standings)
+    home_team_numgames = home_standings["gamesPlayed"]
+
+    away_team_abbreviation = game_info["awayTeam"]["abbrev"]
+    away_standings = standings.get_standings(away_team_abbreviation)
+    away_team_name = away_standings["teamName"]
+    away_team_record = standings.get_record(away_standings)
+    away_team_numgames = away_standings["gamesPlayed"]
+
+    # Get Home & Away Team Names
+    home_team_id, home_team_tri_code = schedule.get_team_id(home_team_name)
+    away_team_id, away_team_tri_code = schedule.get_team_id(away_team_name)
+
+    # Get Broadcast Information
+    gamecenter = livefeed.get_gamecenter_landing(game_id)
+    broadcasts = schedule.get_broadcasts_from_gamecenter(gamecenter)
+
+    logging.info("[NEWAPI] Home Team Name: %s / Record: %s", home_team_name, home_team_record)
+    logging.info("[NEWAPI] Away Team Name: %s / Record: %s", away_team_name, away_team_record)
+
+    # V3 - Create Team Objects (Attribute by Attribute)
+    home_team = Team(
+        team_id=home_team_id,
+        team_name=home_team_name,
+        short_name="TBD",
+        tri_code=home_team_tri_code,
+        home_away="home",
+        tv_channel=broadcasts["home"]["network"],
+        games=home_team_numgames,
+        record=home_team_record,
+        season=gamecenter["season"],
+        tz_id="TBD",
+        standings=home_standings,
+    )
+
+    away_team = Team(
+        team_id=away_team_id,
+        team_name=away_team_name,
+        short_name="TBD",
+        tri_code=away_team_tri_code,
+        home_away="away",
+        tv_channel=broadcasts["away"]["network"],
+        games=away_team_numgames,
+        record=away_team_record,
+        season=gamecenter["season"],
+        tz_id="TBD",
+        standings=away_standings,
+    )
 
     # If lines are being overriden by a local lineup file,
     # set the overrlide lines property to True
@@ -518,8 +576,23 @@ def run():
     # This allows us to track if the preferred team is home / away
     home_team.preferred = bool(home_team.team_name == team_name)
     away_team.preferred = bool(away_team.team_name == team_name)
+    preferred = "home" if home_team.preferred else "away"
 
     # Create the Game Object!
+
+    game = Game(
+        game_id=game_id,
+        game_type=gamecenter["gameType"],
+        date_time=gamecenter["startTimeUTC"],
+        game_state=gamecenter["gameState"],
+        game_state_code=None,
+        venue=gamecenter["venue"],
+        home=home_team,
+        away=away_team,
+        preferred=preferred,
+        live_feed=f"gamcenter/{game_id}",
+        season=gamecenter["season"],
+    )
     game = Game.from_json_and_teams(game_info, home_team, away_team)
     GlobalGame.game = game
 
@@ -527,7 +600,8 @@ def run():
     game.game_state = "Live" if args.localdata else game.game_state
 
     # Update the Team Objects with the gameday rosters
-    roster.gameday_roster_update(game)
+    # TODO: Fix for V3
+    # roster.gameday_roster_update(game)
 
     # print(vars(game))
     # print(vars(away_team))

@@ -14,4 +14,4 @@ URLS_PATH = os.path.join(PROJECT_ROOT, "config", "urls.yaml")
 CONFIG_FILE = "config.yaml" if not args.config else args.config
 CONFIG_PATH = os.path.join(PROJECT_ROOT, "config", CONFIG_FILE)
 
-VERSION = "2.0.1"
+VERSION = "3.0.0"

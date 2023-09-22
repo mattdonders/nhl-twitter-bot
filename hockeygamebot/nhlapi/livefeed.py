@@ -22,3 +22,13 @@ def get_livefeed(game_id):
     api_endpoint = f"game/{game_id}/feed/live?{randomnum}"
     response = api.nhl_api(api_endpoint).json()
     return response
+
+
+def get_gamecenter_landing(game_id):
+    endpoint = f"/gamecenter/{game_id}/landing"
+    response = api.nhl_api(endpoint)
+    if response:
+        gamecenter = response.json()
+        return gamecenter
+    else:
+        return False, None
