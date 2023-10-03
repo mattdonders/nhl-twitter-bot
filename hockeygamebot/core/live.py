@@ -11,6 +11,7 @@ from hockeygamebot.core import common
 from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.models import gameevent
 from hockeygamebot.models.game import Game
+from hockeygamebot.models.globalgame import GlobalGame
 from hockeygamebot.models.gameevent import GoalEvent
 from hockeygamebot.nhlapi import nst
 from hockeygamebot.social import socialhandler
@@ -30,39 +31,46 @@ def live_loop(livefeed: dict, game: Game):
 
     # Load all plays, the next event ID & new plays into lists
     # current_event_idx = livefeed.get("liveData").get("currentPlay").get("about").get("eventIdx")
-    all_plays = livefeed.get("liveData").get("plays").get("allPlays")
+    all_plays = livefeed.get("plays")
 
     # Subset all_plays by last_event_idx to shorten the loop
     next_event_idx = game.last_event_idx + 1
     new_plays_list = all_plays[next_event_idx:]
 
-    if not new_plays_list:
-        new_plays = bool(new_plays_list)
+    # Improved "New Plays" Logic
+    last_total_events = GlobalGame.game.total_events
+    now_total_events = len(all_plays)
+    num_new_events = now_total_events - last_total_events
+    bool_new_events = bool(num_new_events != 0)
+
+    if not bool_new_events:
         logging.info(
             "No new plays detected. This game event loop will catch any missed events & "
             "and also check for any scoring changes on existing goals."
         )
-    elif len(new_plays_list) < 10:
-        new_plays = bool(new_plays_list)
-        new_plays_shortlist = list()
-        for play in new_plays_list:
-            event_type = play["result"]["eventTypeId"]
-            event_idx = play["about"]["eventIdx"]
-            event_kv = f"{event_idx}: {event_type}"
-            new_plays_shortlist.append(event_kv)
-        logging.info(
-            "%s new event(s) detected - looping through them now: %s",
-            len(new_plays_list),
-            new_plays_shortlist,
-        )
+    # elif len(new_plays_list) < 10:
+    #     new_plays = bool(new_plays_list)
+    #     new_plays_shortlist = list()
+    #     for play in new_plays_list:
+    #         event_type = play.get("typeDescKey")
+    #         event_idx = play.get("sortOrder")
+    #         event_kv = f"{event_idx}: {event_type}"
+    #         new_plays_shortlist.append(event_kv)
+    #     logging.info(
+    #         "%s new event(s) detected - looping through them now: %s",
+    #         len(new_plays_list),
+    #         new_plays_shortlist,
+    #     )
     else:
-        new_plays = bool(new_plays_list)
-        logging.info("%s new event(s) detected - looping through them now.", len(new_plays_list))
+        logging.info("%s new event(s) detected - looping through them now.", num_new_events)
 
     # We pass in the entire all_plays list into our event_factory in case we missed an event
     # it will be created because it doesn't exist in the Cache.
     for play in all_plays:
-        gameevent.event_factory(game=game, play=play, livefeed=livefeed, new_plays=new_plays)
+        gameevent.event_factory(game=game, play=play, livefeed=livefeed, new_plays=bool_new_events)
+
+    # Store Number of Total Events for Next Run Comparison
+    GlobalGame.game.total_events = now_total_events
 
     # Check if any goals were removed
     try:
@@ -70,7 +78,7 @@ def live_loop(livefeed: dict, game: Game):
             was_goal_removed = goal.was_goal_removed(all_plays)
             if was_goal_removed:
                 pref_team = game.preferred_team.team_name
-                goals_list = game.pref_goals if goal.event_team == pref_team else game.other_goals
+                goals_list = game.pref_goals if goal.team_name == pref_team.team_name else game.other_goals
 
                 # Remove the Goal from all lists, caches & then finallydelete the object
                 game.all_goals.remove(goal)
@@ -124,6 +132,13 @@ def intermission_loop(game: Game):
                         overview_chart_msg, media=overview_chart, game_hashtag=True
                     )
 
+                # TODO: Add better logic to determine if we have overtime in a playoff game
+                # Non-playoff overtime does not need an overview chart sent (too short - just an ice scrape)
+                if game.period.current < 3:
+                    logging.info("1st or 2nd period intermission, only send the overview chart.")
+                    game.nst_charts.charts_by_period[game.period.current] = True
+                    return
+
                 if team_charts:
                     charts_msg = (
                         f"Individual, on-ice, forward lines & defensive pairs after the "
@@ -160,9 +175,10 @@ def intermission_loop(game: Game):
                 logging.error("Error creating Natural Stat Trick charts (%s) - sleep for a bit longer.", e)
 
     # Check if our shotmap was RT'd & if not try to search for it and send it out
-    shotmap_retweet_sent = game.period.shotmap_retweet
-    if not shotmap_retweet_sent and config["socials"]["twitter"]:
-        game.period.shotmap_retweet = common.search_send_shotmap(game=game)
+    # Twitter API V2 is Too Expensive to Send / Search Shotmaps
+    # shotmap_retweet_sent = game.period.shotmap_retweet
+    # if not shotmap_retweet_sent and config["socials"]["twitter"]:
+    #     game.period.shotmap_retweet = common.search_send_shotmap(game=game)
 
     # Calculate proper sleep time based on intermission status
     if game.period.intermission_remaining > config["script"]["intermission_sleep_time"]:

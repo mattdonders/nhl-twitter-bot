@@ -18,10 +18,12 @@ import yaml
 from hockeygamebot.definitions import CONFIG_PATH, IMAGES_PATH, LOGS_PATH, URLS_PATH
 from hockeygamebot.helpers import arguments
 from hockeygamebot.models.gametype import GameType
+from hockeygamebot.nhlapi import gamecenter
+from hockeygamebot.models.gamestate import GameState
 
 
 # Social Media Decorator
-def check_social_timeout(func):
+def check_social_timeout_bydatetime(func):
     """A function decorate used within the GameEvent module to determine
     if we should send this event to social media. This can only wrap
     functions that have an attribute of a GameEvent.
@@ -47,6 +49,66 @@ def check_social_timeout(func):
             timeout = config["script"]["event_timeout"]
             utcnow = datetime.now(timezone.utc)
             time_since_event = (utcnow - event_time).total_seconds()
+            if time_since_event < timeout:
+                return func(*args, **kwargs)
+            else:
+                logging.info(
+                    "Event #%s (%s) occurred %s second(s) in the past - older than our social timeout.",
+                    event.event_idx,
+                    event.event_type,
+                    time_since_event,
+                )
+                # return False
+                return {"twitter": None, "discord": None, "slack": None}
+        except Exception as e:
+            logging.warning("Timeout function should contain an event key:value. %s", e)
+            return func(*args, **kwargs)
+
+    return wrapper_social_timeout
+
+
+# Social Media Decorator
+def check_social_timeout(func):
+    """
+    A function decorate used within the GameEvent module to determine
+    if we should send this event to social media. This can only wrap
+    functions that have an attribute of a GameEvent.
+
+    The V2 (API Web Version) does not have dateTime in events so we construct a "Game Time"
+    and only send GameEvents within 5 minutes of current GameTime.
+
+    """
+
+    @functools.wraps(func)
+    def wrapper_social_timeout(*args, **kwargs):
+        parsed_args = arguments.get_arguments()
+        config = load_config()
+
+        # If notweets is specified, always run the social methods
+        if parsed_args.notweets:
+            return func(*args, **kwargs)
+
+        # Check for a force-send flag & if not False, force the message through
+        if kwargs.get("force_send"):
+            return func(*args, **kwargs)
+
+        try:
+            event = kwargs.get("event")
+            game_id = event.game.game_id
+            pbp = gamecenter.get_gamecenter_playbyplay(game_id)
+            game_state = pbp.get("gameState")
+
+            # If the Game is Final don't send any event tweets
+            if GameState(game_state) == GameState.FINAL:
+                return {"twitter": None, "discord": None, "slack": None}
+
+            current_period = pbp.get("period")
+            current_ss_remain = pbp.get("clock", {}).get("secondsRemaining", 0)
+            current_game_duration = current_period * 1200 - current_ss_remain
+            event_game_duration = event.game_duration
+
+            timeout = config["script"]["event_timeout"]
+            time_since_event = current_game_duration - event_game_duration
             if time_since_event < timeout:
                 return func(*args, **kwargs)
             else:
@@ -116,6 +178,18 @@ def setup_logging():
 
     log_file_name = datetime.now().strftime(load_config()["script"]["log_file_name"] + "-%Y%m%d%H%M%S.log")
     log_file = os.path.join(LOGS_PATH, log_file_name)
+
+    symlink_name = load_config()["script"]["log_file_name"] + ".latest.log"
+    log_file_latest_symlink = os.path.join(LOGS_PATH, symlink_name)
+    if not args.console:
+        try:
+            os.symlink(log_file, log_file_latest_symlink)
+        except Exception as e:
+            logging.info("Issue creating symlink: %s", e)
+            logging.info("Forcing symlink creation.")
+            os.remove(log_file_latest_symlink)
+            os.symlink(log_file, log_file_latest_symlink)
+
     if args.console and args.debug:
         logging.basicConfig(
             level=logging.DEBUG,
@@ -401,7 +475,7 @@ def time_remain_converter(time: str) -> str:
 
 
 def from_mmss(time_input):
-    """ Converts a timestamp in MM:SS format to an integer for comparison. """
+    """Converts a timestamp in MM:SS format to an integer for comparison."""
     try:
         m, s = time_input.split(":")
         output = int(m) * 60 + int(s)
@@ -412,12 +486,12 @@ def from_mmss(time_input):
 
 
 def to_mmss(time_input):
-    """ Converts a time based integer (in seconds) to MM:SS format. """
+    """Converts a time based integer (in seconds) to MM:SS format."""
     return time.strftime("%M:%S", time.gmtime(time_input))
 
 
 def download_file(url):
-    """ Downloads a remote file to the IMAGES_PATH/temp directory. """
+    """Downloads a remote file to the IMAGES_PATH/temp directory."""
     local_filename = url.split("/")[-1]
     local_path = os.path.join(IMAGES_PATH, "temp", local_filename)
 
@@ -430,7 +504,7 @@ def download_file(url):
 
 
 def empty_images_temp():
-    """ Empties the temporary image directory after the bot is done running."""
+    """Empties the temporary image directory after the bot is done running."""
     temp_path = os.path.join(IMAGES_PATH, "temp")
     temp_images = os.listdir(temp_path)
     logging.info("Emptying the TEMP images directory - %s.", temp_path)

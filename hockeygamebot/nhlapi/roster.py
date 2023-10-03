@@ -9,7 +9,7 @@ from hockeygamebot.models.sessions import SessionFactory
 
 
 def gameday_roster_update(game):
-    """ Gets the gameday rosters from the live feed endpoint.
+    """Gets the gameday rosters from the live feed endpoint.
         This is needed because in some instances a player is not included
         on the /teams/{id}/roster page for some reason.
 
@@ -29,11 +29,22 @@ def gameday_roster_update(game):
 
     try:
         gameday_roster = livefeed.get_livefeed(game.game_id)
-        all_players = gameday_roster.get("gameData").get("players")
-        for player_id, player in all_players.items():
+        all_players = gameday_roster.get("rosterSpots")
+        if not all_players:
+            logging.warning("Gameday Roster currently not available - try again next loop.")
+            return
+
+        for player in all_players:
             try:
-                team = player.get("currentTeam").get("name")
-                if team == home_team.team_name:
+                team_id = player.get("teamId")
+                player_id = player.get("playerId")
+                first_name = player.get("firstName")
+                last_name = player.get("lastName")
+                player["fullName"] = f"{first_name} {last_name}"
+                # Add Player to Full Game Roster & Team Roster
+                game.full_roster[player_id] = player
+
+                if team_id == home_team.team_id:
                     home_team.gameday_roster[player_id] = player
                 else:
                     away_team.gameday_roster[player_id] = player

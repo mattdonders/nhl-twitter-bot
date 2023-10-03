@@ -1,4 +1,5 @@
 import logging
+import sys
 
 import requests
 
@@ -24,11 +25,13 @@ class Team(object):
         season,
         tz_id,
         standings,
+        logo,
     ):
         self.team_id = team_id
         self.team_name = team_name
         self.short_name = short_name
         self.tri_code = tri_code
+        self.tri_code_upper = tri_code.upper()
         self.home_away = home_away
         self.tv_channel = tv_channel
         self.games = games
@@ -36,6 +39,7 @@ class Team(object):
         self.season = season
         self.tz_id = tz_id
         self.standings = standings
+        self.logo = logo
 
         # Not passed in at object creation time
         # self.team_hashtag = team_hashtag(self.team_name)
@@ -142,19 +146,43 @@ class Team(object):
         except (IndexError, KeyError) as e:
             self.pk_time_stats = None
 
-        # Send request to get stats
         try:
-            api = utils.load_urls()["endpoints"]["nhl_endpoint"]
-            stats_url = "/teams/{team}/stats".format(team=self.team_id)
-            logging.info("Getting team stats for %s via NHL API.", self.team_name)
-            stats = nhlapi.api.nhl_api(stats_url).json()
-            stats = stats["stats"]
-            self.team_stats = stats[0]["splits"][0]["stat"]
-            self.rank_stats = stats[1]["splits"][0]["stat"]
+            pk_stats_endpoint = (
+                f"/penaltykill?isAggregate=false&isGame=false&sort="
+                '[{"property":"penaltyKillPct","direction":"DESC"}]'
+                f"&cayenneExp=gameTypeId=2%20and%20seasonId={self.season}"
+            )
+            logging.info("Getting penalty kill stats & rank for %s via NHL Report API.", self.team_name)
+            pk_response = nhlapi.api.nhl_rpt(pk_stats_endpoint).json()
+            pk_data = pk_response["data"]
+            team_pk = [x for x in pk_data if x["teamId"] == self.team_id][0]
+            rank = pk_data.index(team_pk) + 1
+            pk_pct_raw = team_pk["penaltyKillPct"]
+            self.pk_pct = "{:.2%}".format(pk_pct_raw)
+            self.pk_rank = utils.ordinal(rank)
         except Exception as e:
-            logging.warning("Error getting team stats - %s", e)
-            self.team_stats = "N/A"
-            self.rank_stats = "N/A"
+            logging.warning("Error getting Penalty Kill stats - %s", e)
+            self.pk_pct = "0.00%"
+            self.pk_rank = "N/A"
+
+        try:
+            pp_stats_endpoint = (
+                f"/powerplay?isAggregate=false&isGame=false&sort="
+                '[{"property":"powerPlayPct","direction":"DESC"}]'
+                f"&cayenneExp=gameTypeId=2%20and%20seasonId={self.season}"
+            )
+            logging.info("Getting power play stats & rank for %s via NHL Report API.", self.team_name)
+            pp_response = nhlapi.api.nhl_rpt(pp_stats_endpoint).json()
+            pp_data = pp_response["data"]
+            team_pp = [x for x in pp_data if x["teamId"] == self.team_id][0]
+            rank = pp_data.index(team_pp) + 1
+            pp_pct_raw = team_pp["powerPlayPct"]
+            self.pp_pct = "{:.2%}".format(pp_pct_raw)
+            self.pp_rank = utils.ordinal(rank)
+        except Exception as e:
+            logging.warning("Error getting Power Play stats - %s", e)
+            self.pp_pct = "0.00%"
+            self.pp_rank = "N/A"
 
         # Send request to get current roster
         try:

@@ -24,7 +24,7 @@ def get_standings(team_abbreviation):
     else:
         return False, None
 
-    team_standings = [x for x in standings if x["teamAbbrev"] == team_abbreviation]
+    team_standings = [x for x in standings if x["teamAbbrev"]["default"] == team_abbreviation]
     return team_standings[0] if team_standings else None
 
 

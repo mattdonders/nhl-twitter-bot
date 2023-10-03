@@ -33,7 +33,7 @@ class Game:
         game_type,
         date_time,
         game_state,
-        game_state_code,
+        game_schedule_state,
         venue,
         home: Team,
         away: Team,
@@ -41,18 +41,20 @@ class Game:
         live_feed,
         season,
     ):
-
         self.game_id = game_id
         self.game_type = game_type
         self.date_time = date_time
         self.date_time_dt = datetime.strptime(self.date_time, "%Y-%m-%dT%H:%M:%SZ")
         self.game_state = game_state
-        self.game_state_code = game_state_code
+        self.game_schedule_state = game_schedule_state
         self.venue = venue
         self.live_feed_endpoint = live_feed
         self.home_team = home
         self.away_team = away
         self.season = season
+
+        # Build a "Lookup by Team ID"
+        self.team_lookup = {home.team_id: home, away.team_id: away}
 
         # Not passed in at object creation time
         if preferred == "home":
@@ -66,11 +68,16 @@ class Game:
         self.tz_offset = self.tz_id.utcoffset(datetime.now(self.tz_id))
         self.past_start_time = False
         self.last_event_idx = 0
+        self.total_events = 0
         self.power_play_strength = "Even"
         self.penalty_killed_flag = False
         self.penalty_situation = PenaltySituation()
         self.req_session = None
         self.assists_check = 0
+
+        # New API Situation Logic Check
+        self.situation_code = "1551"
+        self.situation_code_splitter()
 
         # Attributes holding other models / objects
         self.shootout = Shootout()
@@ -79,7 +86,10 @@ class Game:
         self.pref_goals = []
         self.other_goals = []
         self.all_goals = []
+        self.full_roster = {}
         self.live_loop_counter = 0
+        self.end_game_loop_counter = 0
+        self.config = utils.load_config()
 
         # Initialize Pregame Tweets dictionary
         self.pregame_lasttweet = None
@@ -180,6 +190,17 @@ class Game:
             preferred=preferred,
         )
 
+    def situation_code_splitter(self):
+        situation_split = [int(x) for x in self.situation_code]
+        away_goalie = situation_split[0]
+        away_skaters = situation_split[1]
+        home_skaters = situation_split[2]
+        home_goalie = situation_split[3]
+        self.away_team.goalie_pulled = True if away_goalie == 0 else False
+        self.home_team.goalie_pulled = True if home_goalie == 0 else False
+        self.away_team.skaters = away_skaters
+        self.home_team.skaters = home_skaters
+
     # Instance Functions
     def update_game(self, response):
         """Use the livefeed to update game attributes.
@@ -187,56 +208,70 @@ class Game:
         """
 
         logging.info("Updating all Game object attributes.")
-        linescore = response.get("liveData").get("linescore")
-        boxscore = response.get("liveData").get("boxscore")
+        # linescore = response.get("liveData").get("linescore")
+        # boxscore = response.get("liveData").get("boxscore")
 
         # Update Game State & Period related attributes
         # Don't update the game state if its final since we might have manually set it this way.
-        lf_game_state = response.get("gameData").get("status").get("abstractGameState")
+        lf_game_state = response.get("gameState")
+        print("LF Game State: ", lf_game_state)
 
-        if lf_game_state == GameState.FINAL.value and not models.gameevent.GameEndEvent.cache.entries:
-            logging.warning(
-                "Game State is FINAL, but no GameEndEvent recorded - don't update thie game state yet."
-            )
+        # Calculate 5 Minutes Worth of Live Loops
+        live_sleep_time = self.config["script"].get("live_sleep_time")
+        end_game_timeout = self.config["script"].get("end_game_timeout", 600)
+        end_game_loops = end_game_timeout / live_sleep_time
+
+        if lf_game_state in GameState.all_finals() and self.end_game_loop_counter > end_game_loops:
+            log_msg = "Game State is FINAL, no GameEndEvent recorded, but we are PAST GameEnd timeout - update thie game state now."
+            logging.warning(log_msg)
+            self.game_state = lf_game_state
+
+        elif lf_game_state == GameState.FINAL.value and not models.gameevent.GameEndEvent.cache.entries:
+            log_msg = "Game State is FINAL, but no GameEndEvent recorded - don't update thie game state yet."
+            logging.warning(log_msg)
+            self.end_game_loop_counter = self.end_game_loop_counter + 1
+
         elif self.game_state != GameState.FINAL.value:
             self.game_state = lf_game_state
-        else:
-            logging.warning(
-                "Game State is FINAL - do not update in case we manually set this via GameEndEvent."
-            )
 
-        self.game_state_code = int(response.get("gameData").get("status").get("codedGameState"))
-        self.period.current = linescore.get("currentPeriod")
-        self.period.current_ordinal = linescore.get("currentPeriodOrdinal")
-        self.period.time_remaining = linescore.get("currentPeriodTimeRemaining")
-        self.period.time_remaining_ss = utils.from_mmss(self.period.time_remaining)
+        else:
+            log_msg = "Game State is FINAL - do not update in case we manually set this via GameEndEvent."
+            logging.warning(log_msg)
+
+        # self.game_state_code = int(response.get("gameData").get("status").get("codedGameState"))
+        self.period.current = response.get("period", 0)
+        self.period.current_ordinal = utils.ordinal(self.period.current)
+        self.period.time_remaining = response.get("clock").get("timeRemaining")
+        self.period.time_remaining_ss = response.get("clock").get("secondsRemaining")
         self.penalty_situation.current_ss = self.period.time_remaining_ss
+
+        self.situation_code = "1551"
+        self.situation_code_splitter()
 
         # TODO: Handle penalties that roll over periods
         if self.penalty_situation.current_ss == 0:
             logging.info("End of Period - resetting Penalty Situation.")
             self.penalty_situation = PenaltySituation()
 
-        intermission = linescore.get("intermissionInfo")
-        self.period.intermission = intermission.get("inIntermission")
-        self.period.intermission_remaining = intermission.get("intermissionTimeRemaining")
+        # intermission = linescore.get("intermissionInfo")
+        self.period.intermission = response.get("clock").get("inIntermission")
+        self.period.intermission_remaining = response.get("clock").get("intermissionTimeRemaining")  # TBD
 
-        linescore_home = linescore.get("teams").get("home")
-        boxscore_home = boxscore.get("teams").get("home")
-        self.home_team.score = linescore_home.get("goals")
-        self.home_team.shots = linescore_home.get("shotsOnGoal")
+        home_team = response.get("homeTeam")
+        self.home_team.score = home_team.get("score")
+        self.home_team.shots = home_team.get("sog")
 
-        linescore_away = linescore.get("teams").get("away")
-        boxscore_away = boxscore.get("teams").get("away")
-        self.away_team.score = linescore_away.get("goals")
-        self.away_team.shots = linescore_away.get("shotsOnGoal")
-        self.power_play_strength = linescore.get("powerPlayStrength")
-        self.home_team.power_play = linescore_home.get("powerPlay")
-        self.home_team.skaters = linescore_home.get("numSkaters")
-        self.home_team.onice = boxscore_home.get("onIce")
-        self.away_team.power_play = linescore_away.get("powerPlay")
-        self.away_team.skaters = linescore_away.get("numSkaters")
-        self.away_team.onice = boxscore_away.get("onIce")
+        away_team = response.get("awayTeam")
+        self.away_team.score = away_team.get("score")
+        self.away_team.shots = away_team.get("sog")
+
+        self.home_team.onice = home_team.get("onIce")
+        self.home_team.skaters = len(self.home_team.onice)
+        self.away_team.onice = away_team.get("onIce")
+        self.away_team.skaters = len(self.away_team.onice)
+        self.power_play_strength = "Even" if self.home_team.skaters == self.away_team.skaters else "PP"
+        self.home_team.power_play = "TBD"
+        self.away_team.power_play = "TBD"
 
         # self.last_event_idx = (
         #     response.get("liveData").get("plays").get("currentPlay").get("about").get("eventIdx")
@@ -428,7 +463,7 @@ class Game:
     @property
     def game_hashtag(self):
         """Returns the game specific hashtag (usually #AWAYvsHOME tri-codes)."""
-        hashtag = "#{}vs{}".format(self.away_team.tri_code, self.home_team.tri_code)
+        hashtag = "#{}vs{}".format(self.away_team.tri_code_upper, self.home_team.tri_code_upper)
         return hashtag
 
     def get_preferred_team(self):

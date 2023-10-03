@@ -2,6 +2,7 @@
 Functions that create images or non-NST charts (via Matplotlib).
 """
 
+from io import BytesIO
 import logging
 import os
 from enum import Enum
@@ -9,11 +10,14 @@ from enum import Enum
 import matplotlib.pyplot as plt
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
+import cairosvg
+import requests
 
 from hockeygamebot.definitions import IMAGES_PATH, PROJECT_ROOT
 from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.models.game import Game
 from hockeygamebot.models.gameevent import GoalEvent
+from hockeygamebot.models.gametype import GameType
 from hockeygamebot.nhlapi import schedule, thirdparty
 from hockeygamebot.models.gametype import GameType
 
@@ -368,6 +372,29 @@ def valign_center_text(draw, left, top, height, text, color, font):
     draw.text(coords_new, text, color, font, align="center")
 
 
+def download_image(url):
+    """Downloads an image from the web."""
+
+    logging.info("Downloading Image via URL: %s", url)
+    if ".svg" in url:
+        response = requests.get(url)
+        svg_data = response.content
+        png_data = cairosvg.svg2png(bytestring=svg_data)
+        png_image = Image.open(BytesIO(png_data))
+    else:
+        response = requests.get(url)
+        png_image = Image.open(BytesIO(response.content))
+
+    return png_image
+
+
+def resize_image(img, width, height):
+    """Resizes an image to a specified width, height combination."""
+
+    resized_image = img.resize((width, height))
+    return resized_image
+
+
 def pregame_image(game: Game):
     """Generates the pre-game image that is sent to social media platforms at the first
         run of the hockeygamebot script per day.
@@ -415,6 +442,14 @@ def pregame_image(game: Game):
         round_number = playoff_info["round"]["number"]
         game_number = playoff_info["currentGame"]["seriesSummary"]["gameNumber"]
         text_gamenumber = f"RD#{round_number} / GM#{game_number}"
+    elif GameType(game.game_type) == GameType.PRESEASON:
+        home_pts = game.home_team.points
+        home_streak_last10 = f"{home_pts} PTS • {game.home_team.current_record}"
+        home_record_str = "LAST SEASON"
+        away_pts = game.away_team.points
+        away_streak_last10 = f"{away_pts} PTS • {game.away_team.current_record}"
+        away_record_str = "LAST SEASON"
+        text_gamenumber = "PRESEASON"
     else:
         home_pts = game.home_team.points
         home_record_str = f"{home_pts} PTS • {game.home_team.current_record}"
@@ -435,9 +470,7 @@ def pregame_image(game: Game):
         num_games = schedule.get_number_games(
             season=game.season, team_id=game.preferred_team.team_id, game_type_code=game.game_type
         )
-        text_gamenumber = (
-            "PRESEASON" if game.game_type == "PR" else f"{game.preferred_team.games + 1} OF {num_games}"
-        )
+        text_gamenumber = f"{game.preferred_team.games + 1} OF {num_games}"
 
     text_datetime = f"{game.game_date_short} • {game.game_time_local}"
     text_hashtags = (
@@ -451,6 +484,15 @@ def pregame_image(game: Game):
     home_team = game.home_team.team_name.replace(" ", "")
     away_logo = Image.open(os.path.join(PROJECT_ROOT, f"resources/logos/{away_team}.png"))
     home_logo = Image.open(os.path.join(PROJECT_ROOT, f"resources/logos/{home_team}.png"))
+
+    LOGO_WIDTH = 300
+    LOGO_HEIGHT = 200
+
+    home_logo = download_image(game.home_team.logo)
+    home_logo = resize_image(home_logo, LOGO_WIDTH, LOGO_HEIGHT)
+
+    away_logo = download_image(game.away_team.logo)
+    away_logo = resize_image(away_logo, LOGO_WIDTH, LOGO_HEIGHT)
 
     # Paste the home / away logos with the mask the same as the image
     bg.paste(away_logo, COORDS_AWAY_LOGO, away_logo)
@@ -900,22 +942,33 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
         )
 
     # Get the boxscores for each team (via the homeaway variable)
-    boxscore_pref = boxscore["teams"][game.preferred_team.home_away]
-    boxscore_other = boxscore["teams"][game.other_team.home_away]
-    preferred_stats = boxscore_pref["teamStats"]["teamSkaterStats"]
-    other_stats = boxscore_other["teamStats"]["teamSkaterStats"]
+    preferred_homeaway = game.preferred_team.home_away
+    other_homeaway = game.other_team.home_away
+    preferred_stats = boxscore.get(f"{preferred_homeaway}Team")
+    print(preferred_stats)
+    other_stats = boxscore.get(f"{other_homeaway}Team")
+    print(other_stats)
+
+    # Manually Calculate Power Play Conversion Stats
+    preferred_power_play = preferred_stats["powerPlayConversion"]
+    preferred_power_play_g = int(preferred_power_play.split("/")[0])
+    preferred_power_play_opp = int(preferred_power_play.split("/")[1])
+
+    other_power_play = other_stats["powerPlayConversion"]
+    other_power_play_g = int(other_power_play.split("/")[0])
+    other_power_play_opp = int(other_power_play.split("/")[1])
 
     # fmt: off
     # Generate each stats bar via the function & box score
     # Shots, Blocked, Hits & FO% are always there with no logic necessary
     generate_stats_bar(
-        draw=draw, stat=StatTypes.SHOTS, pref_value=preferred_stats["shots"],
-        other_value=other_stats["shots"], pref_color=pref_colors, other_color=other_colors
+        draw=draw, stat=StatTypes.SHOTS, pref_value=preferred_stats["sog"],
+        other_value=other_stats["sog"], pref_color=pref_colors, other_color=other_colors
     )
 
     generate_stats_bar(
-        draw=draw, stat=StatTypes.BLOCKED_SHOTS, pref_value=preferred_stats["blocked"],
-        other_value=other_stats["blocked"], pref_color=pref_colors, other_color=other_colors
+        draw=draw, stat=StatTypes.BLOCKED_SHOTS, pref_value=preferred_stats["blocks"],
+        other_value=other_stats["blocks"], pref_color=pref_colors, other_color=other_colors
     )
 
     generate_stats_bar(
@@ -924,8 +977,8 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
     )
 
     generate_stats_bar(
-        draw=draw, stat=StatTypes.FACEOFF_PCT, pref_value=float(preferred_stats["faceOffWinPercentage"]),
-        other_value=float(other_stats["faceOffWinPercentage"]), pref_color=pref_colors, other_color=other_colors
+        draw=draw, stat=StatTypes.FACEOFF_PCT, pref_value=float(preferred_stats["faceoffWinningPctg"]),
+        other_value=float(other_stats["faceoffWinningPctg"]), pref_color=pref_colors, other_color=other_colors
     )
 
     generate_stats_bar(
@@ -934,8 +987,8 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
     )
 
     # Power Plays takes a tuple instead of single values (opporunities & goals)
-    pref_pp = (preferred_stats["powerPlayOpportunities"], preferred_stats["powerPlayGoals"])
-    other_pp = (other_stats["powerPlayOpportunities"], other_stats["powerPlayGoals"])
+    pref_pp = (preferred_power_play_opp, preferred_power_play_g)
+    other_pp = (other_power_play_opp, other_power_play_g)
     generate_stats_bar(
         draw=draw, stat=StatTypes.POWER_PLAYS, pref_value=pref_pp,
         other_value=other_pp, pref_color=pref_colors, other_color=other_colors
@@ -954,6 +1007,7 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
         period = goal.period_ordinal
         time = goal.period_time_remain_str
         strength = goal.strength_code
+        strength = "EVEN" if strength == "ev" else strength.upper()
         goal_scorer = goal.scorer_name
         assist_primary = goal.primary_name
         assist_secondary = goal.secondary_name
@@ -975,6 +1029,7 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
         period = goal.period_ordinal
         time = goal.period_time_remain_str
         strength = goal.strength_code
+        strength = "EVEN" if strength == "ev" else strength.upper()
         goal_scorer = goal.scorer_name
         assist_primary = goal.primary_name
         assist_secondary = goal.secondary_name
@@ -987,6 +1042,84 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
 
     # bg.show()
     return bg
+
+
+def three_stars_image(game: Game, three_stars: dict):
+    """Generates a custom three-stars image.
+
+    Args:
+        game: Current Game object
+        three_stars: Three Stars of the Game
+
+    Returns:
+        bg: Finished Image instance
+    """
+
+    # Constant Values / Text Strings
+    FONT_TITLE = ImageFont.truetype(FontFiles.BITTER_BOLD, FontSizes.TITLE)
+    FONT_PLAYER_NAME = ImageFont.truetype(FontFiles.BITTER_BOLD, FontSizes.STAT_VALUE)
+
+    HEADER_TEXT = "THREE STARS OF THE GAME!"
+
+    HEADSHOT_W = 250
+    HEADSHOT_H = 250
+
+    # Load background & pasted resized logos
+    bg = Image.open(Backgrounds.STATS)
+    bg_w, bg_h = bg.size
+    print("width:", bg_w)
+    print("height:", bg_h)
+
+    # Generates a 'draw' object that we use to draw on top of the image
+    draw = ImageDraw.Draw(bg)
+
+    # Draw Text on the Image
+    # fmt: off
+    center_text(draw=draw, left=0, top=0, width=bg_w, text=HEADER_TEXT, color=Colors.WHITE, font=FONT_TITLE)
+
+    star1_headshot = three_stars[0]["headshot"]
+    star1_img = download_image(star1_headshot)
+    star1_img = resize_image(star1_img, HEADSHOT_W, HEADSHOT_H)
+    star1_first = three_stars[0]["firstName"]
+    star1_last = three_stars[0]["lastName"]
+    star1_name = f"{star1_first} {star1_last}"
+
+    star2_headshot = three_stars[1]["headshot"]
+    star2_img = download_image(star2_headshot)
+    star2_img = resize_image(star2_img, HEADSHOT_W, HEADSHOT_H)
+    star2_first = three_stars[1]["firstName"]
+    star2_last = three_stars[1]["lastName"]
+    star2_name = f"{star2_first} {star2_last}"
+
+    star3_headshot = three_stars[2]["headshot"]
+    star3_img = download_image(star3_headshot)
+    star3_img = resize_image(star3_img, HEADSHOT_W, HEADSHOT_H)
+    star3_first = three_stars[2]["firstName"]
+    star3_last = three_stars[2]["lastName"]
+    star3_name = f"{star3_first} {star3_last}"
+
+
+    # Draw four rectangles that are 300px wide & 500px tall
+    draw.rectangle(((50, 200), (350, 400)), fill="white")
+    draw.rectangle(((450, 200), (750, 400)), fill="white")
+    draw.rectangle(((850, 200), (1150, 400)), fill="white")
+    bg.paste(star1_img, (75, 150), star1_img)
+    bg.paste(star2_img, (475, 150), star2_img)
+    bg.paste(star3_img, (875, 150), star3_img)
+
+    center_text(
+        draw=draw, left=50, top=400, width=300, text=star1_name.upper(), color=Colors.WHITE, font=FONT_PLAYER_NAME
+    )
+    center_text(
+        draw=draw, left=450, top=400, width=300, text=star2_name.upper(), color=Colors.WHITE, font=FONT_PLAYER_NAME
+    )
+    center_text(
+        draw=draw, left=850, top=400, width=300, text=star3_name.upper(), color=Colors.WHITE, font=FONT_PLAYER_NAME
+    )
+
+    # fmt: on
+
+    bg.show()
 
 
 def hockeystatcards_charts(game: Game, home_gs: dict, away_gs: dict):
@@ -1015,7 +1148,10 @@ def hockeystatcards_charts(game: Game, home_gs: dict, away_gs: dict):
 
         gs_df = pd.DataFrame(gs)
         gs_df.columns = map(str.lower, gs_df.columns)
-        gs_df = gs_df[["player", "toi", "gamescore", "hero", "gsavg"]]
+        if "hero" in gs_df.columns:
+            gs_df = gs_df[["player", "toi", "gamescore", "hero", "gsavg"]]
+        else:
+            gs_df = gs_df[["player", "toi", "gamescore", "gsavg"]]
         gs_df["gamescore"] = pd.to_numeric(gs_df["gamescore"])
         gs_df["gsavg"] = pd.to_numeric(gs_df["gsavg"])
         gs_df = gs_df.sort_values(by=["gamescore"], ascending=False)
@@ -1025,10 +1161,13 @@ def hockeystatcards_charts(game: Game, home_gs: dict, away_gs: dict):
         gs_fig, ax = plt.subplots(1, 1, figsize=(10, 8))
         bars = gs_df[["gamescore"]].astype(float).plot.barh(ax=ax, color=color)
         bars = bars.patches
-        heros = gs_df["hero"]
-        for bar, hero in zip(bars, heros):
-            if hero:
-                bar.set_hatch("///")
+
+        # Standout Games not in Pre-Season
+        if "hero" in gs_df.columns:
+            heros = gs_df["hero"]
+            for bar, hero in zip(bars, heros):
+                if hero:
+                    bar.set_hatch("///")
 
         ax.plot(
             gs_df[["gsavg"]].astype(float).gsavg.values,

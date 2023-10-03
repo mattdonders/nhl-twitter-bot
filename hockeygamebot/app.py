@@ -9,6 +9,7 @@ import logging
 import os
 import sys
 import time
+import traceback
 from datetime import datetime
 
 # If running as app.py directly, we may need to import the module manually.
@@ -17,17 +18,15 @@ try:
 except ImportError:
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir))
 
-from hockeygamebot.core import final, live, preview, common
+from hockeygamebot.core import common, final, live, preview, images
 from hockeygamebot.definitions import VERSION
 from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.models.game import Game, PenaltySituation
-from hockeygamebot.models.gamestate import GameState, GameStateCode
+from hockeygamebot.models.gamestate import GameScheduleState, GameState, V1GameStateCode
 from hockeygamebot.models.globalgame import GlobalGame
 from hockeygamebot.models.team import Team
-from hockeygamebot.nhlapi import contentfeed, livefeed, nst, roster, schedule, youtube, standings
+from hockeygamebot.nhlapi import contentfeed, livefeed, nst, roster, schedule, standings, youtube
 from hockeygamebot.social import socialhandler
-
-SEASON_ID_OVERRIDE = "20222023"
 
 
 def start_game_loop(game: Game):
@@ -48,13 +47,18 @@ def start_game_loop(game: Game):
     # ------------------------------------------------------------------------------
 
     while True:
-        if game.game_state == GameState.PREVIEW.value:
+        if game.game_state in GameState.all_pregames():
             livefeed_resp = livefeed.get_livefeed(game.game_id)
             game.update_game(livefeed_resp)
 
+            # If the Game Roster is still empty, try setting it again
+            if not game.full_roster:
+                logging.info("Game Roster is still not set, try getting it again.")
+                roster.gameday_roster_update(game)
+
             # If after the update_game() function runs, we have a Postponed Game
             # We should tweet it - this means it happened after the game was scheduled
-            if game.game_state_code == GameStateCode.POSTPONED.value:
+            if game.game_schedule_state == GameScheduleState.POSTPONED.value:
                 logging.warning("This game was originally scheduled, but is now postponed.")
                 social_msg = (
                     f"⚠️ The {game.preferred_team.team_name} game scheduled for today has been postponed."
@@ -90,6 +94,11 @@ def start_game_loop(game: Game):
                     "& update game attributes so we detect when game goes live."
                 )
 
+                # If the Game Roster is still empty, try setting it again
+                if not game.full_roster:
+                    logging.info("Game Roster is <STILL> not set, try getting it again.")
+                    roster.gameday_roster_update(game)
+
                 # Somehow we got here without the starting lineup - try again
                 if not game.preview_socials.starters_sent:
                     preview.get_starters(game)
@@ -97,7 +106,7 @@ def start_game_loop(game: Game):
                 sleep_time = config["script"]["pregame_sleep_time"]
                 time.sleep(sleep_time)
 
-        elif game.game_state == GameState.LIVE.value:
+        elif game.game_state in GameState.all_lives():
             try:
                 logging.info("-" * 80)
                 logging.info(
@@ -170,7 +179,7 @@ def start_game_loop(game: Game):
 
                 # Update all game attributes & check for goalie pulls
                 game.update_game(livefeed_resp)
-                game.goalie_pull_updater(livefeed_resp)
+                # game.goalie_pull_updater(livefeed_resp)
 
                 # Logging (Temporarily) for Penalty Killed Tweets
                 logging.info(
@@ -207,6 +216,7 @@ def start_game_loop(game: Game):
             except Exception as error:
                 logging.error("Uncaught exception in live game loop - see below error.")
                 logging.error(error)
+                traceback.print_exc()
 
             # Perform any intermission score changes, charts & sleep
             if game.period.intermission:
@@ -224,7 +234,7 @@ def start_game_loop(game: Game):
             game.live_loop_counter += 1
             time.sleep(live_sleep_time)
 
-        elif game.game_state == GameState.FINAL.value:
+        elif game.game_state in GameState.all_finals():
             logging.info("Game is now over & 'Final' - run end of game functions with increased sleep time.")
 
             livefeed_resp = livefeed.get_livefeed(game.game_id)
@@ -249,14 +259,16 @@ def start_game_loop(game: Game):
                 # thirdparty.nst_linetool(game=game, team=game.preferred_team)
                 game.final_socials.nst_linetool_sent = True
 
-            if not game.final_socials.shotmap_retweet:
-                game.final_socials.shotmap_retweet = common.search_send_shotmap(game=game)
+            # Twitter API V2 is too Expensive to Send Shotmaps
+            # if not game.final_socials.shotmap_retweet:
+            #     game.final_socials.shotmap_retweet = common.search_send_shotmap(game=game)
 
             if not game.final_socials.hsc_sent:
                 try:
                     final.hockeystatcards(game=game)
                 except Exception as e:
                     logging.error("Error generating Hockey Stat Cards - setting HSC finals to true.")
+                    traceback.print_exc()
                     # Set the end of game social attributes
                     game.final_socials.hsc_msg = None
                     game.final_socials.hsc_sent = True
@@ -429,7 +441,7 @@ def run():
     game_today, game_info = schedule.is_game_today(team_tri_code, date)
 
     if not game_today:
-        game_yesterday, prev_game = schedule.was_game_yesterday(team_id, date)
+        game_yesterday, prev_game = schedule.was_game_yesterday(team_tri_code, date)
         if game_yesterday:
             logging.info(
                 "There was a game yesterday - send recap, condensed game "
@@ -437,49 +449,64 @@ def run():
             )
 
             # Get Team Information
-            home_team = prev_game["teams"]["home"]
-            home_team_name = home_team["team"]["name"]
-            away_team = prev_game["teams"]["away"]
-            away_team_name = away_team["team"]["name"]
+            game_id = prev_game["id"]
+            gamecenter = livefeed.get_gamecenter_landing(game_id)
 
-            pref_team = home_team if home_team["team"]["name"] == team_name else away_team
-            other_team = away_team if home_team["team"]["name"] == team_name else home_team
+            home_team_place = gamecenter["homeTeam"]["placeName"]
+            home_team_short_name = gamecenter["homeTeam"]["name"]
+            home_team_name = f"{home_team_place} {home_team_short_name}"
 
-            pref_team_name = pref_team["team"]["name"]
+            away_team_place = gamecenter["awayTeam"]["placeName"]
+            away_team_short_name = gamecenter["awayTeam"]["name"]
+            away_team_name = f"{away_team_place} {away_team_short_name}"
+
+            pref_team = gamecenter["homeTeam"] if home_team_name == team_name else gamecenter["awayTeam"]
+            other_team = gamecenter["awayTeam"] if home_team_name == team_name else gamecenter["homeTeam"]
+
+            pref_team_name = home_team_name if home_team_name == team_name else away_team_name
             pref_score = pref_team["score"]
             pref_hashtag = utils.team_hashtag(pref_team_name)
-            other_team_name = other_team["team"]["name"]
+
+            other_team_name = away_team_name if home_team_name == team_name else home_team_name
             other_score = other_team["score"]
 
-            # Get the Recap & Condensed Game
-            game_id = prev_game["gamePk"]
-            content_feed = contentfeed.get_content_feed(game_id)
+            # # TODO: Content Feed Re-Write
+            # game_summary = gamecenter.get("summary", {})
+            # game_video = game_summary.get("gameVideo", {})
+            # three_min_recap_id = game_video.get("threeMinRecap")
+            # three_min_recap_url = f"https://www.nhl.com/video/c-{three_min_recap_id}?tcid=tw_video_content_id"
+            # condensed_game_id = game_video.get("condensedGame")
+            # condensed_game_url = f"https://www.nhl.com/video/c-{condensed_game_id}?tcid=tw_video_content_id"
+            # print(three_min_recap_url, condensed_game_url)
 
-            # Send Recap Tweet
-            try:
-                recap, recap_video_url = contentfeed.get_game_recap(content_feed)
-                recap_description = recap["items"][0]["description"]
-                recap_msg = f"📺 {recap_description}.\n\n{recap_video_url}"
-                socialhandler.send(recap_msg)
-            except Exception as e:
-                logging.error("Error getting Game Recap. %s", e)
+            # # Get the Recap & Condensed Game
+            # content_feed = contentfeed.get_content_feed(game_id)
 
-            # Send Condensed Game / Extended Highlights Tweet
-            try:
-                condensed_game, condensed_video_url = contentfeed.get_condensed_game(content_feed)
-                condensed_blurb = condensed_game["items"][0]["blurb"]
-                condensed_msg = f"📺 {condensed_blurb}.\n\n{condensed_video_url}"
-                socialhandler.send(condensed_msg)
-            except Exception as e:
-                logging.error("Error getting Condensed Game from NHL - trying YouTube. %s", e)
-                try:
-                    condensed_game = youtube.youtube_condensed(away_team_name, home_team_name)
-                    condensed_blurb = condensed_game["title"]
-                    condensed_video_url = condensed_game["yt_link"]
-                    condensed_msg = f"📺 {condensed_blurb}.\n\n{condensed_video_url}"
-                    socialhandler.send(condensed_msg)
-                except Exception as e:
-                    logging.error("Error getting Condensed Game from NHL & YouTube - skip this today. %s", e)
+            # # Send Recap Tweet
+            # try:
+            #     recap, recap_video_url = contentfeed.get_game_recap(content_feed)
+            #     recap_description = recap["items"][0]["description"]
+            #     recap_msg = f"📺 {recap_description}.\n\n{recap_video_url}"
+            #     socialhandler.send(recap_msg)
+            # except Exception as e:
+            #     logging.error("Error getting Game Recap. %s", e)
+
+            # # Send Condensed Game / Extended Highlights Tweet
+            # try:
+            #     condensed_game, condensed_video_url = contentfeed.get_condensed_game(content_feed)
+            #     condensed_blurb = condensed_game["items"][0]["blurb"]
+            #     condensed_msg = f"📺 {condensed_blurb}.\n\n{condensed_video_url}"
+            #     socialhandler.send(condensed_msg)
+            # except Exception as e:
+            #     logging.error("Error getting Condensed Game from NHL - trying YouTube. %s", e)
+            #     try:
+            #         condensed_game = youtube.youtube_condensed(away_team_name, home_team_name)
+            #         condensed_blurb = condensed_game["title"]
+            #         condensed_video_url = condensed_game["yt_link"]
+            #         condensed_msg = f"📺 {condensed_blurb}.\n\n{condensed_video_url}"
+            #         socialhandler.send(condensed_msg)
+            #     except Exception as e:
+            #         logging.error("Error getting Condensed Game from NHL & YouTube - skip this today. %s", e)
 
             # Generate the Season Overview charts
             game_result_str = "defeat" if pref_score > other_score else "lose to"
@@ -514,25 +541,31 @@ def run():
     # Get Game ID from Game Info
     game_id = game_info["id"]
 
+    # Get Broadcast Information
+    gamecenter = livefeed.get_gamecenter_landing(game_id)
+    broadcasts = schedule.get_broadcasts_from_gamecenter(gamecenter)
+
     home_team_abbreviation = game_info["homeTeam"]["abbrev"]
+    home_team_logo = game_info["homeTeam"]["logo"]
     home_standings = standings.get_standings(home_team_abbreviation)
-    home_team_name = home_standings["teamName"]
+    home_team_name = home_standings["teamName"]["default"]
+    # home_team_name = home_standings["teamName"].get("en", home_standings["teamName"]["default"])
+    home_team_short_name = gamecenter["homeTeam"]["name"]
     home_team_record = standings.get_record(home_standings)
     home_team_numgames = home_standings["gamesPlayed"]
 
     away_team_abbreviation = game_info["awayTeam"]["abbrev"]
+    away_team_logo = game_info["awayTeam"]["logo"]
     away_standings = standings.get_standings(away_team_abbreviation)
-    away_team_name = away_standings["teamName"]
+    away_team_name = away_standings["teamName"]["default"]
+    # away_team_name = away_standings["teamName"].get("en", away_standings["teamName"]["default"])
+    away_team_short_name = gamecenter["awayTeam"]["name"]
     away_team_record = standings.get_record(away_standings)
     away_team_numgames = away_standings["gamesPlayed"]
 
     # Get Home & Away Team Names
     home_team_id, home_team_tri_code = schedule.get_team_id(home_team_name)
     away_team_id, away_team_tri_code = schedule.get_team_id(away_team_name)
-
-    # Get Broadcast Information
-    gamecenter = livefeed.get_gamecenter_landing(game_id)
-    broadcasts = schedule.get_broadcasts_from_gamecenter(gamecenter)
 
     logging.info("[NEWAPI] Home Team Name: %s / Record: %s", home_team_name, home_team_record)
     logging.info("[NEWAPI] Away Team Name: %s / Record: %s", away_team_name, away_team_record)
@@ -541,29 +574,31 @@ def run():
     home_team = Team(
         team_id=home_team_id,
         team_name=home_team_name,
-        short_name="TBD",
+        short_name=home_team_short_name,
         tri_code=home_team_tri_code,
         home_away="home",
         tv_channel=broadcasts["home"]["network"],
         games=home_team_numgames,
         record=home_team_record,
         season=gamecenter["season"],
-        tz_id="TBD",
+        tz_id=None,
         standings=home_standings,
+        logo=home_team_logo,
     )
 
     away_team = Team(
         team_id=away_team_id,
         team_name=away_team_name,
-        short_name="TBD",
+        short_name=away_team_short_name,
         tri_code=away_team_tri_code,
         home_away="away",
         tv_channel=broadcasts["away"]["network"],
         games=away_team_numgames,
         record=away_team_record,
         season=gamecenter["season"],
-        tz_id="TBD",
+        tz_id=None,
         standings=away_standings,
+        logo=away_team_logo,
     )
 
     # If lines are being overriden by a local lineup file,
@@ -577,38 +612,55 @@ def run():
     home_team.preferred = bool(home_team.team_name == team_name)
     away_team.preferred = bool(away_team.team_name == team_name)
     preferred = "home" if home_team.preferred else "away"
+    preferred_team = home_team if home_team.preferred else away_team
+
+    # Set Timezone of Preferred Team
+    preferred_team_timezone = schedule.get_team_timezone(preferred_team.tri_code)
+    preferred_team.tz_id = preferred_team_timezone
 
     # Create the Game Object!
-
     game = Game(
         game_id=game_id,
         game_type=gamecenter["gameType"],
         date_time=gamecenter["startTimeUTC"],
         game_state=gamecenter["gameState"],
-        game_state_code=None,
+        game_schedule_state=gamecenter["gameScheduleState"],
         venue=gamecenter["venue"],
         home=home_team,
         away=away_team,
         preferred=preferred,
-        live_feed=f"gamcenter/{game_id}",
+        live_feed=f"gamecenter/{game_id}/play-by-play",
         season=gamecenter["season"],
     )
-    game = Game.from_json_and_teams(game_info, home_team, away_team)
+
+    # game = Game.from_json_and_teams(game_info, home_team, away_team)
     GlobalGame.game = game
+
+    # TESTING: Three Stars Image
+    # boxscore = gamecenter["summary"]["threeStars"]
+    # images.three_stars_image(game, boxscore)
+    # sys.exit()
+
+    # Setup API V1 and V2 for Twitter (Store them in the Global Game Instance)
+    if config.get("socials").get("twitter"):
+        logging.info("Setting up Twitter API Clients & storing them in the GlobalGame.")
+        twitter_api_v1 = socialhandler.twitter.get_api()
+        twitter_api_v2 = socialhandler.twitter.get_api_v2()
+        GlobalGame.game.twitter_api_v1 = twitter_api_v1
+        GlobalGame.game.twitter_api_v2 = twitter_api_v2
 
     # Override Game State for localdata testing
     game.game_state = "Live" if args.localdata else game.game_state
 
     # Update the Team Objects with the gameday rosters
-    # TODO: Fix for V3
-    # roster.gameday_roster_update(game)
+    roster.gameday_roster_update(game)
 
     # print(vars(game))
     # print(vars(away_team))
     # print(vars(home_team))
 
     # If the codedGameState is set to 9 originally, game is postponed (exit immediately)
-    if game.game_state_code == GameStateCode.POSTPONED.value:
+    if game.game_schedule_state == GameScheduleState.POSTPONED.value:
         logging.warning("This game is marked as postponed during our first run - exit silently.")
         end_game_loop(game)
 

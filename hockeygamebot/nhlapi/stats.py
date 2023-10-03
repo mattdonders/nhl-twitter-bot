@@ -8,6 +8,7 @@ import requests
 import pandas as pd
 
 from hockeygamebot.helpers import utils
+from hockeygamebot.nhlapi import api
 
 # Load configuration file in global scope
 urls = utils.load_urls()
@@ -23,14 +24,16 @@ def get_player_career_stats(player_id):
         career_stats: A dictionary of a players career stats
     """
     try:
-        PERSON_API = "{api}/people/{id}?expand=person.stats&stats=careerRegularSeason".format(
-            api=urls["endpoints"]["nhl_endpoint"], id=player_id
-        )
-        response = requests.get(PERSON_API).json()
-        person = response.get("people")[0]
-        position = person.get("primaryPosition")["code"]
-        stats = person.get("stats")[0].get("splits")[0].get("stat")
-        return stats
+        endpoint = f"player/{player_id}/landing"
+        response = api.nhl_api(endpoint)
+        if response:
+            stats = response.json()
+        else:
+            return None
+
+        position = stats.get("position")
+        regular_season = stats.get("careerTotals", {}).get("regularSeason")
+        return regular_season or {"assists": 0, "points": 0, "goals": 0}
     except IndexError as e:
         logging.error("For some reason, %s doesn't have regular season stats. (%s)", player_id, e)
         return {"assists": 0, "points": 0, "goals": 0}

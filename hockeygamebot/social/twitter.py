@@ -10,6 +10,7 @@ from twython import Twython  # TODO: REMOVE ONCE TWEEPY SUPPORTS CHUNKED VIDEO
 
 from hockeygamebot.helpers import arguments, utils
 from hockeygamebot.models.hashtag import Hashtag
+from hockeygamebot.models.globalgame import GlobalGame
 
 
 def get_twython_api():
@@ -58,11 +59,42 @@ def get_api():
     access_token = twitter_config["access_token"]
     access_secret = twitter_config["access_secret"]
 
-    auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
-    auth.set_access_token(access_token, access_secret)
+    # auth = tweepy.OAuth1UserHandler(consumer_key, consumer_secret)
+    # auth.set_access_token(access_token, access_secret)
+    auth = tweepy.OAuth1UserHandler(consumer_key, consumer_secret, access_token, access_secret)
 
-    tweepy_session = tweepy.API(auth)
+    tweepy_session = tweepy.API(auth, wait_on_rate_limit=True)
     return tweepy_session
+
+
+def get_api_v2():
+    """
+    Returns an Authorized session of the Tweepy API.
+
+    Input:
+        None
+
+    Output:
+        tweepy_session - authorized twitter session that can send a tweet.
+    """
+    args = arguments.get_arguments()
+
+    twitterenv = "debug" if args.debugsocial else "prod"
+    twitter_config = utils.load_config()["twitter"][twitterenv]
+
+    consumer_key = twitter_config["consumer_key"]
+    consumer_secret = twitter_config["consumer_secret"]
+    access_token = twitter_config["access_token"]
+    access_secret = twitter_config["access_secret"]
+
+    client = tweepy.Client(
+        consumer_key=consumer_key,
+        consumer_secret=consumer_secret,
+        access_token=access_token,
+        access_token_secret=access_secret,
+        wait_on_rate_limit=True,
+    )
+    return client
 
 
 def send_tweet(
@@ -90,7 +122,8 @@ def send_tweet(
         return "https://twitter.com/{handle}/status".format(handle=twitter_handle)
 
     # Get the API session & send a tweet depending on the parameters sent
-    api = get_api()
+    v1_client = GlobalGame.game.twitter_api_v1
+    v2_client = GlobalGame.game.twitter_api_v2
 
     # Add any hashtags that need to be added
     # Start with team hashtag (most required)
@@ -136,32 +169,43 @@ def send_tweet(
 
     try:
         if not reply and not media:
-            status = api.update_status(status=tweet_text)
+            logging.info("No reply and no media - using V2 client.")
+            status = v2_client.create_tweet(text=tweet_text)
         elif not reply and media:
             if isinstance(media, list):
-                media_ids = [api.media_upload(i).media_id_string for i in media]
-                status = api.update_status(status=tweet_text, media_ids=media_ids)
+                logging.info(
+                    "No reply but YES media (& media is a list) - using V1 client for media, V2 client for tweet."
+                )
+                media_ids = [v1_client.media_upload(i).media_id_string for i in media]
+                logging.info("Uploaded media (id: %s) to Twitter - sending tweet now.", media_ids)
+                status = v2_client.create_tweet(text=tweet_text, media_ids=media_ids)
             else:
-                status = api.update_with_media(status=tweet_text, filename=media)
+                logging.info(
+                    "No reply but YES media (& single media) - using V1 client for media, V2 client for tweet."
+                )
+                media_id = v1_client.media_upload(media)
+                logging.info("Uploaded media (id: %s) to Twitter - sending tweet now.", media_id)
+                status = v2_client.create_tweet(text=tweet_text, media_ids=[media_id.media_id_string])
         elif reply and not media:
             # tweet_text = f"@{twitter_handle} {tweet_text}"
-            status = api.update_status(
-                status=tweet_text, in_reply_to_status_id=reply, auto_populate_reply_metadata=True
-            )
+            logging.info("YES reply but NO media - using V1 client.")
+            status = v2_client.create_tweet(text=tweet_text, in_reply_to_tweet_id=reply)
         elif reply and media:
             # tweet_text = f"@{twitter_handle} {tweet_text}"
             if isinstance(media, list):
-                media_ids = [api.media_upload(i).media_id_string for i in media]
-                status = api.update_status(
-                    status=tweet_text,
+                media_ids = [v1_client.media_upload(i).media_id_string for i in media]
+                status = v2_client.create_tweet(
+                    text=tweet_text,
                     media_ids=media_ids,
-                    in_reply_to_status_id=reply,
-                    auto_populate_reply_metadata=True,
+                    in_reply_to_tweet_id=reply,
                 )
             else:
-                status = api.update_with_media(status=tweet_text, filename=media, in_reply_to_status_id=reply)
+                media_id = v1_client.media_upload(media)
+                status = v2_client.create_tweet(
+                    text=tweet_text, media_ids=[media_id.media_id_string], in_reply_to_tweet_id=reply
+                )
 
-        return status.id
+        return status.data["id"]
 
     except Exception as e:
         logging.error("Failed to send tweet : %s", tweet_text)

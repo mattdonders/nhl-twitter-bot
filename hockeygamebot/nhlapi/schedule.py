@@ -15,6 +15,14 @@ from hockeygamebot.nhlapi import api, roster
 from hockeygamebot.definitions import VERSION
 
 
+def generate_season(date):
+    year = date.year
+    month = date.month
+
+    season = f"{year}{year+1}" if month > 8 else f"{year-1}{year}"
+    return season
+
+
 def get_team_id(team_name):
     """Passes team name to NHL API and returns team ID.
 
@@ -59,8 +67,11 @@ def is_game_today(team_tri_code, date):
         bool - True if game today, False if not.
         games_info (dict) - A dictionary from the Schedule API that describes game information.
     """
+
     args = arguments.get_arguments()
-    endpoint = f"/club-schedule-season/{team_tri_code}/now"
+
+    season = generate_season(date)
+    endpoint = f"/club-schedule-season/{team_tri_code}/{season}"
 
     response = api.nhl_api(endpoint)
     if response:
@@ -71,6 +82,13 @@ def is_game_today(team_tri_code, date):
     date_only = date.strftime("%Y-%m-%d")
     games = schedule["games"]
     games_today = [x for x in games if x["gameDate"] == date_only]
+
+    if not games_today:
+        date_string = date.date() if args.date else "today"
+        logging.info("There are no games scheduled for %s, SAD!", date_string)
+        return False, None
+
+    games_today = [games_today[0]]
 
     if len(games_today) == 1:
         games_info = games_today[0]
@@ -97,7 +115,20 @@ def is_game_today(team_tri_code, date):
     return False, None
 
 
-def was_game_yesterday(team_id, date):
+def team_timezone(team_tri_code):
+    endpoint = f"/club-schedule-season/{team_tri_code}/now"
+
+    response = api.nhl_api(endpoint)
+    if response:
+        schedule = response.json()
+    else:
+        return False, None
+
+    timezone = schedule["clubTimezone"]
+    return timezone
+
+
+def was_game_yesterday(team_tri_code, date):
     """Determines if there was a game yesterday.
 
     Args:
@@ -109,12 +140,25 @@ def was_game_yesterday(team_id, date):
         games_info (dict) - A dictionary from the Schedule API that describes game information.
     """
 
-    prev_game_date, prev_game = get_previous_game(team_id)
-    yesterday = date - timedelta(days=1)
-    prev_game_date_dt = parse(prev_game_date)
+    season = generate_season(date)
+    endpoint = f"/club-schedule-season/{team_tri_code}/{season}"
 
-    prev_game_yesterday = bool(prev_game_date_dt.date() == yesterday.date())
-    return prev_game_yesterday, prev_game
+    response = api.nhl_api(endpoint)
+    if response:
+        schedule = response.json()
+    else:
+        return False, None
+
+    yesterday = date - timedelta(days=1)
+    date_only = yesterday.strftime("%Y-%m-%d")
+    games = schedule["games"]
+    game_yesterday = [x for x in games if x["gameDate"] == date_only]
+
+    if not game_yesterday:
+        return False, None
+
+    games_info = game_yesterday[0]
+    return True, games_info
 
 
 def get_broadcasts(resp):
@@ -158,7 +202,7 @@ def get_broadcasts_from_gamecenter(gamecenter):
     away_broadcast = [x for x in broadcasts if x["market"] == "A"]
     national_broadcasts = [x for x in broadcasts if x["market"] == "N"]
 
-    national_broadcast = national_broadcasts[0] if national_broadcasts else "N/A"
+    national_broadcast = national_broadcasts[0] if national_broadcasts else {"network": "N/A"}
     home_broadcast = home_broadcast[0] if home_broadcast else national_broadcast
     away_broadcast = away_broadcast[0] if away_broadcast else national_broadcast
     broadcasts_dict = {"home": home_broadcast, "away": away_broadcast, "national": national_broadcast}
@@ -168,32 +212,46 @@ def get_broadcasts_from_gamecenter(gamecenter):
 
 def get_team_timezone(team_tri_code):
     endpoint = f"scoreboard/{team_tri_code}/now"
+    response = api.nhl_api(endpoint)
+    if response:
+        scoreboard = response.json()
+    else:
+        # return "US/Eastern"
+        return None
+
+    tz = scoreboard["clubTimeZone"]
+    return tz
 
 
-def get_next_game(today_game_date: datetime, team_id: int) -> dict:
+def get_next_game(today_game_date: datetime, team_tri_code: str) -> dict:
     """Takes today's game date & the team ID to get the next game from the NHL API endpoint.
 
     Args:
         today_game_date (datetime) - The date of today's game.
-        team_id (int) - The unique identifier of the team (from get_team function).
+        team_tri_code (str) - The unique 3-character identifier of the team.
 
     Returns:
         next_game (dict) - Dictionary of next game attributes.
     """
 
+    season = generate_season(today_game_date)
+    endpoint = f"/club-schedule-season/{team_tri_code}/{season}"
+
+    response = api.nhl_api(endpoint)
+    if response:
+        schedule = response.json()
+    else:
+        return False, None
+
+    games = schedule["games"]
+
+    # Get Today's Game (-1) in case of Pre-Season Split Squad Stuff
     game_date = today_game_date.strftime("%Y-%m-%d")
-    tomorrow = (today_game_date + timedelta(days=1)).strftime("%Y-%m-%d")
-    end_date = (today_game_date + timedelta(days=365)).strftime("%Y-%m-%d")
+    todays_game = [x for x in games if x["gameDate"] == game_date][-1]
+    idx_todays_game = games.index(todays_game)
 
-    logging.info("Checking the schedule API endpoint for the next game.")
-    url = f"schedule?teamId={team_id}&startDate={game_date}&endDate={end_date}"
-
-    response = api.nhl_api(url)
-    if not response:
-        return None
-
-    next_game_json = response.json()
-    next_game = next_game_json.get("dates")[1].get("games")[0]
+    idx_next_game = idx_todays_game + 1
+    next_game = games[idx_next_game]
 
     return next_game
 

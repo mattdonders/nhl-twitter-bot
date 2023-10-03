@@ -19,8 +19,10 @@ def get_livefeed(game_id):
     """
     randomnum = random.randint(1000, 9999)
     logging.info("Live Feed requested (random cache - %s)!", randomnum)
-    api_endpoint = f"game/{game_id}/feed/live?{randomnum}"
+    api_endpoint = f"gamecenter/{game_id}/play-by-play?{randomnum}"
+    # print(api_endpoint)
     response = api.nhl_api(api_endpoint).json()
+    # print(response)
     return response
 
 
@@ -32,3 +34,13 @@ def get_gamecenter_landing(game_id):
         return gamecenter
     else:
         return False, None
+
+
+def get_gamecenter_boxscore(game_id):
+    endpoint = f"/gamecenter/{game_id}/boxscore"
+    response = api.nhl_api(endpoint)
+    if response:
+        gamecenter = response.json()
+        return gamecenter
+    else:
+        return None

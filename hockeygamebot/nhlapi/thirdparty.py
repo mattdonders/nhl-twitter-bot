@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timedelta
 
 import lxml
+import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from dateutil.parser import parse
@@ -92,7 +93,7 @@ def nst_abbreviation(team_name: str) -> str:
     """
 
     team_name = team_name.replace("é", "e")
-    nss_teams = {
+    nst_teams = {
         "Anaheim Ducks": "ANA",
         "Arizona Coyotes": "ARI",
         "Boston Bruins": "BOS",
@@ -126,7 +127,7 @@ def nst_abbreviation(team_name: str) -> str:
         "Winnipeg Jets": "WPG",
         "Washington Capitals": "WSH",
     }
-    return nss_teams[team_name]
+    return nst_teams[team_name]
 
 
 def get_nst_stat(list, index):
@@ -423,7 +424,7 @@ def dailyfaceoff_lines(game, team):
     return return_dict
 
 
-def scouting_the_refs(game, pref_team):
+def scouting_the_refs_bs4(game, pref_team):
     """Scrapes Scouting the Refs for referee information for the night.
 
     Args:
@@ -562,6 +563,109 @@ def scouting_the_refs(game, pref_team):
     return return_dict
 
 
+def scouting_the_refs(game, pref_team):
+    """Scrapes Scouting the Refs for referee information for the night.
+
+    Args:
+        game: Game Object
+        pref_team (Team): Preferred team object.
+
+    Returns:
+        Tuple: dictionary {goalie string, goalie confirmed}
+    """
+
+    def calculate_total_games(ref_info):
+        # Takes a referee dictionary & returns number of total games (centralizes logic)
+        career_games_str = ref_info.get("careergames", "0")
+        if "|" in career_games_str:
+            total_games = sum([int(x) for x in career_games_str.split(" | ")])
+        else:
+            total_games = sum([int(x) for x in career_games_str.split(" / ")])
+        return total_games
+
+    # Initialized return dictionary
+    return_dict = dict()
+    return_dict["confirmed"] = False
+
+    urls = utils.load_urls()
+    refs_url = urls["endpoints"]["scouting_refs"]
+    logging.info("Getting officials information from Scouting the Refs, via url: %s", refs_url)
+    response = thirdparty_request(refs_url).json()
+
+    # If we get a bad response from the function above, return False
+    if response is None:
+        return False, {}
+
+    for post in response:
+        categories = post.get("categories")
+        post_date = parse(post.get("date"))
+        posted_today = bool(post_date.date() == datetime.today().date())
+        post_title = post.get("title").get("rendered")
+        if (921 in categories and posted_today) or (
+            posted_today and "NHL Referees and Linesmen" in post_title
+        ):
+            # if 921 in categories:     # This line is uncommented for testing on non-game days
+            post_url = post.get("link")
+            content = post.get("content").get("rendered")
+            soup = bs4_parse(content)
+            break
+    else:
+        logging.warning("BS4 result is empty - either no posts found or bad scraping.")
+        return False, {}
+
+    all_games = soup.find_all("h1")
+    game = [x for x in all_games if pref_team.team_name in x.text]
+
+    if not game:
+        logging.warning("No game details found - your team is probably not playing today.")
+        return False, {}
+
+    pref_team_game = game[0]
+    game_idx = all_games.index(pref_team_game)
+
+    logging.info("Getting Post Tables via Pandas & navigating to proper index.")
+    df = pd.read_html(post_url)[game_idx]
+    df = df.iloc[:, [0, 1, 4]]
+    df = df.set_axis(["Category", "Official1", "Official2"], axis=1)
+    df = df.replace("\s\(Reg/PO\)", "", regex=True)
+    idx_linesmen = df[df.Category == "LINESMEN"].index[0]
+
+    df_refs = df.iloc[0:idx_linesmen, :].iloc[1:, :].reset_index(drop=True)
+    df_refs.at[0, "Category"] = "Name"
+    df_refs.loc[len(df_refs.index)] = ["Type", "Referee", "Referee"]
+    df_refs = df_refs.set_index("Category")
+    df_linesmen = df.iloc[idx_linesmen:, :].iloc[1:, :].reset_index(drop=True)
+    df_linesmen.at[0, "Category"] = "Name"
+    df_linesmen.loc[len(df_linesmen.index)] = ["Type", "Linesman", "Linesman"]
+    df_linesmen = df_linesmen.set_index("Category")
+
+    df_officials = pd.concat([df_refs.transpose(), df_linesmen.transpose()])
+    df_officials = df_officials.reset_index(drop=True)
+
+    # TODO: Dynamically Build Current Season Games Column
+    df_officials = df_officials.rename(columns={df_officials.columns[1]: "Season Games"})
+    cols_to_keep = ["Name", "Season Games", "Career Games", "Penl/Gm", "Type"]
+    df_officials = df_officials[cols_to_keep]
+
+    # Replace ALL Dashes with Zeroes (for new refs)
+    df_officials = df_officials.replace("[-—]", 0, regex=True)
+
+    # Last year, they used pipes (just in case they use it again)
+    df_officials = df_officials.replace("\|", "/", regex=True)
+    df_officials["total_career"] = [
+        sum(int(n) for n in str(val).split("/")) for val in df_officials["Career Games"]
+    ]
+    df_officials["total_season"] = [
+        sum(int(n) for n in str(val).split("/")) for val in df_officials["Season Games"]
+    ]
+    df_officials["penl_gm"] = df_officials["Penl/Gm"].str.replace(r"\(.*\)", "", regex=True)
+
+    df_officials.columns = df_officials.columns.str.lower()
+    dict_officials = df_officials.to_json(orient="records")
+
+    return True, dict_officials
+
+
 def dailyfaceoff_goalies(pref_team, other_team, pref_homeaway, game_date):
     """Scrapes Daily Faceoff for starting goalies for the night.
 
@@ -697,12 +801,14 @@ def hockeystatcard_gamescores(game: Game):
     urls = utils.load_urls()
     hsc_base = urls["endpoints"]["hockey_stat_cards"]
 
-    hsc_season = f"{game.season[2:4]}{game.season[6:8]}"
+    game_season_str = str(game.season)
+    hsc_season = f"{game_season_str[2:4]}{game_season_str[6:8]}"
     hsc_gametype = "ps" if game.game_id_gametype_shortid == "1" else "rs"
     hsc_nst_num = int(f"{game.game_id_gametype_id}{game.game_id_shortid}")
     hsc_game_num = None
 
     hsc_games_url = f"{hsc_base}/get-games?date={game.game_date_local}&y={hsc_season}&s={hsc_gametype}"
+    logging.info("Getting Hockey Game Score Cards via API: %s", hsc_games_url)
     resp = thirdparty_request(hsc_games_url)
 
     # If we get a bad response from the function above, return False

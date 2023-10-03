@@ -101,64 +101,68 @@ def generate_game_preview(game: Game):
     social_dict = socialhandler.send(msg=preview_tweet_text, media=img_filename, force_send=True)
     game.pregame_lasttweet = social_dict["twitter"]
 
-    # Generate Season Series Data
-    season_series = schedule.season_series(game.game_id, pref_team, other_team)
-    season_series_string = season_series[0]
-
-    if season_series_string is None:
-        # If this is the first game of the season, we can set the 'last_season' flag to enable the
-        # season series function to check last year's season series between the two teams.
-        logging.info(
-            "First game of the season - re-run the season series function with the last_season flag."
-        )
-
-        season_series = schedule.season_series(game.game_id, pref_team, other_team, last_season=True)
-
+    if GameType(game.game_type) == GameType.PRESEASON:
+        game.preview_socials.core_sent = True
+        game.preview_socials.season_series_sent = True
+    else:
+        # Generate Season Series Data
+        season_series = schedule.season_series(game.game_id, pref_team, other_team)
         season_series_string = season_series[0]
-        season_series_string = (
-            f"This is the first meeting of the season between the "
-            f"{pref_team.short_name} & the {other_team.short_name}.\n\n"
-            f"LAST SEASON STATS\n{season_series_string}"
+
+        if season_series_string is None:
+            # If this is the first game of the season, we can set the 'last_season' flag to enable the
+            # season series function to check last year's season series between the two teams.
+            logging.info(
+                "First game of the season - re-run the season series function with the last_season flag."
+            )
+
+            season_series = schedule.season_series(game.game_id, pref_team, other_team, last_season=True)
+
+            season_series_string = season_series[0]
+            season_series_string = (
+                f"This is the first meeting of the season between the "
+                f"{pref_team.short_name} & the {other_team.short_name}.\n\n"
+                f"LAST SEASON STATS\n{season_series_string}"
+            )
+
+            # season_series_tweet_text = (
+            #     f"This is the first meeting of the season between the "
+            #     f"{pref_team.short_name} & the {other_team.short_name}. "
+            #     f"Last season's stats -"
+            #     f"\n\n{season_series_string}\n{points_leader_str}\n{toi_leader_str}"
+            #     f"\n\n{pref_hashtag} {other_hashtag} {game.game_hashtag}"
+            # )
+
+        # Extract strings from returned list / tuple
+        points_leader_str = season_series[1]
+        toi_leader_str = season_series[2]
+
+        if game.game_type == "P":
+            # season_series_str = season_series_str.replace("season series", "regular season series")
+            season_series_string = f"Regular Season Stats -\n\n{season_series_string}"
+
+        season_series_tweet_text = (
+            f"{season_series_string}\n{points_leader_str}\n{toi_leader_str}"
+            f"\n\n{pref_hashtag} {other_hashtag} {game.game_hashtag}"
         )
 
-        # season_series_tweet_text = (
-        #     f"This is the first meeting of the season between the "
-        #     f"{pref_team.short_name} & the {other_team.short_name}. "
-        #     f"Last season's stats -"
-        #     f"\n\n{season_series_string}\n{points_leader_str}\n{toi_leader_str}"
-        #     f"\n\n{pref_hashtag} {other_hashtag} {game.game_hashtag}"
-        # )
+        game.preview_socials.season_series_msg = season_series_tweet_text
 
-    # Extract strings from returned list / tuple
-    points_leader_str = season_series[1]
-    toi_leader_str = season_series[2]
+        # logging.info(preview_tweet_text)
+        # logging.info(season_series_tweet_text)
+        discord_color = images.discord_color(game.preferred_team.team_name)
+        social_dict = socialhandler.send(
+            msg=season_series_tweet_text,
+            reply=game.pregame_lasttweet,
+            force_send=True,
+            discord_title="PREVIEW: Season Series",
+            discord_color=discord_color,
+        )
 
-    if game.game_type == "P":
-        # season_series_str = season_series_str.replace("season series", "regular season series")
-        season_series_string = f"Regular Season Stats -\n\n{season_series_string}"
+        game.pregame_lasttweet = social_dict["twitter"]
 
-    season_series_tweet_text = (
-        f"{season_series_string}\n{points_leader_str}\n{toi_leader_str}"
-        f"\n\n{pref_hashtag} {other_hashtag} {game.game_hashtag}"
-    )
-
-    game.preview_socials.season_series_msg = season_series_tweet_text
-
-    # logging.info(preview_tweet_text)
-    # logging.info(season_series_tweet_text)
-    discord_color = images.discord_color(game.preferred_team.team_name)
-    social_dict = socialhandler.send(
-        msg=season_series_tweet_text,
-        reply=game.pregame_lasttweet,
-        force_send=True,
-        discord_title="PREVIEW: Season Series",
-        discord_color=discord_color,
-    )
-
-    game.pregame_lasttweet = social_dict["twitter"]
-
-    game.preview_socials.core_sent = True
-    game.preview_socials.season_series_sent = True
+        game.preview_socials.core_sent = True
+        game.preview_socials.season_series_sent = True
 
 
 def game_preview_others(game: Game):
@@ -291,41 +295,45 @@ def game_preview_others(game: Game):
     # Process the pre-game information for the game officials
     if not game.preview_socials.officials_sent:
         try:
-            officials = thirdparty.scouting_the_refs(game, pref_team)
+            officials_confirmed, officials = thirdparty.scouting_the_refs(game, pref_team)
             logging.info(officials)
 
-            officials_confirmed = officials.get("confirmed")
-
-            if officials_confirmed:
-                officials_tweet_text = f"The officials (via @ScoutingTheRefs) for {game.game_hashtag} are -\n"
-                for key, attrs in officials.items():
-                    if key == "confirmed":
-                        continue
-                    officials_tweet_text = f"{officials_tweet_text}\n\n{key.title()}:"
-                    for official in attrs:
-                        official_name = official.get("name")
-                        official_season = official.get("seasongames")
-                        official_career = official.get("careergames")
-                        official_games = official.get("totalgames", 0)
-                        official_penalty_game = official.get("penaltygame")
-                        if official_penalty_game:
-                            official_detail = (
-                                f"{official_name} (Games: {official_games} | P/GM: {official_penalty_game})"
-                            )
-                            # official_detail = f"{official_name} (Gms: {official_season} / {official_career} | P/GM: {official_penalty_game})"
-                        else:
-                            official_detail = f"{official_name} (Games: {official_games})"
-                            # official_detail = f"{official_name} (Games: {official_season} / {official_career})"
-                        officials_tweet_text = f"{officials_tweet_text}\n- {official_detail}"
-
-                social_dict = socialhandler.send(
-                    msg=officials_tweet_text, reply=game.pregame_lasttweet, force_send=True
-                )
-
-                game.pregame_lasttweet = social_dict["twitter"]
-                game.preview_socials.officials_sent = True
-            else:
+            if not officials_confirmed:
                 logging.info("Officials not yet confirmed - try again next loop.")
+                return None
+
+            refs = [x for x in officials if x["type"] == "Referee"]
+            linesmen = [x for x in officials if x["type"] == "Linesman"]
+
+            ref_strings = []
+            linesman_strings = []
+
+            for official in officials:
+                type = official["type"]
+                name = official["name"]
+                career_games = official["total_career"]
+                season_games = official["total_season"]
+                penalty_game = official.get("penl_gm")
+                if type == "Referee":
+                    detail = f"R: {name} (Games: {career_games} | P/GM: {penalty_game.strip()})"
+                    ref_strings.append(detail)
+                else:
+                    detail = f"L: {name} (Games: {career_games})"
+                    linesman_strings.append(detail)
+
+            all_officials = ref_strings + linesman_strings
+            all_officials_str = "\n".join(all_officials)
+
+            officials_tweet_text = (
+                f"The officials (via @ScoutingTheRefs) for {game.game_hashtag} are -\n\n{all_officials_str}"
+            )
+
+            social_dict = socialhandler.send(
+                msg=officials_tweet_text, reply=game.pregame_lasttweet, force_send=True
+            )
+
+            game.pregame_lasttweet = social_dict["twitter"]
+            game.preview_socials.officials_sent = True
 
         except Exception as e:
             logging.error("Exception getting Scouting the Refs information - try again next loop.")
