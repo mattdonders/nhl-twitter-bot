@@ -137,39 +137,44 @@ def intermission_loop(game: Game):
                 if game.period.current < 3:
                     logging.info("1st or 2nd period intermission, only send the overview chart.")
                     game.nst_charts.charts_by_period[game.period.current] = True
-                    return
+                else:
+                    if team_charts:
+                        charts_msg = (
+                            f"Individual, on-ice, forward lines & defensive pairs after the "
+                            f"{game.period.current_ordinal} period (via @NatStatTrick)."
+                        )
+                        last_chart_socials = socialhandler.send(
+                            charts_msg,
+                            media=team_charts,
+                            game_hashtag=True,
+                            reply=last_chart_socials["twitter"],
+                        )
 
-                if team_charts:
-                    charts_msg = (
-                        f"Individual, on-ice, forward lines & defensive pairs after the "
-                        f"{game.period.current_ordinal} period (via @NatStatTrick)."
-                    )
-                    last_chart_socials = socialhandler.send(
-                        charts_msg, media=team_charts, game_hashtag=True, reply=last_chart_socials["twitter"]
-                    )
+                    if heatmap_charts:
+                        charts_msg = (
+                            f"Linemate & Opposition Data (TOI, CF% and xGF%) after the "
+                            f"{game.period.current_ordinal} period (via @NatStatTrick)."
+                        )
+                        last_chart_socials = socialhandler.send(
+                            charts_msg,
+                            media=heatmap_charts,
+                            game_hashtag=True,
+                            reply=last_chart_socials["twitter"],
+                        )
 
-                if heatmap_charts:
-                    charts_msg = (
-                        f"Linemate & Opposition Data (TOI, CF% and xGF%) after the "
-                        f"{game.period.current_ordinal} period (via @NatStatTrick)."
-                    )
-                    last_chart_socials = socialhandler.send(
-                        charts_msg,
-                        media=heatmap_charts,
-                        game_hashtag=True,
-                        reply=last_chart_socials["twitter"],
-                    )
+                    if shift_chart:
+                        charts_msg = (
+                            f"Shift length breakdown after the "
+                            f"{game.period.current_ordinal} period (via @NatStatTrick)."
+                        )
+                        last_chart_socials = socialhandler.send(
+                            charts_msg,
+                            media=shift_chart,
+                            game_hashtag=True,
+                            reply=last_chart_socials["twitter"],
+                        )
 
-                if shift_chart:
-                    charts_msg = (
-                        f"Shift length breakdown after the "
-                        f"{game.period.current_ordinal} period (via @NatStatTrick)."
-                    )
-                    last_chart_socials = socialhandler.send(
-                        charts_msg, media=shift_chart, game_hashtag=True, reply=last_chart_socials["twitter"]
-                    )
-
-                game.nst_charts.charts_by_period[game.period.current] = True
+                    game.nst_charts.charts_by_period[game.period.current] = True
 
             except Exception as e:
                 logging.error("Error creating Natural Stat Trick charts (%s) - sleep for a bit longer.", e)

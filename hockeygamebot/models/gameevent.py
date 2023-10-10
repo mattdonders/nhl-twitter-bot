@@ -2,18 +2,18 @@
 This module contains object creation for all Game Events.
 """
 
-from enum import Enum
 import logging
 import os
 import traceback
+from enum import Enum
 
+from hockeygamebot.core import images
 from hockeygamebot.definitions import IMAGES_PATH
 from hockeygamebot.helpers import utils
 from hockeygamebot.models.game import Game, PenaltySituation
 from hockeygamebot.models.gametype import GameType
-from hockeygamebot.nhlapi import contentfeed, stats, livefeed
+from hockeygamebot.nhlapi import contentfeed, gamecenter, livefeed, stats
 from hockeygamebot.social import socialhandler
-from hockeygamebot.core import images
 
 
 class GameEventTypeCode(Enum):
@@ -38,7 +38,7 @@ class GameEventTypeCode(Enum):
 
 
 def strength_mapper(strength_code):
-    mapper = {"pp": "Power Play", "ev": "Even"}
+    mapper = {"pp": "Power Play", "ev": "Even", "sh": "Short Handed"}
     return mapper.get(strength_code, strength_code)
 
 
@@ -559,31 +559,44 @@ class PeriodEndEvent(GenericEvent):
         self.tied_score = bool(self.pref_goals == self.other_goals)
 
         # Now call any functions that should be called when creating a new object
-        # Only do these for Period Official event type
-        if self.event_type == "PERIOD_END":
-            self.period_end_text = self.get_period_end_text()
-            self.lead_trail_text = self.get_lead_trail()
-            self.social_msg = self.generate_social_msg()
-
-            # Generate Stats Image
-            boxscore = self.livefeed.get("liveData").get("boxscore")
-            # Sometimes (???) the boxscore is empty...?
-            if not boxscore:
-                raise AttributeError("Cannot generate images with an empty boxscore, try again later.")
-
-            stats_image = images.stats_image(game=self.game, game_end=False, boxscore=boxscore)
-            img_filename = os.path.join(IMAGES_PATH, "temp", f"Intermission-{self.period}-{game.game_id}.png")
-            stats_image.save(img_filename)
-
-            social_ids = socialhandler.send(
-                msg=self.social_msg, media=img_filename, event=self, game_hashtag=True
+        # We only want to send a tweet for 1st period, 2nd period & then for
+        if not GameType(game.game_type) == GameType.PLAYOFFS and self.game.period.current > 2:
+            logging.info(
+                "A non-playoff game should not send ANY 'PeriodEnd' socials for 3rd period or later."
             )
-            last_tweet = social_ids.get("twitter") if social_ids else None
+            return
 
-            stat_leaders_social = self.get_stat_leaders()
-            social_ids = socialhandler.send(
-                msg=stat_leaders_social, reply=last_tweet, event=self, game_hashtag=True
+        if self.game.period.current > 2 and not self.tied_score:
+            logging.info(
+                "After the 2nd period, don't send 'PeriodEnd' socials for a non-tied game (game is over)."
             )
+            return
+
+        # This should only run for -
+        # Non-Playoff Games (P1 or P2)
+        # Playoff Game Where Score is NOT Tied At Period End (Going to Another OT)
+        self.period_end_text = self.get_period_end_text()
+        self.lead_trail_text = self.get_lead_trail()
+        self.social_msg = self.generate_social_msg()
+
+        # Generate Stats Image
+        boxscore = gamecenter.get_gamecenter_boxscore(game.game_id)
+        if not boxscore:
+            raise AttributeError("Cannot generate images with an empty boxscore, try again later.")
+
+        stats_image = images.stats_image(game=self.game, game_end=False, boxscore=boxscore)
+        img_filename = os.path.join(IMAGES_PATH, "temp", f"Intermission-{self.period}-{game.game_id}.png")
+        stats_image.save(img_filename)
+
+        social_ids = socialhandler.send(
+            msg=self.social_msg, media=img_filename, event=self, game_hashtag=True
+        )
+        last_tweet = social_ids.get("twitter") if social_ids else None
+
+        stat_leaders_social = self.get_stat_leaders()
+        social_ids = socialhandler.send(
+            msg=stat_leaders_social, reply=last_tweet, event=self, game_hashtag=True
+        )
 
     def get_period_end_text(self):
         """Formats the main period end text with some logic based on score & period."""
@@ -1396,7 +1409,7 @@ class ShotEvent(GenericEvent):
 
 
 class PenaltyEvent(GenericEvent):
-    """A Faceoff object contains all faceoff-related attributes and extra methods.
+    """A PenaltyEvent object contains all penalty-related attributes and extra methods.
     It is a subclass of the GenericEvent class with the most basic attributes.
     """
 
@@ -1431,13 +1444,13 @@ class PenaltyEvent(GenericEvent):
         if self.penalty_team_name == preferred_team.team_name:
             self.penalty_team_obj = preferred_team
             self.powerplay_team_obj = other_team
-            print("Penalty Team:", self.penalty_team_obj.team_name)
-            print("PP Team:", self.powerplay_team_obj.team_name)
+            # print("Penalty Team:", self.penalty_team_obj.team_name)
+            # print("PP Team:", self.powerplay_team_obj.team_name)
         else:
             self.penalty_team_obj = other_team
             self.powerplay_team_obj = preferred_team
-            print("Penalty Team:", self.penalty_team_obj.team_name)
-            print("PP Team:", self.powerplay_team_obj.team_name)
+            # print("Penalty Team:", self.penalty_team_obj.team_name)
+            # print("PP Team:", self.powerplay_team_obj.team_name)
 
         # Setup the Penalty Situation Object
         penalty_situation = self.game.penalty_situation

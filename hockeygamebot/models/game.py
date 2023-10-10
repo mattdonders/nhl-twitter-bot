@@ -140,7 +140,7 @@ class Game:
             self.game_id_gametype = "Unknown"
 
         # Set the hashtags in the Hashtag class
-        Hashtag.game_hashtag = f"#{self.away_team.tri_code}vs{self.home_team.tri_code}"
+        Hashtag.game_hashtag = f"#{self.away_team.tri_code.upper()}vs{self.home_team.tri_code.upper()}"
         Hashtag.pref_hashtag = utils.team_hashtag(self.preferred_team.team_name, self.game_type)
         Hashtag.other_hashtag = utils.team_hashtag(self.other_team.team_name, self.game_type)
         Hashtag.home_hashtag = utils.team_hashtag(self.home_team.team_name, self.game_type)

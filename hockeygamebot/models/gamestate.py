@@ -40,7 +40,13 @@ class GameState(Enum):
 
     @classmethod
     def all_finals(cls):
-        return [cls.FINAL.value, cls.OFFICIAL.value, cls.SOFT_FINAL.value, cls.HARD_FINAL.value]
+        return [
+            cls.FINAL.value,
+            cls.FINAL.value.title(),
+            cls.OFFICIAL.value,
+            cls.SOFT_FINAL.value,
+            cls.HARD_FINAL.value,
+        ]
 
     @classmethod
     def all_lives(cls):

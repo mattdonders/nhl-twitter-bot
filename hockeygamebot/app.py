@@ -363,6 +363,9 @@ def start_game_loop(game: Game):
             time.sleep(config["script"]["final_sleep_time"])
 
         else:
+            # Update Game State even with an Unknown Value (in case there's a glitch / bad state)
+            livefeed_resp = livefeed.get_livefeed(game.game_id)
+            game.update_game(livefeed_resp)
             logging.warning(
                 "Game State %s is unknown - sleep for 5 seconds and check again.", game.game_state
             )

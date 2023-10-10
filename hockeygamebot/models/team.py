@@ -6,7 +6,7 @@ import requests
 from hockeygamebot import nhlapi
 from hockeygamebot.helpers import utils
 from hockeygamebot.models.gametype import GameType
-from hockeygamebot.nhlapi import schedule
+from hockeygamebot.nhlapi import schedule, roster
 
 
 class Team(object):
@@ -55,6 +55,7 @@ class Team(object):
         self.overridelines = False
         self.nss_gamelog = None
         self.gameday_roster = {}
+        self.full_roster = {}
 
         # Break-up the record into wins, losses, ot
         self.wins = record["wins"]
@@ -186,12 +187,7 @@ class Team(object):
 
         # Send request to get current roster
         try:
-            api = utils.load_urls()["endpoints"]["nhl_endpoint"]
-            roster_url = f"roster/{self.tri_code}/{self.season}"
-            logging.info("Getting roster for %s via NHL API.", self.team_name)
-            roster = nhlapi.api.nhl_api(roster_url).json()
-            full_roster = roster["forwards"] + roster["defensemen"] + roster["goalies"]
-            self.roster = full_roster
+            self.full_roster = roster.get_full_roster(self.tri_code_upper)
         except (IndexError, KeyError) as e:
             logging.warning("Error getting team roster - %s", e)
             self.roster = "N/A"

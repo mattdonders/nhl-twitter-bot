@@ -179,16 +179,16 @@ def setup_logging():
     log_file_name = datetime.now().strftime(load_config()["script"]["log_file_name"] + "-%Y%m%d%H%M%S.log")
     log_file = os.path.join(LOGS_PATH, log_file_name)
 
-    symlink_name = load_config()["script"]["log_file_name"] + ".latest.log"
-    log_file_latest_symlink = os.path.join(LOGS_PATH, symlink_name)
-    if not args.console:
-        try:
-            os.symlink(log_file, log_file_latest_symlink)
-        except Exception as e:
-            logging.info("Issue creating symlink: %s", e)
-            logging.info("Forcing symlink creation.")
-            os.remove(log_file_latest_symlink)
-            os.symlink(log_file, log_file_latest_symlink)
+    # symlink_name = load_config()["script"]["log_file_name"] + ".latest.log"
+    # log_file_latest_symlink = os.path.join(LOGS_PATH, symlink_name)
+    # if not args.console:
+    #     try:
+    #         os.symlink(log_file, log_file_latest_symlink)
+    #     except Exception as e:
+    #         logging.info("Issue creating symlink: %s", e)
+    #         logging.info("Forcing symlink creation.")
+    #         os.remove(log_file_latest_symlink)
+    #         os.symlink(log_file, log_file_latest_symlink)
 
     if args.console and args.debug:
         logging.basicConfig(

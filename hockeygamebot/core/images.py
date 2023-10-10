@@ -950,11 +950,11 @@ def stats_image(game: Game, game_end: bool, boxscore: dict):
     print(other_stats)
 
     # Manually Calculate Power Play Conversion Stats
-    preferred_power_play = preferred_stats["powerPlayConversion"]
+    preferred_power_play = preferred_stats.get("powerPlayConversion", "0/0")
     preferred_power_play_g = int(preferred_power_play.split("/")[0])
     preferred_power_play_opp = int(preferred_power_play.split("/")[1])
 
-    other_power_play = other_stats["powerPlayConversion"]
+    other_power_play = other_stats.get("powerPlayConversion", "0/0")
     other_power_play_g = int(other_power_play.split("/")[0])
     other_power_play_opp = int(other_power_play.split("/")[1])
 

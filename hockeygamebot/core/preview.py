@@ -107,31 +107,15 @@ def generate_game_preview(game: Game):
     else:
         # Generate Season Series Data
         season_series = schedule.season_series(game.game_id, pref_team, other_team)
+        no_games_this_season = season_series[3]
         season_series_string = season_series[0]
 
-        if season_series_string is None:
-            # If this is the first game of the season, we can set the 'last_season' flag to enable the
-            # season series function to check last year's season series between the two teams.
-            logging.info(
-                "First game of the season - re-run the season series function with the last_season flag."
-            )
-
-            season_series = schedule.season_series(game.game_id, pref_team, other_team, last_season=True)
-
-            season_series_string = season_series[0]
+        if no_games_this_season:
             season_series_string = (
                 f"This is the first meeting of the season between the "
                 f"{pref_team.short_name} & the {other_team.short_name}.\n\n"
                 f"LAST SEASON STATS\n{season_series_string}"
             )
-
-            # season_series_tweet_text = (
-            #     f"This is the first meeting of the season between the "
-            #     f"{pref_team.short_name} & the {other_team.short_name}. "
-            #     f"Last season's stats -"
-            #     f"\n\n{season_series_string}\n{points_leader_str}\n{toi_leader_str}"
-            #     f"\n\n{pref_hashtag} {other_hashtag} {game.game_hashtag}"
-            # )
 
         # Extract strings from returned list / tuple
         points_leader_str = season_series[1]
@@ -300,10 +284,10 @@ def game_preview_others(game: Game):
 
             if not officials_confirmed:
                 logging.info("Officials not yet confirmed - try again next loop.")
-                return None
-
-            refs = [x for x in officials if x["type"] == "Referee"]
-            linesmen = [x for x in officials if x["type"] == "Linesman"]
+            else:
+                logging.info("Officials confirmed - convert data into string & send tweet.")
+                refs = [x for x in officials if x["type"] == "Referee"]
+                linesmen = [x for x in officials if x["type"] == "Linesman"]
 
             ref_strings = []
             linesman_strings = []
@@ -321,19 +305,17 @@ def game_preview_others(game: Game):
                     detail = f"L: {name} (Games: {career_games})"
                     linesman_strings.append(detail)
 
-            all_officials = ref_strings + linesman_strings
-            all_officials_str = "\n".join(all_officials)
+                all_officials = ref_strings + linesman_strings
+                all_officials_str = "\n".join(all_officials)
 
-            officials_tweet_text = (
-                f"The officials (via @ScoutingTheRefs) for {game.game_hashtag} are -\n\n{all_officials_str}"
-            )
+                officials_tweet_text = f"The officials (via @ScoutingTheRefs) for {game.game_hashtag} are -\n\n{all_officials_str}"
 
-            social_dict = socialhandler.send(
-                msg=officials_tweet_text, reply=game.pregame_lasttweet, force_send=True
-            )
+                social_dict = socialhandler.send(
+                    msg=officials_tweet_text, reply=game.pregame_lasttweet, force_send=True
+                )
 
-            game.pregame_lasttweet = social_dict["twitter"]
-            game.preview_socials.officials_sent = True
+                game.pregame_lasttweet = social_dict["twitter"]
+                game.preview_socials.officials_sent = True
 
         except Exception as e:
             logging.error("Exception getting Scouting the Refs information - try again next loop.")

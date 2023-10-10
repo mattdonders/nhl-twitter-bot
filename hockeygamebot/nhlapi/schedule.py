@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from dateutil.parser import parse
 
 from hockeygamebot.helpers import arguments, process
-from hockeygamebot.nhlapi import api, roster
+from hockeygamebot.nhlapi import api, roster, gamecenter
 from hockeygamebot.definitions import VERSION
 
 
@@ -21,6 +21,11 @@ def generate_season(date):
 
     season = f"{year}{year+1}" if month > 8 else f"{year-1}{year}"
     return season
+
+
+def get_last_season(season):
+    last_season = season - 10001
+    return last_season
 
 
 def get_team_id(team_name):
@@ -307,7 +312,175 @@ def get_number_games(season: str, team_id: int, game_type_code: str = "R") -> di
     return 82
 
 
-def season_series(game_id, pref_team, other_team, last_season=False):
+def get_gameid_from_last_season(season, pref_team, other_team):
+    pref_team_tri_code = pref_team.tri_code_upper
+    endpoint = f"/club-schedule-season/{pref_team_tri_code}/{season}"
+    response = api.nhl_api(endpoint)
+    if response:
+        schedule = response.json()
+    else:
+        return False, None
+
+    games = schedule["games"]
+    other_team_tri_code = other_team.tri_code_upper
+    game_ids = [
+        x["id"]
+        for x in games
+        if x["homeTeam"]["abbrev"] == other_team_tri_code or x["awayTeam"]["abbrev"] == other_team_tri_code
+    ]
+
+    return game_ids[0] if game_ids else None
+
+
+def season_series(game_id, pref_team, other_team):
+    """Documentation: TBD"""
+
+    gc_landing = gamecenter.get_gamecenter_landing(game_id)
+    season_series_stats = gc_landing["matchup"]["seasonSeries"]
+    all_games_future = all(game["gameState"] == "FUT" for game in season_series_stats)
+
+    if all_games_future:
+        logging.info(
+            "First game of the season - re-run the season series function with the last_season flag."
+        )
+        current_season = gc_landing["season"]
+        last_season = current_season - 10001
+        last_season_game_id = get_gameid_from_last_season(last_season, pref_team, other_team)
+        gc_landing = gamecenter.get_gamecenter_landing(last_season_game_id)
+        season_series_stats = gc_landing["summary"]["seasonSeries"]
+
+    # Return Variable Instantiation
+    pref_toi = dict()
+    pref_goals = dict()
+    pref_assists = dict()
+    pref_points = dict()
+    pref_record = {"wins": 0, "losses": 0, "ot": 0}
+    roster_player = True
+
+    game_ids = [x["id"] for x in season_series_stats]
+    games_against = len(game_ids)
+
+    for game_id in game_ids:
+        gc_boxscore = gamecenter.get_gamecenter_boxscore(game_id)
+        home_team_tricode = gc_boxscore["homeTeam"]["abbrev"]
+        pref_homeaway = "home" if pref_team.tri_code == home_team_tricode else "away"
+        other_homeaway = "away" if pref_team.tri_code == home_team_tricode else "home"
+
+        # Calculate Win / Loss / OT
+        end_period = gc_boxscore["period"]
+        extra_time = True if end_period > 3 else False
+        boxscore = gc_boxscore["boxscore"]
+        linescore = boxscore["linescore"]
+        pref_score = linescore["totals"][pref_homeaway]
+        other_score = linescore["totals"][other_homeaway]
+
+        if pref_score > other_score:
+            pref_record["wins"] += 1
+        elif other_score > pref_score and extra_time:
+            pref_record["ot"] += 1
+        else:
+            pref_record["losses"] += 1
+
+        # Final Season Series String
+        season_series_str = f"Series: {pref_record['wins']}-{pref_record['losses']}-{pref_record['ot']}"
+
+        # Calculate Individual Player Stats
+        key_homeaway = "homeTeam" if pref_homeaway == "home" else "awayTeam"
+        pref_playerstats = boxscore["playerByGameStats"][key_homeaway]
+        pref_playerstats = pref_playerstats["forwards"] + pref_playerstats["defense"]
+        for player in pref_playerstats:
+            try:
+                player_id = player["playerId"]
+
+                player_toi_str = player["toi"]
+                player_toi_minutes = int(player_toi_str.split(":")[0])
+                player_toi_seconds = int(player_toi_str.split(":")[1])
+                player_toi = (player_toi_minutes * 60) + player_toi_seconds
+                pref_toi[player_id] = pref_toi.get(player_id, 0) + player_toi
+
+                player_goals = player["goals"]
+                player_assists = player["assists"]
+                player_points = player["points"]
+                pref_goals[player_id] = pref_goals.get(player_id, 0) + int(player_goals)
+                pref_assists[player_id] = pref_assists.get(player_id, 0) + int(player_assists)
+                pref_points[player_id] = pref_points.get(player_id, 0) + int(player_points)
+
+            except KeyError:
+                pass
+
+    # Caclulate Stats Leaders
+    # sorted_toi = sorted(pref_toi.values(), reverse=True)
+    sorted_toi = sorted(pref_toi.items(), key=lambda x: x[1], reverse=True)
+    leader_toi_playerid = sorted_toi[0][0]
+    leader_toi_value = sorted_toi[0][1]
+    player_short_name = roster.player_attr_by_id(pref_team.full_roster, leader_toi_playerid, "short_name")
+    leader_toi_avg = leader_toi_value / games_against
+    m, s = divmod(leader_toi_avg, 60)
+    toi_m = int(m)
+    toi_s = int(s)
+    toi_s = "0{}".format(toi_s) if toi_s < 10 else toi_s
+    toi_avg = "{}:{}".format(toi_m, toi_s)
+    toi_leader_str = f"TOI Leader: {player_short_name} with {toi_avg} / game."
+
+    sorted_points = sorted(pref_points.values(), reverse=True)
+    leader_points = sorted_points[0]
+
+    # Get TOI Leader
+    sorted_points = sorted(pref_points.items(), key=lambda x: x[1], reverse=True)
+    max_points = sorted_points[0][1]
+    points_leaders = [x for x in sorted_points if x[1] == max_points]
+    num_points_leaders = len(points_leaders)
+
+    if max_points == 0:
+        points_leader_str = "Points Leader: None (all players have 0 points)."
+
+    elif num_points_leaders == 1:
+        player_id = points_leaders[0][0]
+        player_short_name = roster.player_attr_by_id(pref_team.full_roster, player_id, "short_name")
+        player_points = pref_points[player_id]
+        player_goals = pref_goals[player_id]
+        player_assists = pref_assists[player_id]
+        points_leader_str = (
+            f"Points Leader: {player_short_name} with {player_points} points "
+            f"({player_goals}G {player_assists}A) "
+        )
+
+    elif num_points_leaders > 3:
+        point_leaders_with_attrs = list()
+        for leader in points_leaders:
+            player_id = leader[0]
+            player_short_name = roster.player_attr_by_id(pref_team.full_roster, player_id, "short_name")
+            player_points = pref_points[player_id]
+            player_goals = pref_goals[player_id]
+            player_assists = pref_assists[player_id]
+            point_leaders_with_attrs.append(player_short_name)
+
+        point_leaders_joined = ", ".join(point_leaders_with_attrs[0:3])
+        leftover_leaders = num_points_leaders - 3
+        points_leader_str = (
+            f"Points Leaders: {point_leaders_joined} & {leftover_leaders} others ({leader_points} each)."
+        )
+
+    else:
+        point_leaders_with_attrs = list()
+        for leader in points_leaders:
+            player_id = leader[0]
+            player_short_name = roster.player_attr_by_id(pref_team.full_roster, player_id, "short_name")
+            player_points = pref_points[player_id]
+            player_goals = pref_goals[player_id]
+            player_assists = pref_assists[player_id]
+            player_str = f"{player_short_name} ({player_goals}G {player_assists}A)"
+            point_leaders_with_attrs.append(player_str)
+
+        point_leaders_joined = (
+            f", ".join(point_leaders_with_attrs[:-1]) + f" & {point_leaders_with_attrs[-1]}"
+        )
+        points_leader_str = "Points Leaders: {} with {} each.".format(point_leaders_joined, leader_points)
+
+    return season_series_str, points_leader_str, toi_leader_str, all_games_future
+
+
+def season_series_v1(game_id, pref_team, other_team, last_season=False):
     """Generates season series, points leader & TOI leader.
 
     Args:
