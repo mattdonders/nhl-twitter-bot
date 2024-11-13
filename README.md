@@ -173,7 +173,6 @@ optional arguments:
   --console        log to console instead of file
   --debug          print debug log items
   --team TEAM      override team in configuration
-  --debugtweets    send tweets from debug account
   --debugsocial    use debug social accounts
   --localdata      use local data instead of API
   --overridelines  override lines if None are returned
